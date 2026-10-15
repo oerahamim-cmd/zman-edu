@@ -26,7 +26,7 @@ test('בלי כניסה: כל נתיבי המידע סגורים (401)', async (
 test('הנתיב הציבורי לא מחזיר משתמשים, קודי הצטרפות או מבטים', async () => {
   const r = await app.client().get('/api/public');
   assert.equal(r.status, 200);
-  assert.equal(r.json.schools.length, 3);
+  assert.equal(r.json.schools.length, 4);
   for (const n of [...NAOMI, ...OTHERS]) assert.ok(!r.text.includes(n), `שם ${n} דלף`);
   for (const s of Object.values(await app.joinCodes())) { assert.ok(!r.text.includes(s.educator)); assert.ok(!r.text.includes(s.lead)); }
 });

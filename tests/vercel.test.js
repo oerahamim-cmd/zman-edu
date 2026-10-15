@@ -48,7 +48,7 @@ test('נתיבי ה-API עובדים דרך הפונקציה, כולל בריא�
   assert.equal(health.status, 200);
   assert.deepEqual(await health.json(), { ok: true });
   const pub = await (await fetch(`${base}/api/public`, { headers: H() })).json();
-  assert.equal(pub.schools.length, 3);
+  assert.equal(pub.schools.length, 4);
   assert.equal(pub.setupNeeded, true);
   assert.equal((await fetch(`${base}/api/nope`, { headers: H() })).status, 404);
 });
@@ -84,7 +84,7 @@ test('שחזור הנתיב מפרמטר הנתיב אם הכתובת הגיעה
   // כאן req.query מוצב כמו ש-Vercel עושה לנתיב עם סימון [...path]
   const r = await fetch(`${base}/rewritten-by-platform?path=public`, { headers: H() });
   assert.equal(r.status, 200);
-  assert.equal((await r.json()).schools.length, 3);
+  assert.equal((await r.json()).schools.length, 4);
   const nested = await fetch(`${base}/rewritten-by-platform?path=auth&path=educator&path=login`, { method: 'POST', headers: H(), body: JSON.stringify({ school: 'rabin', name: 'מחנכת שלא קיימת', code: '1111' }) });
   assert.equal(nested.status, 401, 'נתיב מרובה מקטעים הגיע ל-login');
   // כמו ה-rewrite ב-vercel.json: /api/handler?path=auth/educator/login (הנתיב כמחרוזת אחת עם לוכסנים)

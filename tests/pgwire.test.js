@@ -44,7 +44,7 @@ const call = async (method, path, body, cookie = '') => {
 test('דרך pg: סכמה, נתוני דוגמה וקריאה ציבורית (כולל סוגי נתונים)', async () => {
   const r = await call('GET', '/api/public');
   assert.equal(r.status, 200);
-  assert.equal(r.json.schools.length, 3);
+  assert.equal(r.json.schools.length, 4);
   assert.equal(typeof r.json.tools[0].id, 'number', 'מזהים הם מספרים, לא מחרוזות');
   assert.equal(r.json.tools[0].desc.length > 0, true);
 });

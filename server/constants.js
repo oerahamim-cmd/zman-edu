@@ -11,6 +11,7 @@ const SCHOOLS = [
   { slug: 'kiryat-motzkin', name: 'תיכון אורט קריית מוצקין', order: 1 },
   { slug: 'naomi-shemer', name: 'תיכון אורט גן יבנה נעמי שמר', order: 2 },
   { slug: 'rabin', name: 'תיכון אורט גן יבנה יצחק רבין', order: 3 },
+  { slug: 'demo-school', name: 'בית ספר מדגים', order: 4 },
 ];
 
 module.exports = { ROUNDS, AXES, KINDS, FEELINGS, NONE_REASONS, FOLDERS, SCHOOLS };
