@@ -587,43 +587,71 @@ function viewCircles() {
   const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
   let sel = null;
   const R = [0.07, 0.21, 0.35, 0.48]; // גבולות הטבעות ביחידות של רוחב הלוח
+  const dist = (x, y) => Math.hypot(x - 0.5, y - 0.5);
   const ringOf = (d) => (d < R[0] ? null : d < R[1] ? 3 : d < R[2] ? 2 : d <= R[3] + 0.04 ? 1 : 0);
-  function place(members, ring) {
-    const rin = ring === 3 ? R[0] + 0.03 : ring === 2 ? R[1] : R[2];
-    const rout = ring === 3 ? R[1] : ring === 2 ? R[2] : R[3];
-    const n = members.length;
-    return members.map((s, i) => {
-      let a = (i * 2.399963 + ring) % (Math.PI * 2);
-      if (Math.abs(a - Math.PI * 1.5) < 0.32) a += 0.7; // לא מניחים תלמיד על תווית הטבעת בראש הלוח
-      const r = Math.sqrt(rin * rin + (rout * rout - rin * rin) * ((i + 0.5) / n)) * 0.97;
-      return { s, x: 0.5 + r * Math.cos(a), y: 0.5 + r * Math.sin(a) };
-    });
+  const clamp = (v) => Math.min(0.97, Math.max(0.03, v));
+  const LABEL_Y = [0.34, 0.195, 0.055]; // מיקום תוויות הטבעות בראש הלוח: לא מניחים שם תלמיד
+  // כל תלמיד/ה מקבלים מיקום משלהם (x, y) שנשמר. גרירה של אחד לא מזיזה אף אחד אחר.
+  function autoPlace(st, others) {
+    const rin = st.link === 3 ? R[0] + 0.045 : st.link === 2 ? R[1] + 0.025 : R[2] + 0.025;
+    const rout = st.link === 3 ? R[1] - 0.025 : st.link === 2 ? R[2] - 0.025 : R[3] - 0.01;
+    let best = null, bestScore = -1;
+    for (let i = 0; i < 80; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(rin * rin + (rout * rout - rin * rin) * Math.random());
+      const x = 0.5 + r * Math.cos(a), y = 0.5 + r * Math.sin(a);
+      if (Math.abs(x - 0.5) < 0.16 && LABEL_Y.some((ly) => Math.abs(y - ly) < 0.045)) continue;
+      const score = Math.min(9, ...others.map((o) => Math.hypot(o.x - x, o.y - y)));
+      if (score > bestScore) { best = { x, y }; bestScore = score; }
+    }
+    st.x = best ? best.x : 0.5 + rin; st.y = best ? best.y : 0.5;
   }
-  function chipEl(s, pos) {
-    const b = h('button', { class: 'pchip' + (s.urgent ? ' urgent' : '') + (sel === s.id ? ' sel' : ''), title: `${s.name || '(ללא שם)'}${s.urgent ? ' · דחוף' + (s.word ? ': ' + s.word : '') : ''}`, 'aria-label': s.name || 'תלמיד/ה' }, h('span', null, chipText(s.name)));
+  // מיקום שמור שלא מתאים לקשר (אחרי עריכה בטבלה, טעינת נתונים ישנים וכד') מקבל מיקום חדש, ושאר התלמידים נשארים במקום
+  function ensurePositions() {
+    let changed = false;
+    const placed = [], pending = [];
+    for (const st of map.students) {
+      if (!st.link) { if (st.x !== undefined) { delete st.x; delete st.y; changed = true; } continue; }
+      if (typeof st.x === 'number' && typeof st.y === 'number' && ringOf(dist(st.x, st.y)) === st.link) placed.push(st); else pending.push(st);
+    }
+    for (const st of pending) { autoPlace(st, placed); placed.push(st); changed = true; }
+    if (changed) saveMap();
+  }
+  function chipEl(st, pos) {
+    const b = h('button', { class: 'pchip' + (st.urgent ? ' urgent' : '') + (sel === st.id ? ' sel' : ''), title: `${st.name || '(ללא שם)'}${st.urgent ? ' · דחוף' + (st.word ? ': ' + st.word : '') : ''}`, 'aria-label': st.name || 'תלמיד/ה' }, h('span', null, (st.name || '').trim() || '?'));
     if (pos) { b.style.left = pos.x * 100 + '%'; b.style.top = pos.y * 100 + '%'; }
-    let drag = null;
-    b.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, moved: false }; b.setPointerCapture(e.pointerId); });
-    b.addEventListener('pointermove', (e) => {
-      if (!drag) return;
-      if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) > 6) drag.moved = true;
-      if (!drag.moved) return;
-      const bd = root.querySelector('.board').getBoundingClientRect();
-      b.classList.add('drag'); b.style.position = 'absolute'; b.style.transform = 'translate(-50%,-50%)';
-      b.style.left = ((e.clientX - bd.left) / bd.width) * 100 + '%'; b.style.top = ((e.clientY - bd.top) / bd.height) * 100 + '%';
-      if (b.parentNode !== root.querySelector('.board')) root.querySelector('.board').append(b);
+    // גרירה: מעתיקים את הצ'יפ לצל שעוקב אחרי האצבע או העכבר, ורק בשחרור שומרים מיקום. הלוח לא נבנה מחדש באמצע גרירה.
+    b.addEventListener('pointerdown', (e) => {
+      if (e.button) return;
+      const start = { x: e.clientX, y: e.clientY };
+      let ghost = null;
+      const move = (ev) => {
+        if (!ghost) {
+          if (Math.abs(ev.clientX - start.x) + Math.abs(ev.clientY - start.y) <= 6) return;
+          ghost = b.cloneNode(true);
+          ghost.classList.add('ghost'); ghost.classList.remove('sel');
+          ghost.style.left = ''; ghost.style.top = '';
+          document.body.append(ghost); b.classList.add('dragging');
+        }
+        ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px';
+        ev.preventDefault();
+      };
+      const end = (ev) => {
+        document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', end); document.removeEventListener('pointercancel', end);
+        if (!ghost) { if (ev.type === 'pointerup') { sel = sel === st.id ? null : st.id; paint(); } return; }
+        ghost.remove(); b.classList.remove('dragging');
+        if (ev.type === 'pointercancel') return;
+        const bd = root.querySelector('.board').getBoundingClientRect();
+        const x = (ev.clientX - bd.left) / bd.width, y = (ev.clientY - bd.top) / bd.height;
+        const r = ringOf(dist(x, y));
+        if (r === 0) { st.link = null; delete st.x; delete st.y; } // מחוץ ללוח: חוזרים לרשימה "עדיין לא הוצבו"
+        else if (r) { st.link = r; st.x = clamp(x); st.y = clamp(y); }
+        saveMap(); paint();
+      };
+      document.addEventListener('pointermove', move, { passive: false });
+      document.addEventListener('pointerup', end);
+      document.addEventListener('pointercancel', end);
     });
-    b.addEventListener('pointerup', (e) => {
-      if (!drag) return;
-      const wasDrag = drag.moved; drag = null;
-      if (!wasDrag) { sel = sel === s.id ? null : s.id; paint(); return; }
-      const bd = root.querySelector('.board').getBoundingClientRect();
-      const dx = (e.clientX - bd.left) / bd.width - 0.5, dy = (e.clientY - bd.top) / bd.height - 0.5;
-      const r = ringOf(Math.hypot(dx, dy));
-      if (r === 0) s.link = null; else if (r) s.link = r;
-      saveMap(); paint();
-    });
-    b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sel = sel === s.id ? null : s.id; paint(); } });
+    b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sel = sel === st.id ? null : st.id; paint(); } });
     return b;
   }
   function paint() {
@@ -633,11 +661,12 @@ function viewCircles() {
     board.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring" cx="50" cy="50" r="48"/><circle class="ring mid" cx="50" cy="50" r="35"/><circle class="ring" cx="50" cy="50" r="21"/><circle class="core" cx="50" cy="50" r="7"/></svg>`;
     board.append(h('span', { class: 'core-t' }, 'אני'));
     [[3, 0.13], [2, 0.275], [1, 0.415]].forEach(([ring, off]) => board.append(h('span', { class: 'ringlabel', style: `top:${(0.5 - off - 0.03) * 100}%` }, `${ring} · ${lab(LINKS, ring)}`)));
-    [1, 2, 3].forEach((ring) => place(map.students.filter((s) => s.link === ring), ring).forEach((p) => board.append(chipEl(p.s, p))));
+    ensurePositions();
+    map.students.filter((s) => s.link).forEach((s) => board.append(chipEl(s, { x: s.x, y: s.y })));
     const unplaced = map.students.filter((s) => !s.link);
     const tray = h('div', { class: 'tray' }, unplaced.length ? unplaced.map((s) => chipEl(s, null)) : h('span', { class: 'micro muted' }, 'כל התלמידים הוצבו במעגלים'));
     const legend = h('div', { class: 'row small muted', 'aria-label': 'מקרא המעגלים' }, LINKS.slice().reverse().map((l) => h('span', null, `טבעת ${l.v}: ${l.t}`)));
-    const panel = sel ? selPanel(map.students.find((s) => s.id === sel)) : h('p', { class: 'muted small' }, 'גוררים תלמיד/ה למעגל שמתאים, או לוחצים עליו כדי לערוך. הנקודה הסגולה מסמנת דחוף.');
+    const panel = sel ? selPanel(map.students.find((s) => s.id === sel)) : h('p', { class: 'muted small' }, 'גוררים תלמיד/ה לכל מקום במעגל שמתאים, או לוחצים עליו כדי לערוך. הנקודה הסגולה מסמנת דחוף.');
     add(root, [mapHead('מעגלי קשר', 'מפה ויזואלית לכיתה: כל תלמיד/ה במעגל שמתאים לקשר שלכם איתם.'), privacyMap(),
       h('section', { class: 'frame' }, classFields(paint), board, legend, h('div', { class: 'stack' }, h('h4', null, 'עדיין לא הוצבו'), tray), panel,
         h('div', { class: 'row' },
@@ -650,6 +679,7 @@ function viewCircles() {
   function selPanel(s) {
     const body = h('div', { class: 'stack' });
     body.append(h('div', { class: 'row between' }, h('h4', null, s.name || '(ללא שם)'), h('button', { class: 'btn ghost sm', onclick: () => { sel = null; paint(); } }, 'סגירה')));
+    body.append(field('שם', h('input', { class: 'input', value: s.name, 'aria-label': 'שם התלמיד/ה', onchange: (e) => { s.name = e.target.value.trim(); saveMap(); paint(); } })));
     body.append(h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'קשר'), chipGroup({ options: LINKS, value: s.link, label: 'קשר', onChange: (v) => { s.link = v; saveMap(); paint(); } })));
     body.append(h('div', { class: 'row' }, h('button', { class: 'btn soft sm', 'aria-pressed': String(s.urgent), onclick: () => { s.urgent = !s.urgent; if (!s.urgent) s.word = ''; saveMap(); paint(); } }, s.urgent ? 'להסיר סימון דחוף' : 'סימון כדחוף'),
       s.urgent ? h('select', { class: 'select', style: 'max-width:200px', 'aria-label': 'מילה אחת לדחוף', onchange: (e) => { s.word = e.target.value; saveMap(); paint(); } }, h('option', { value: '' }, 'מילה אחת'), URGENT_WORDS.map((w) => h('option', { value: w, selected: s.word === w }, w))) : null));

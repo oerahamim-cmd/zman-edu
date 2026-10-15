@@ -205,14 +205,15 @@ a { color: var(--lead); }
 .board .core { fill: var(--lead); }
 .board .core-t { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #fff; font-weight: 900; font-size: clamp(13px, 2.6vw, 18px); pointer-events: none; }
 .ringlabel { position: absolute; left: 50%; transform: translateX(-50%); background: var(--lead); color: #fff; border-radius: 999px; padding: 3px 12px; font-size: clamp(10px, 1.9vw, 13px); font-weight: 700; white-space: nowrap; pointer-events: none; }
-.pchip { position: absolute; width: clamp(34px, 7.4%, 48px); aspect-ratio: 1; margin: 0; transform: translate(-50%, -50%); border-radius: 50%; background: var(--lead); color: #fff; border: 0; padding: 0;
-  font: 700 12px/1 var(--font); display: grid; place-items: center; touch-action: none; cursor: grab; user-select: none; overflow: visible; }
-.pchip span { max-width: 92%; overflow: hidden; text-overflow: clip; white-space: nowrap; }
+.pchip { position: absolute; height: clamp(30px, 6vw, 38px); min-width: clamp(30px, 6vw, 38px); max-width: min(48%, 200px); margin: 0; padding: 0 12px; transform: translate(-50%, -50%); border-radius: 999px; background: var(--lead); color: #fff; border: 0;
+  font: 700 clamp(11px, 1.9vw, 14px)/1 var(--font); display: inline-flex; align-items: center; justify-content: center; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; overflow: visible; }
+.pchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pchip.urgent::after { content: ""; position: absolute; top: -3px; right: -3px; width: 14px; height: 14px; border-radius: 50%; background: var(--violet); border: 2px solid #fff; }
 .pchip.sel { outline: 4px solid var(--sky); outline-offset: 2px; }
-.pchip.drag { cursor: grabbing; z-index: 5; }
+.pchip.dragging { opacity: .25; }
+.pchip.ghost { position: fixed; z-index: 1000; pointer-events: none; cursor: grabbing; }
 .tray { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-height: 58px; }
-.tray .pchip { position: relative; transform: none; left: auto; top: auto; width: 46px; }
+.tray .pchip { position: relative; transform: none; left: auto; top: auto; }
 
 /* ---------- סקירה (מנהלת) ---------- */
 .cols { display: flex; align-items: flex-end; gap: 10px; height: 190px; padding-top: 24px; overflow-x: auto; }
