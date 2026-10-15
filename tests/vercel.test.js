@@ -1,5 +1,5 @@
 'use strict';
-// מדמה את הכניסה של Vercel: הפונקציה api/[...path].js מקבלת (req, res) מפלטפורמה שמפענחת את הגוף מראש
+// מדמה את הכניסה של Vercel: הפונקציה api/handler.js מקבלת (req, res) מפלטפורמה שמפענחת את הגוף מראש
 // ומציבה את כתובת הלקוח בכותרות. כאן עוטפים שרת רגיל באותה פונקציה בדיוק.
 process.env.VERCEL = '1';
 process.env.PG_MEMORY = '1';
@@ -12,7 +12,7 @@ process.env.NODE_ENV = 'production';
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const handler = require('../api/[...path].js');
+const handler = require('../api/handler.js');
 const db = require('../server/db');
 const auth = require('../server/auth');
 
@@ -87,4 +87,10 @@ test('שחזור הנתיב מפרמטר הנתיב אם הכתובת הגיעה
   assert.equal((await r.json()).schools.length, 3);
   const nested = await fetch(`${base}/rewritten-by-platform?path=auth&path=educator&path=login`, { method: 'POST', headers: H(), body: JSON.stringify({ school: 'rabin', name: 'מחנכת שלא קיימת', code: '1111' }) });
   assert.equal(nested.status, 401, 'נתיב מרובה מקטעים הגיע ל-login');
+  // כמו ה-rewrite ב-vercel.json: /api/handler?path=auth/educator/login (הנתיב כמחרוזת אחת עם לוכסנים)
+  const joined = await fetch(`${base}/api/handler?path=auth/educator/login`, { method: 'POST', headers: H(), body: JSON.stringify({ school: 'rabin', name: 'מחנכת שלא קיימת', code: '1111' }) });
+  assert.equal(joined.status, 401, 'נתיב עם לוכסנים בפרמטר אחד הגיע ל-login');
+  // הנתיב המקורי נשמר בכתובת: לא משנים אותה
+  const kept = await fetch(`${base}/api/auth/educator/login`, { method: 'POST', headers: H(), body: JSON.stringify({ school: 'rabin', name: 'מחנכת שלא קיימת', code: '1111' }) });
+  assert.equal(kept.status, 401);
 });

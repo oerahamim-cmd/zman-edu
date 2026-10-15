@@ -105,6 +105,14 @@ a { color: var(--lead); }
 .textarea { min-height: 96px; resize: vertical; }
 .input:focus, .select:focus, .textarea:focus { outline: 3px solid var(--lead); outline-offset: 0; }
 .input.pin { letter-spacing: 0.5em; text-align: center; font-size: 26px; font-weight: 700; max-width: 220px; }
+.reveal-wrap { position: relative; }
+.reveal-wrap .input { padding-inline-end: 84px; }
+.reveal { position: absolute; inset-block: 6px; inset-inline-end: 6px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: var(--lead); font: 700 15px/1 var(--font); cursor: pointer; }
+.reveal:hover { background: rgba(0, 72, 255, 0.08); }
+.reveal:focus-visible { outline: 3px solid var(--lead); outline-offset: 0; }
+.pin-wrap { display: flex; align-items: center; gap: 10px; }
+.pin-wrap .input { padding-inline-end: 16px; }
+.pin-wrap .reveal { position: static; padding: 12px 14px; flex: none; }
 .err { color: var(--violet); font-weight: 500; }
 .chips { display: flex; flex-wrap: wrap; gap: 10px; }
 .chip { position: relative; }

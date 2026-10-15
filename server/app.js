@@ -1,5 +1,5 @@
 'use strict';
-// שרת מקומי (הרצה במחשב, הדגמה ובדיקות). בענן (Vercel) משתמשים ב-api/[...path].js, ולא בקובץ הזה.
+// שרת מקומי (הרצה במחשב, הדגמה ובדיקות). בענן (Vercel) משתמשים ב-api/handler.js, ולא בקובץ הזה.
 const http = require('node:http');
 const config = require('./config');
 const { requestListener } = require('./http');

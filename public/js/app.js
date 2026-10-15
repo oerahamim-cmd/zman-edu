@@ -113,10 +113,23 @@ function moodGroup({ value, onChange }) {
   });
   return box;
 }
+// שדה סיסמה או קוד: כפתור "הצגה" מחליף בין נקודות לטקסט גלוי
+function withReveal(input) {
+  const btn = h('button', { class: 'reveal', type: 'button', 'aria-pressed': 'false', 'aria-label': 'הצגת הסיסמה' }, 'הצגה');
+  btn.addEventListener('click', () => {
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.textContent = show ? 'הסתרה' : 'הצגה';
+    btn.setAttribute('aria-pressed', String(show));
+    btn.setAttribute('aria-label', show ? 'הסתרת הסיסמה' : 'הצגת הסיסמה');
+  });
+  return h('div', { class: input.classList.contains('pin') ? 'reveal-wrap pin-wrap' : 'reveal-wrap' }, input, btn);
+}
 function field(label, input, hint) {
   const id = nid('f');
   if (input.id === '' || !input.id) input.id = id;
-  return h('div', { class: 'field' }, h('label', { for: input.id }, label), input, hint ? h('div', { class: 'hint' }, hint) : null);
+  const control = input.type === 'password' ? withReveal(input) : input;
+  return h('div', { class: 'field' }, h('label', { for: input.id }, label), control, hint ? h('div', { class: 'hint' }, hint) : null);
 }
 
 

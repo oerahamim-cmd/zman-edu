@@ -12,6 +12,12 @@
       "maxDuration": 15
     }
   },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/handler?path=:path*"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
