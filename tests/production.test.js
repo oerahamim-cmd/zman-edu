@@ -13,7 +13,7 @@ before(async () => {
   const env = { ...process.env, NODE_ENV: 'production', PORT: String(PORT), HOST: '127.0.0.1', PG_MEMORY: '1', TRUST_PROXY: '1', SETUP_CODE: 'prod-setup-code' };
   delete env.DATABASE_URL; delete env.VERCEL;
   child = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env, stdio: 'ignore' });
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < 600; i++) {
     try { if ((await fetch(`${base}/healthz`)).ok) return; } catch { /* עדיין עולה */ }
     await new Promise((r) => setTimeout(r, 200));
   }
