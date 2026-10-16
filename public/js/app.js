@@ -344,6 +344,8 @@ function resolve(p) {
   if (p === '/mapping') return gate(p, viewMappingHome);
   if (p === '/mapping/map') return gate(p, viewMap);
   if (p === '/mapping/circles') return gate(p, viewCircles);
+  if (p === '/mapping/class') return gate(p, viewClass);
+  if (p === '/mapping/helper') return gate(p, viewHelper);
   if (p.startsWith('/tools/mapping')) return redirect(p.replace('/tools/mapping', '/mapping'));
   if (p === '/enter') return viewEnter('new', '/me');
   if (p === '/enter/manager') return viewEnter('manager', '/admin');
@@ -438,24 +440,235 @@ function toolCard(t) {
     t.url ? h('div', null, h('a', { class: 'btn sm', href: t.url, target: '_blank', rel: 'noopener' }, 'פתיחה')) : null);
 }
 
-function viewMappingHome() {
-  const item = (title, desc, to, pdf, imgs) => h('article', { class: 'frame' },
-    h('h3', null, title), h('p', null, desc),
-    h('div', { class: 'row' }, link(to, 'מילוי דיגיטלי'), h('a', { class: 'btn soft', href: pdf, target: '_blank', rel: 'noopener' }, 'הקובץ המקורי (PDF)')),
-    h('details', null, h('summary', { style: 'cursor:pointer;font-weight:500;color:var(--lead)' }, 'תצוגה מקדימה של הקובץ המקורי'), h('div', { class: 'previews', style: 'margin-top:14px' }, imgs.map((s) => h('img', { class: 'preview-img', src: s, alt: `תצוגה מקדימה של ${title}`, loading: 'lazy' })))));
-  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
-    h('section', { class: 'frame' }, h('div', { class: 'row' }, ic('compass', { size: 44, tone: 'blue' }), h('h2', null, 'מיפוי הכיתה')),
-      h('p', { class: 'muted', style: 'max-width:60ch' }, 'שני כלים שעוזרים להחליט עם מי לשוחח ומתי: מפת שיחות (טבלה) ומעגלי קשר (תמונה). אותם נתונים, בשתי תצוגות.')),
-    privacyMap(),
-    item('מפת שיחות', 'דף מיפוי לכיתה: לכל תלמיד/ה חמישה שדות (קשר, דחוף, ציר שיחה, סבבי שיחות ושיחה אחרונה), וקבוצה שמחושבת לבד ומסדרת את סדר השיחות.', '/mapping/map', 'assets/pdf/map-sichot.pdf', ['assets/preview/map-1.png', 'assets/preview/map-2.png']),
-    item('מעגלי קשר', 'אותה מפה בתמונה: כל תלמיד/ה במעגל שמתאים לקשר, ונקודה סגולה ליד מי שיש לו או לה משהו שלא יכול לחכות.', '/mapping/circles', 'assets/pdf/maagalei-kesher.pdf', ['assets/preview/circles-1.png']));
+/* =====================================================================
+   מיפוי הכיתה: ארבעה שלבים, וכולם על אותה רשימה
+   1. הכיתה שלי (הדבקה או העלאה של רשימת שמות)  2. עוזר לקשר (לא חובה)  3. מעגלי קשר  4. מפת שיחות
+   ===================================================================== */
+const MAP_TABS = [['/mapping/class', '1 · הכיתה שלי'], ['/mapping/helper', '2 · עוזר לקשר (לא חובה)'], ['/mapping/circles', '3 · מעגלי קשר'], ['/mapping/map', '4 · מפת שיחות']];
+function mapNav(active) {
+  return h('nav', { class: 'nav mapnav', 'aria-label': 'שלבי המיפוי' }, [['/mapping', 'סקירה'], ...MAP_TABS].map(([to, t]) => h('a', { href: '#' + to, 'aria-current': to === active ? 'page' : null, onclick: (e) => { e.preventDefault(); go(to); } }, t)));
 }
-function privacyMap() {
+function mapHead(title, sub, active) {
+  return h('section', { class: 'frame' }, h('h2', null, title), h('p', { class: 'muted', style: 'max-width:62ch' }, sub), mapNav(active));
+}
+function privacyNote() {
   const e = me();
-  return h('section', { class: 'frame lead' }, h('div', { class: 'row' }, ic('lock', { size: 34, tone: 'white' }), h('h3', null, e ? `המיפוי של ${e.name}` : 'המיפוי נשאר במכשיר')),
-    h('p', null, 'המיפוי נשמר רק אצל המחנכת: במכשיר הזה, על שמה, והוא נפתח לה בכל כניסה (באותו קוד של השיחות האישיות). הוא לא נשלח לשרת, ומנהלת התכנית לא רואה אותו. כדי לעבוד ממכשיר אחר, מעתיקים את הנתונים (בתחתית הדף) וטוענים אותם שם. כדאי לרשום ראשי תיבות במקום שם מלא, ולמחוק את הנתונים אם המכשיר משותף.'));
+  return h('details', { class: 'privnote' }, h('summary', null, ic('lock', { size: 18 }), h('span', null, 'הרשימה והמיפוי נשארים רק במכשיר הזה. הם לא נשלחים לשרת, ואף אחד אחר לא רואה אותם.'), h('span', { class: 'small', style: 'margin-inline-start:auto;color:var(--lead);font-weight:500' }, 'מה זה אומר?')),
+    h('p', { class: 'small', style: 'margin-top:10px;max-width:70ch' }, `${e ? `המיפוי של ${e.name} ` : 'המיפוי '}נשמר על שמה במכשיר הזה, ונפתח בכל כניסה (באותו קוד של השיחות האישיות). מנהלת התכנית והמובילות לא רואות אותו. כדי לעבוד ממכשיר אחר, מעתיקים את הנתונים (בתחתית הדף "הכיתה שלי") וטוענים אותם שם. כדאי לרשום ראשי תיבות במקום שם מלא, ולמחוק את הנתונים אם המכשיר משותף.`));
+}
+function emptyRoster() {
+  return h('div', { class: 'well stack' }, h('b', null, 'עדיין אין תלמידים ברשימה'), h('p', { class: 'muted' }, 'מתחילים בשלב 1: מדביקים או מעלים את רשימת השמות של הכיתה, ואז היא מופיעה כאן וגם במעגלי הקשר.'), h('div', null, link('/mapping/class', 'להוספת רשימת הכיתה')));
 }
 
+/* ---------- רשימת שמות: פענוח והוספה ---------- */
+// שורה לכל תלמיד/ה. מבינים מספור בתחילת שורה, עמודות מאקסל (טאב) ורשימה בשורה אחת מופרדת בפסיקים
+function parseNames(text) {
+  let lines = String(text || '').replace(/^﻿/, '').split(/\r?\n/);
+  if (lines.filter((l) => l.trim()).length === 1 && /[,;]/.test(lines[0])) lines = lines[0].split(/[,;]/);
+  const out = [], seen = new Set();
+  for (let l of lines) {
+    l = l.split('\t').map((c) => c.trim()).filter(Boolean).join(' ');
+    l = l.replace(/^[0-9]+[.)\-:]\s*/, '').replace(/^["']+|["']+$/g, '').replace(/\s+/g, ' ').trim();
+    if (!l) continue;
+    if (l.length > 40) l = l.slice(0, 40);
+    const k = l.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k); out.push(l);
+  }
+  return out;
+}
+const nameKey = (s) => (s.name || '').trim().toLowerCase();
+const MAX_STUDENTS = 80;
+// replace=false: מוסיפים שמות חדשים. replace=true: הרשימה היא מה שהודבק; שמות קיימים נשארים עם הקשר שלהם, שמות שלא הודבקו יוצאים
+function applyNames(names, replace) {
+  let added = 0, dup = 0, removed = 0;
+  if (replace) {
+    const want = new Set(names.map((n) => n.toLowerCase()));
+    const keep = map.students.filter((s) => want.has(nameKey(s)));
+    removed = map.students.length - keep.length;
+    const byKey = new Map(keep.map((s) => [nameKey(s), s]));
+    map.students = names.map((n) => byKey.get(n.toLowerCase()) || (added++, newStudent(n))).slice(0, MAX_STUDENTS);
+    dup = names.length - added;
+  } else {
+    const have = new Set(map.students.map(nameKey));
+    for (const n of names) {
+      if (have.has(n.toLowerCase())) { dup++; continue; }
+      if (map.students.length >= MAX_STUDENTS) break;
+      have.add(n.toLowerCase()); map.students.push(newStudent(n)); added++;
+    }
+  }
+  saveMap();
+  return { added, dup, removed };
+}
+
+function viewMappingHome() {
+  ensureMap();
+  const n = map.students.length, placed = map.students.filter((s) => s.link).length;
+  const step = (num, title, desc, to, btn, status, optional) => h('article', { class: 'frame stepcard' },
+    h('div', { class: 'row' }, h('span', { class: 'group-badge' }, num), h('h3', null, title), optional ? h('span', { class: 'tag' }, 'לא חובה') : null),
+    h('p', null, desc), status ? h('p', { class: 'small muted' }, status) : null, h('div', null, link(to, btn)));
+  const orig = (title, desc, pdf, imgs) => h('div', { class: 'well stack' }, h('b', null, title), h('p', { class: 'small' }, desc),
+    h('div', { class: 'row' }, h('a', { class: 'btn soft sm', href: pdf, target: '_blank', rel: 'noopener' }, 'הקובץ המקורי (PDF)')),
+    h('details', null, h('summary', { style: 'cursor:pointer;font-weight:500;color:var(--lead)' }, 'תצוגה מקדימה'), h('div', { class: 'previews', style: 'margin-top:14px' }, imgs.map((s) => h('img', { class: 'preview-img', src: s, alt: `תצוגה מקדימה של ${title}`, loading: 'lazy' })))));
+  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
+    mapHead('מיפוי הכיתה', 'עוזר להחליט עם מי לשוחח ומתי: כל תלמיד/ה במעגל שמתאים לרמת הקשר איתם, ומהמיפוי יוצא סדר שיחות מוצע. עובדים בארבעה שלבים, על אותה רשימה.', '/mapping'),
+    privacyNote(),
+    h('div', { class: 'grid' },
+      step('1', 'הכיתה שלי', 'מדביקים או מעלים את רשימת השמות של הכיתה, פעם אחת.', '/mapping/class', n ? 'לרשימה שלי' : 'להוספת הרשימה', n ? `${n} תלמידים ברשימה` : 'עוד אין רשימה'),
+      step('2', 'עוזר לקשר', 'לא בטוחים מה רמת הקשר עם תלמיד/ה? עד שלוש שאלות קצרות, והצעה איפה למקם אותם.', '/mapping/helper', 'להתחיל שיחה עם העוזר', '', true),
+      step('3', 'מעגלי קשר', 'גוררים כל תלמיד/ה למעגל שמתאים: תמונה אחת של כל הכיתה.', '/mapping/circles', 'למעגלי קשר', n ? `${placed} מתוך ${n} כבר ממוקמים` : ''),
+      step('4', 'מפת שיחות', 'אותם נתונים בטבלה: דחוף, ציר שיחה, סבבים ושיחה אחרונה, וסדר מוצע לשיחות.', '/mapping/map', 'למפת שיחות', '')),
+    h('details', { class: 'frame' }, h('summary', { style: 'font-weight:700;font-size:19px;cursor:pointer' }, 'הקבצים המקוריים של המפה והמעגלים'),
+      h('div', { class: 'grid', style: 'margin-top:14px' },
+        orig('מפת שיחות', 'דף מיפוי לכיתה: חמישה שדות לכל תלמיד/ה, וקבוצה שמסדרת את סדר השיחות.', 'assets/pdf/map-sichot.pdf', ['assets/preview/map-1.png', 'assets/preview/map-2.png']),
+        orig('מעגלי קשר', 'אותה מפה בתמונה: כל תלמיד/ה במעגל שמתאים לקשר.', 'assets/pdf/maagalei-kesher.pdf', ['assets/preview/circles-1.png']))));
+}
+
+/* ---------- 1. הכיתה שלי ---------- */
+function viewClass() {
+  ensureMap();
+  const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
+  function paint() {
+    const y0 = window.scrollY;
+    clear(root);
+    const ta = h('textarea', { class: 'textarea', style: 'min-height:170px', placeholder: 'שורה לכל תלמיד/ה, למשל:\nא.כ\nב.ל\nג.מ\n\nאפשר גם להדביק עמודה מאקסל או מגוגל שיטס.', 'aria-label': 'רשימת שמות להדבקה' });
+    const preview = h('p', { class: 'small', 'aria-live': 'polite', style: 'min-height:1.4em' });
+    const refresh = () => {
+      const names = parseNames(ta.value), have = new Set(map.students.map(nameKey));
+      const dup = names.filter((x) => have.has(x.toLowerCase())).length;
+      preview.textContent = names.length ? `נמצאו ${names.length} שמות${dup ? `, ${dup} מהם כבר ברשימה` : ''}.` : '';
+    };
+    ta.addEventListener('input', refresh);
+    const loadFile = (f) => {
+      if (!f) return;
+      if (f.size > 300000) return toast('הקובץ גדול מדי. אפשר להדביק את העמודה עם השמות.');
+      const read = (enc) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.readAsText(f, enc); });
+      read('utf-8').then(async (t) => {
+        if (t.includes('�')) t = await read('windows-1255'); // קובץ עברית ישן מאקסל
+        if (/\.csv$/i.test(f.name)) t = t.replace(/[,;]/g, '\t');
+        ta.value = (ta.value.trim() ? ta.value.trimEnd() + '\n' : '') + t;
+        refresh(); toast('הקובץ נטען. בודקים את הרשימה ולוחצים "הוספה לרשימה".');
+      });
+    };
+    const fileInput = h('input', { type: 'file', accept: '.txt,.csv,text/plain,text/csv', hidden: true, 'aria-label': 'בחירת קובץ', onchange: (e) => { loadFile(e.target.files[0]); e.target.value = ''; } });
+    const confirmHost = h('div', { class: 'stack' });
+    const done = (r, replace) => { ta.value = ''; paint(); toast(replace ? `הרשימה עודכנה: ${r.added} חדשים${r.removed ? `, ${r.removed} הוסרו` : ''}.` : `נוספו ${r.added} תלמידים${r.dup ? `, ${r.dup} כבר היו ברשימה` : ''}.`); };
+    const addBtn = h('button', { class: 'btn', onclick: () => { const names = parseNames(ta.value); if (!names.length) return toast('עוד אין שמות להוספה. מדביקים או מעלים רשימה.'); done(applyNames(names, false), false); } }, 'הוספה לרשימה');
+    const replaceBtn = h('button', { class: 'btn soft', onclick: () => {
+      const names = parseNames(ta.value); if (!names.length) return toast('עוד אין שמות להוספה. מדביקים או מעלים רשימה.');
+      if (!map.students.length) return done(applyNames(names, false), false);
+      confirmInline(confirmHost, 'לעדכן את הרשימה לפי מה שהדבקתם? שמות שלא מופיעים בהדבקה יוסרו (יחד עם הקשר שסומן להם). שמות שכבר ברשימה נשארים עם הקשר שלהם.', 'עדכון הרשימה', () => done(applyNames(names, true), true));
+    } }, 'עדכון הרשימה לפי ההדבקה');
+    const addOne = h('input', { class: 'input', placeholder: 'שם או ראשי תיבות, ואז Enter', 'aria-label': 'הוספת תלמיד/ה אחד/ת', onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) { applyNames(parseNames(e.target.value), false); paint(); setTimeout(() => root.querySelector('[aria-label="הוספת תלמיד/ה אחד/ת"]')?.focus(), 0); } } });
+    const listHost = h('div', { class: 'stack', style: 'gap:8px' });
+    map.students.forEach((s, i) => listHost.append(h('div', { class: 'rosterrow' },
+      h('span', { class: 'small muted' }, String(i + 1)),
+      h('input', { class: 'input', value: s.name, 'aria-label': `שם תלמיד/ה ${i + 1}`, oninput: (e) => { s.name = e.target.value; saveMap(); } }),
+      s.link ? h('span', { class: 'tag lead' }, `קשר ${s.link}`) : h('span', { class: 'tag' }, 'טרם מוקם'),
+      h('button', { class: 'xbtn', 'aria-label': `הסרת ${s.name || 'תלמיד/ה'}`, onclick: () => { map.students = map.students.filter((x) => x.id !== s.id); saveMap(); paint(); } }, '×'))));
+    const sample = () => { applyNames(['א.כ', 'ב.ל', 'ג.מ', 'ד.ש', 'ה.ר', 'ו.ט', 'ז.ח', 'ח.נ'], false); paint(); toast('נוספו ראשי תיבות בדויים לדוגמה'); };
+    const clearHost = h('div', { class: 'stack' });
+    add(root, [
+      mapHead('הכיתה שלי', 'שלב ראשון: רשימת השמות של הכיתה. מכאן היא עוברת אוטומטית למעגלי הקשר ולמפת השיחות, ואין צורך להקליד שוב.', '/mapping/class'),
+      privacyNote(),
+      h('section', { class: 'frame' }, h('h3', null, 'פרטי הכיתה'), classFields(paint)),
+      h('section', { class: 'frame' }, h('h3', null, 'הוספת רשימת שמות'),
+        h('ol', { class: 'steps' }, h('li', null, 'מעתיקים את השמות מהקובץ שלכם (אקסל, וורד, גוגל שיטס, רשימת תלמידים) ומדביקים בתיבה. שורה לכל תלמיד/ה.'), h('li', null, 'או לוחצים "העלאת קובץ" ובוחרים קובץ טקסט או CSV.'), h('li', null, 'בודקים את מספר השמות שנמצאו, ולוחצים "הוספה לרשימה".')),
+        ta, preview,
+        h('div', { class: 'row' }, addBtn, replaceBtn, h('button', { class: 'btn soft', onclick: () => fileInput.click() }, 'העלאת קובץ (txt או csv)'), fileInput),
+        confirmHost,
+        h('p', { class: 'small muted' }, 'מומלץ ראשי תיבות במקום שם מלא. עד 80 תלמידים. קובץ אקסל (xlsx) אי אפשר להעלות ישירות: מעתיקים את העמודה ומדביקים.')),
+      h('section', { class: 'frame' }, h('div', { class: 'row between' }, h('h3', null, `הרשימה שלי (${map.students.length})`), map.students.length ? null : h('button', { class: 'btn soft sm', onclick: sample }, 'נסו עם כיתה לדוגמה')),
+        map.students.length ? listHost : h('p', { class: 'muted' }, 'עדיין אין תלמידים. מדביקים רשימה למעלה, או מוסיפים אחד אחד.'),
+        h('div', { class: 'row' }, h('div', { style: 'flex:1 1 260px' }, addOne),
+          map.students.length ? h('button', { class: 'btn ghost sm', onclick: () => confirmInline(clearHost, 'למחוק את כל הרשימה והמיפוי מהמכשיר הזה? אי אפשר לשחזר.', 'מחיקה', () => { map.students = []; saveMap(); paint(); toast('הרשימה נמחקה'); }) }, 'ניקוי הרשימה') : null), clearHost),
+      map.students.length ? h('section', { class: 'frame lead' }, h('h3', null, 'מה עכשיו?'), h('p', null, 'אפשר לגרור כל תלמיד/ה למעגל ישר, או לבקש עזרה מהעוזר אם לא בטוחים מה רמת הקשר.'),
+        h('div', { class: 'row' }, link('/mapping/circles', 'למעגלי קשר', 'btn white'), link('/mapping/helper', 'לעוזר לקשר', 'btn soft'), link('/mapping/map', 'למפת שיחות', 'btn soft'))) : null,
+      h('section', { class: 'frame' }, h('h3', null, 'שמירה וגיבוי'), h('p', { class: 'muted' }, 'הכול נשמר אוטומטית במכשיר הזה. כדי להעביר למכשיר אחר, מעתיקים את הנתונים ושומרים אותם בקובץ שלכם.'), mapActions(paint))]);
+    window.scrollTo(0, y0);
+  }
+  paint();
+  return root;
+}
+
+/* ---------- 2. עוזר לקשר: עד שלוש שאלות ---------- */
+// עוזר מונחה (בלי בינה מלאכותית ובלי שרת): שאלות קבועות והצעה לפי התשובות. שום דבר לא נשלח ולא נשמר, חוץ מהמיקום שבוחרים.
+const LEVEL_COPY = {
+  1: { title: 'קשר 1 · כמעט לא מכירים', text: 'כרגע הקשר בתחילתו, וזה בסדר גמור: זו נקודת פתיחה, לא ציון.', tip: 'שיחה קצרה אחת בלי ציפיות. שאלו על משהו שהוא או היא נהנים ממנו, והקשיבו יותר ממה שאתם מדברים.' },
+  2: { title: 'קשר 2 · מכירים את הבסיס', text: 'יש היכרות ויש בסיס, ועוד לא נבנה אמון עמוק.', tip: 'שיחה ממוקדת. בקשו מהם לספר על רגע מהשבוע שהם גאים בו, ושאלו מה עזר להם שם.' },
+  3: { title: 'קשר 3 · קשר ושיח פתוח', text: 'יש אמון, והם פונים אליכם. כדאי לשמור עליו.', tip: 'אפשר לדבר על יעדים וצעדים: מה הוא או היא רוצים שיתחיל לזוז?' },
+};
+const HELPER_Q = {
+  know: { short: 'מה יודעים עליהם', text: (n) => `מה אתם יודעים על ${n} מעבר ללימודים? משהו שהוא או היא סיפרו לכם בעצמם.`, opts: [['כמעט כלום. מכירים בעיקר מהשיעור', 0], ['כמה דברים: תחביב, חברים, משפחה, מה אוהבים', 1], ['הרבה, כולל דברים אישיים שסומכים עליכם', 2]] },
+  initiative: { short: 'פנייה ביוזמתם', text: (n) => `מתי ${n} פנה או פנתה אליכם ביוזמתם לאחרונה, לא בגלל משימה?`, opts: [['לא קרה עדיין', 0], ['פעם או פעמיים', 1], ['קורה לא מעט', 2]] },
+  trust: { short: 'סיכוי שיספרו', text: () => 'אם משהו קשה היה קורה לתלמיד/ה, כמה סביר שהם יספרו לכם על זה בעצמם?', opts: [['לא סביר. כנראה הייתם שומעים ממישהו אחר', 0], ['תלוי במצב', 1], ['סביר מאוד, הם פונים אליכם', 2]] },
+  last: { short: 'השיחה האחרונה', text: () => 'איך נראתה השיחה האישית האחרונה ביניכם?', opts: [['עוד לא הייתה לנו שיחה אישית', 0], ['קצרה ועניינית, בלי להתעמק', 0], ['נעימה, אבל נשארנו על פני השטח', 1], ['פתוחה: הם שיתפו ואתם הקשבתם', 2]] },
+};
+// השאלה הבאה לפי מה שנענה. מסיימים מוקדם כשהתמונה כבר ברורה (שתי תשובות נמוכות, או שתיים גבוהות)
+function nextQuestion(scores) {
+  if (scores.length === 0) return 'know';
+  if (scores.length === 1) return scores[0] === 0 ? 'initiative' : 'trust';
+  if (scores.length === 2) return scores[0] + scores[1] === 0 || scores[0] + scores[1] === 4 ? null : 'last';
+  return null;
+}
+function suggestLevel(scores) {
+  const sum = scores.reduce((a, b) => a + b, 0);
+  if (scores.length <= 2) return sum <= 1 ? 1 : sum >= 3 ? 3 : 2;
+  return sum <= 1 ? 1 : sum <= 4 ? 2 : 3;
+}
+
+function viewHelper() {
+  ensureMap();
+  const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
+  function paint(student) {
+    clear(root);
+    add(root, [mapHead('עוזר לקשר', 'לא בטוחים מה רמת הקשר עם תלמיד/ה? העוזר שואל עד שלוש שאלות קצרות ומציע איפה למקם אותם. זה לא חובה: אפשר גם למקם ישר במעגלים.', '/mapping/helper'), privacyNote(), student ? chat(student) : picker()]);
+  }
+  function picker() {
+    const addOne = h('input', { class: 'input', placeholder: 'או כותבים שם חדש, ואז Enter', 'aria-label': 'שם תלמיד/ה חדש/ה', onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) { const [nm] = parseNames(e.target.value); applyNames([nm], false); paint(map.students.find((s) => nameKey(s) === nm.toLowerCase())); } } });
+    return h('section', { class: 'frame' }, h('h3', null, 'על מי נדבר?'),
+      map.students.length ? h('div', { class: 'chips' }, map.students.map((s) => h('button', { class: 'tag pick', type: 'button', onclick: () => paint(s) }, s.name || '(ללא שם)', s.link ? h('span', { class: 'micro', style: 'margin-inline-start:6px;opacity:.8' }, `קשר ${s.link}`) : null)))
+        : h('p', { class: 'muted' }, 'עוד אין רשימה. אפשר להוסיף שם כאן, או להדביק רשימה שלמה בשלב 1.'),
+      h('div', { class: 'row' }, h('div', { style: 'flex:1 1 260px' }, addOne), link('/mapping/class', 'להדבקת רשימה שלמה', 'btn soft sm')));
+  }
+  function chat(student) {
+    const log = h('div', { class: 'chatlog', 'aria-live': 'polite' });
+    const opts = h('div', { class: 'chatopts' });
+    const say = (who, ...content) => { const b = h('div', { class: 'bubble ' + who }, ...content); log.append(b); b.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return b; };
+    const scores = [], asked = [];
+    const name = student.name || 'התלמיד/ה';
+    function ask() {
+      clear(opts);
+      const key = nextQuestion(scores);
+      if (!key) return finish();
+      const q = HELPER_Q[key];
+      asked.push(key);
+      say('bot', h('span', { class: 'micro muted', style: 'display:block' }, `שאלה ${asked.length}`), q.text(name));
+      q.opts.forEach(([t, score]) => opts.append(h('button', { class: 'btn soft chatopt', type: 'button', onclick: () => { scores.push(score); say('me', t); ask(); } }, t)));
+    }
+    function finish() {
+      clear(opts);
+      const level = suggestLevel(scores), L = LEVEL_COPY[level];
+      const why = asked.map((k, i) => `${HELPER_Q[k].short}: ${HELPER_Q[k].opts.find((o) => o[1] === scores[i])[0]}`);
+      say('bot', h('b', null, `ההצעה שלי: ${L.title}`), h('p', null, L.text), h('ul', { class: 'why' }, why.map((w) => h('li', null, w))), h('p', null, h('b', null, 'צעד קטן להמשך: '), L.tip));
+      const urgent = h('button', { class: 'btn soft sm', type: 'button', 'aria-pressed': String(!!student.urgent), onclick: () => { student.urgent = !student.urgent; if (!student.urgent) student.word = ''; saveMap(); urgent.setAttribute('aria-pressed', String(student.urgent)); urgent.textContent = student.urgent ? 'מסומן כדחוף. לבטל?' : 'יש משהו שלא יכול לחכות? לסמן כדחוף'; } }, student.urgent ? 'מסומן כדחוף. לבטל?' : 'יש משהו שלא יכול לחכות? לסמן כדחוף');
+      const place = (v) => {
+        student.link = v; delete student.x; delete student.y; saveMap(); clear(opts);
+        say('bot', `מיקמתי את ${name} בקשר ${v} (${lab(LINKS, v)}). אפשר לשנות בכל רגע במעגלים או בטבלה.`);
+        opts.append(h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => paint(null) }, 'תלמיד/ה נוספ/ת'), link('/mapping/circles', 'לראות במעגלי קשר', 'btn soft'), link('/mapping/map', 'למפת שיחות', 'btn soft')));
+      };
+      opts.append(h('button', { class: 'btn chatopt', type: 'button', onclick: () => { say('me', `ממקמים בקשר ${level}`); place(level); } }, `למקם את ${name} בקשר ${level}`),
+        h('div', { class: 'row' }, h('span', { class: 'small muted' }, 'או לבחור בעצמנו:'), [1, 2, 3].filter((v) => v !== level).map((v) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => { say('me', `ממקמים בקשר ${v}`); place(v); } }, `קשר ${v}`))), urgent,
+        h('button', { class: 'btn ghost sm', type: 'button', onclick: () => paint(student) }, 'להתחיל מחדש'));
+    }
+    say('bot', `היי! אשאל עד שלוש שאלות קצרות על ${name}, ואציע איפה למקם אותם. אין תשובות נכונות, והכול נשאר במכשיר שלכם.`);
+    if (student.link) say('bot', `כרגע ${name} מוצבים בקשר ${student.link} (${lab(LINKS, student.link)}).`);
+    ask();
+    return h('section', { class: 'frame chat' }, h('div', { class: 'row between' }, h('h3', null, `שיחה על ${name}`), h('button', { class: 'btn ghost sm', type: 'button', onclick: () => paint(null) }, 'בחירת תלמיד/ה אחר/ת')), log, opts);
+  }
+  paint(null);
+  return root;
+}
 
 
 /* =====================================================================
@@ -493,9 +706,6 @@ function mapActions(rerender) {
     h('button', { class: 'btn soft sm', onclick: () => confirmInline(host, 'למחוק את כל נתוני המיפוי מהמכשיר הזה? אי אפשר לשחזר.', 'מחיקה', () => { map = { cls: '', round: 1, students: [] }; saveMap(); rerender(); toast('הנתונים נמחקו מהמכשיר'); }) }, 'מחיקת הנתונים מהמכשיר'));
   host.append(row);
   return host;
-}
-function mapHead(title, sub) {
-  return h('section', { class: 'frame' }, h('div', null, link('/mapping', 'מיפוי הכיתה', 'btn ghost')), h('h2', null, title), h('p', { class: 'muted' }, sub));
 }
 function classFields(rerender) {
   const cls = h('input', { class: 'input', value: map.cls, placeholder: 'למשל ט׳ 2', oninput: (e) => { map.cls = e.target.value; saveMap(); } });
@@ -542,20 +752,13 @@ function viewMap() {
     const list = h('div', { class: 'stack', style: 'gap:8px' });
     list.append(h('div', { class: 'maphead', 'aria-hidden': 'true' }, h('span', null, '#'), h('span', null, 'שם או ראשי תיבות'), h('span', null, 'קשר'), h('span', null, 'דחוף'), h('span', null, 'ציר שיחה'), h('span', null, 'סבבי שיחות'), h('span', null, 'שיחה אחרונה'), h('span', null, 'קבוצה'), h('span', null, '')));
     map.students.forEach((s, i) => list.append(studentRow(s, i, paint)));
-    const addName = h('input', { class: 'input', placeholder: 'שם או ראשי תיבות, ואז Enter', 'aria-label': 'הוספת תלמיד/ה', onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) { map.students.push(newStudent(e.target.value.trim())); saveMap(); paint(); setTimeout(() => root.querySelector('[aria-label="הוספת תלמיד/ה"]')?.focus(), 0); } } });
-    const bulk = h('button', { class: 'btn soft sm', onclick: () => openSheet((close) => {
-      const ta = h('textarea', { class: 'textarea', style: 'min-height:200px', placeholder: 'שורה לכל תלמיד/ה' });
-      return [h('h3', null, 'הדבקת רשימה'), h('p', { class: 'muted' }, 'אפשר להדביק רשימה מקובץ שלכם. מומלץ ראשי תיבות. כל שורה היא תלמיד/ה.'), ta,
-        h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => { ta.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 60).forEach((n) => map.students.push(newStudent(n))); saveMap(); close(); paint(); } }, 'הוספה'), h('button', { class: 'btn soft', onclick: close }, 'ביטול'))];
-    }) }, 'הדבקת רשימה');
-    const demoBtn = h('button', { class: 'btn soft sm', onclick: () => { map.students.push(...sample()); saveMap(); paint(); toast('נוספו תלמידים לדוגמה (ראשי תיבות בדויים)'); } }, 'הוספת דוגמה');
-    add(root, [mapHead('מפת שיחות', 'כלי מיפוי למחנכות ולמחנכים: מי ראשון, מתי ואיך.'), privacyMap(), guide(),
-      h('section', { class: 'frame' }, classFields(paint),
-        map.students.length ? h('div', { class: 'tablewrap', style: 'overflow:visible' }, list) : h('div', { class: 'well' }, h('p', null, 'עדיין אין תלמידים במפה. אפשר להוסיף אחד אחד, להדביק רשימה, או לנסות עם דוגמה.')),
-        h('div', { class: 'row' }, h('div', { style: 'flex:1 1 260px' }, addName), bulk, demoBtn)),
+    const addName = h('input', { class: 'input', placeholder: 'הוספת שם אחד, ואז Enter', 'aria-label': 'הוספת תלמיד/ה', onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) { applyNames(parseNames(e.target.value), false); paint(); setTimeout(() => root.querySelector('[aria-label="הוספת תלמיד/ה"]')?.focus(), 0); } } });
+    add(root, [mapHead('מפת שיחות', `${map.cls ? 'כיתה ' + map.cls + '. ' : ''}טבלה אחת לכל הכיתה: קשר, דחוף, ציר שיחה, סבבים ושיחה אחרונה. הקבוצה בעמודה האחרונה מחושבת לבד ומסדרת את סדר השיחות.`, '/mapping/map'), privacyNote(), guide(),
+      h('section', { class: 'frame' },
+        map.students.length ? h('div', { class: 'tablewrap', style: 'overflow:visible' }, list) : emptyRoster(),
+        h('div', { class: 'row' }, h('div', { style: 'flex:1 1 260px' }, addName), link('/mapping/class', 'הוספת רשימה שלמה', 'btn soft sm'), link('/mapping/helper', 'לא בטוחים בקשר? העוזר', 'btn soft sm'))),
       groupSummary(),
-      h('section', { class: 'frame' }, h('h3', null, 'שמירה וגיבוי'), h('p', { class: 'muted' }, 'המפה נשמרת אוטומטית במכשיר הזה. כדי להעביר אותה למכשיר אחר, מעתיקים את הנתונים ושומרים אותם בקובץ שלכם.'), mapActions(paint),
-        h('p', { class: 'small' }, link('/mapping/circles', 'לראות את אותה מפה כמעגלי קשר', 'btn ghost')))]);
+      h('section', { class: 'frame' }, h('h3', null, 'שמירה וגיבוי'), h('p', { class: 'muted' }, 'המפה נשמרת אוטומטית במכשיר הזה. כדי להעביר אותה למכשיר אחר, מעתיקים את הנתונים ושומרים אותם בקובץ שלכם.'), mapActions(paint))]);
     window.scrollTo(0, y0);
   }
   paint();
@@ -667,11 +870,11 @@ function viewCircles() {
     const tray = h('div', { class: 'tray' }, unplaced.length ? unplaced.map((s) => chipEl(s, null)) : h('span', { class: 'micro muted' }, 'כל התלמידים הוצבו במעגלים'));
     const legend = h('div', { class: 'row small muted', 'aria-label': 'מקרא המעגלים' }, LINKS.slice().reverse().map((l) => h('span', null, `טבעת ${l.v}: ${l.t}`)));
     const panel = sel ? selPanel(map.students.find((s) => s.id === sel)) : h('p', { class: 'muted small' }, 'גוררים תלמיד/ה לכל מקום במעגל שמתאים, או לוחצים עליו כדי לערוך. הנקודה הסגולה מסמנת דחוף.');
-    add(root, [mapHead('מעגלי קשר', 'מפה ויזואלית לכיתה: כל תלמיד/ה במעגל שמתאים לקשר שלכם איתם.'), privacyMap(),
-      h('section', { class: 'frame' }, classFields(paint), board, legend, h('div', { class: 'stack' }, h('h4', null, 'עדיין לא הוצבו'), tray), panel,
-        h('div', { class: 'row' },
-          h('input', { class: 'input', style: 'flex:1 1 220px', placeholder: 'שם או ראשי תיבות, ואז Enter', 'aria-label': 'הוספת תלמיד/ה', onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) { map.students.push(newStudent(e.target.value.trim())); saveMap(); paint(); } } }),
-          h('button', { class: 'btn soft sm', onclick: () => { map.students.push(...[`א.כ`, `ב.ל`, `ג.מ`, `ד.ש`, `ה.ר`, `ו.ט`].map((n, i) => ({ ...newStudent(n), link: [1, 2, 3, 1, 2, 3][i], urgent: i === 0 || i === 4, word: i === 0 ? 'נוכחות' : i === 4 ? 'חברים' : '' }))); saveMap(); paint(); } }, 'הוספת דוגמה'))),
+    const addOne = h('input', { class: 'input', placeholder: 'הוספת שם אחד, ואז Enter', 'aria-label': 'הוספת תלמיד/ה', onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) { applyNames(parseNames(e.target.value), false); paint(); } } });
+    add(root, [mapHead('מעגלי קשר', `${map.cls ? 'כיתה ' + map.cls + '. ' : ''}גוררים כל תלמיד/ה למעגל שמתאים לקשר שלכם איתם. ככל שהשם קרוב יותר למרכז, הקשר חזק יותר.`, '/mapping/circles'), privacyNote(),
+      map.students.length ? h('section', { class: 'frame' }, board, legend, h('div', { class: 'stack' }, h('h4', null, 'עדיין לא הוצבו'), tray), panel,
+        h('div', { class: 'row' }, h('div', { style: 'flex:1 1 220px' }, addOne), link('/mapping/class', 'הוספת רשימה שלמה', 'btn soft sm'), link('/mapping/helper', 'לא בטוחים? העוזר לקשר', 'btn soft sm')))
+        : h('section', { class: 'frame' }, emptyRoster()),
       groupSummary(),
       h('section', { class: 'frame' }, h('h3', null, 'שמירה וגיבוי'), mapActions(paint), h('p', { class: 'small' }, link('/mapping/map', 'לראות את אותה מפה כטבלה', 'btn ghost')))]);
     window.scrollTo(0, y0);
