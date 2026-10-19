@@ -422,7 +422,7 @@ function viewTools() {
     h('section', { class: 'frame' }, h('h2', null, 'ארגז כלים'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'כלים ופרקטיקות לשיחות אישיות. פתוח לכולם, בלי כניסה. התכנים יתווספו כאן לאורך השנה.')),
     h('a', { class: 'frame cardsfeature', href: '#/tools/cards', onclick: (e) => { e.preventDefault(); go('/tools/cards'); } },
       h('img', { src: 'cards/t05.webp', alt: '', loading: 'lazy' }),
-      h('div', { class: 'stack' }, h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'חדש'), h('h3', null, 'קלפי שיח וקשר אישי'), h('p', { class: 'muted' }, '48 קלפים עם שאלה בצד אחד ותמונה בצד השני: לפי נושא, דרך תמונה, קלף מעורבב או לפי עומק השיחה. עובד גם בטלפון, בשיחה אישית.'), h('span', { class: 'btn', style: 'align-self:flex-start' }, 'לפתיחת הקלפים'))),
+      h('div', { class: 'stack' }, h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'חדש'), h('h3', null, 'קלפי שיח וקשר אישי'), h('p', { class: 'muted' }, '48 קלפים עם שאלה בצד אחד ותמונה בצד השני: לפי נושא, דרך תמונה, קלף מעורבב או לפי עומק וסוג השיחה. עובד גם בטלפון, בשיחה אישית.'), h('span', { class: 'btn', style: 'align-self:flex-start' }, 'לפתיחת הקלפים'))),
     h('div', { class: 'grid' }, FOLDERS.map((f) => h('a', { class: 'folder', href: '#/tools/' + f.id, onclick: (e) => { e.preventDefault(); go('/tools/' + f.id); } },
       h('span', { class: 'ic-big' }, ic(f.icon, { size: 38, tone: 'blue' })), h('h3', null, f.t), h('p', { class: 'muted' }, f.d),
       h('span', { class: 'tag', style: 'align-self:flex-start' }, `${count(f.id)} כלים`)))));
@@ -571,7 +571,7 @@ function cardsHome() {
       mode('/tools/cards/topics', 'checklist', 'לפי נושא', 'התלמיד/ה בוחר/ת נושא, ומשם מקבלים שאלות שקשורות אליו.'),
       mode('/tools/cards/pictures', 'eye', 'דרך תמונה', 'ארבע תמונות על המסך. התלמיד/ה בוחר/ת תמונה אחת, והקלף מסתובב לשאלה.'),
       mode('/tools/cards/random', 'idea', 'קלף מעורבב', 'כל השאלות מעורבבות, ומושכים קלף אחד. אפשר להפוך אותו לתמונה.'),
-      mode('/tools/cards/depth', 'steps', 'לפי עומק השיחה', 'שאלות קלילות להיכרות, שאלות להעמקה ושאלות לשיחה עמוקה, בהתאם לרמת הקשר.', 'חדש')),
+      mode('/tools/cards/depth', 'steps', 'לפי עומק וסוג השיחה', 'עומק: קליל, להעמיק או מעמיק, בהתאם לרמת הקשר. סוג: זהות וחוזקות, יעדים ומטרות, אג\'נסי ושותפות. אפשר לשלב.', 'חדש')),
     h('div', { class: 'row' }, link('/tools/cards/browse', 'לדפדף בכל הקלפים', 'btn soft')),
     h('details', { class: 'frame' }, h('summary', { style: 'cursor:pointer;font-weight:700;color:var(--lead)' }, 'איך משתמשים בשיחה'),
       h('div', { class: 'grid', style: 'margin-top:14px' },
@@ -648,21 +648,42 @@ function cardsRandom() {
     cardDeck({ list: cShuffle(cardsData().cards), cover: true }));
 }
 
-/* ---------- 4. לפי עומק השיחה (מתאים לרמת הקשר במיפוי) ---------- */
+/* ---------- 4. לפי עומק השיחה ולפי סוג השיחה (אפשר גם לשלב) ---------- */
+const CARD_TYPES = [
+  { id: 'identity', t: 'זהות וחוזקות', d: 'שאלות על מי שאני: חוזקות, רגשות, מה מרגש ומה חשוב לי.' },
+  { id: 'goals', t: 'יעדים ומטרות', d: 'שאלות על חלומות, על מה שרוצים להשיג ועל ההחלטות הבאות.' },
+  { id: 'agency', t: "אג'נסי ושותפות", d: 'שאלות על היכולת לפעול ולהשפיע, ועל מי ואיך אפשר להיעזר.' },
+];
 function cardsDepthHome() {
   const D = cardsData();
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
-    cardsHeader('לפי עומק השיחה', 'שאלות קלילות מתאימות להתחלה, ושאלות עמוקות לקשר שכבר יש בו אמון. כך מתאימים את הקלפים לרמת הקשר.'),
-    h('div', { class: 'grid cardmodes' }, DEPTHS.map((dp) => h('a', { class: 'frame cardmode depth', href: '#/tools/cards/depth/' + dp.n, onclick: (e) => { e.preventDefault(); go('/tools/cards/depth/' + dp.n); } },
-      h('span', { class: 'group-badge' }, dp.n), h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, dp.t), h('p', { class: 'muted' }, dp.d), h('span', { class: 'tag', style: 'align-self:flex-start' }, `${dp.link} · ${D.cards.filter((c) => c.d === dp.n).length} קלפים`))))),
+    cardsHeader('לפי עומק וסוג השיחה', 'בוחרים כמה עמוק רוצים להגיע, ועל מה רוצים לדבר. אפשר גם לשלב בין השניים. שאלה יכולה להתאים ליותר מסוג אחד.'),
+    h('section', { class: 'frame' }, h('h3', null, 'עומק השיחה'), h('p', { class: 'muted small' }, 'מתאים לרמת הקשר עם התלמיד/ה.'),
+      h('div', { class: 'grid cardmodes' }, DEPTHS.map((dp) => h('a', { class: 'frame cardmode depth', href: '#/tools/cards/depth/' + dp.n, onclick: (e) => { e.preventDefault(); go('/tools/cards/depth/' + dp.n); } },
+        h('span', { class: 'group-badge' }, dp.n), h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, dp.t), h('p', { class: 'muted' }, dp.d), h('span', { class: 'tag', style: 'align-self:flex-start' }, `${dp.link} · ${D.cards.filter((c) => c.d === dp.n).length} קלפים`)))))),
+    h('section', { class: 'frame' }, h('h3', null, 'סוג השיחה'), h('p', { class: 'muted small' }, 'על מה רוצים לדבר: אותם שלושה צירים של המבט השבועי.'),
+      h('div', { class: 'grid cardmodes' }, CARD_TYPES.map((tp) => h('a', { class: 'frame cardmode depth', href: '#/tools/cards/type/' + tp.id, onclick: (e) => { e.preventDefault(); go('/tools/cards/type/' + tp.id); } },
+        h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, tp.t), h('p', { class: 'muted' }, tp.d), h('span', { class: 'tag', style: 'align-self:flex-start' }, `${D.cards.filter((c) => c.a.includes(tp.id)).length} קלפים`)))))),
     h('p', { class: 'small muted' }, 'לא בטוחים באיזה קשר אתם? ', link('/mapping/helper', 'העוזר לקשר', 'btn ghost sm'), ' עוזר להבין, ואז מציע קלפים שמתאימים.'));
 }
-function cardsDepth(n) {
-  const dp = DEPTHS.find((x) => x.n === n);
-  if (!dp) return redirect('/tools/cards/depth');
-  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
-    cardsHeader(dp.t, `${dp.d} מתאים ל${dp.link}.`, ['/tools/cards/depth', 'לרמות העומק']),
-    cardDeck({ list: cShuffle(cardsData().cards.filter((c) => c.d === n)), label: `${dp.t}: ` }));
+// עמוד אחד לשני הסינונים: אפשר לבחור עומק, סוג, או את שניהם
+function cardsFocus(init) {
+  const D = cardsData();
+  const st = { depth: init.depth || 0, axis: init.axis || 'all' };
+  const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
+  function paint() {
+    clear(root);
+    const list = cShuffle(D.cards.filter((c) => (!st.depth || c.d === st.depth) && (st.axis === 'all' || c.a.includes(st.axis))));
+    const dp = DEPTHS.find((x) => x.n === st.depth), tp = CARD_TYPES.find((x) => x.id === st.axis);
+    const sub = [dp ? `${dp.d} מתאים ל${dp.link}.` : null, tp ? tp.d : null].filter(Boolean).join(' ') || 'כל הקלפים, בלי סינון.';
+    const depthChips = chipGroup({ options: [{ v: 0, t: 'כל הרמות' }, ...DEPTHS.map((x) => ({ v: x.n, t: x.t }))], value: st.depth, cls: 'sm', label: 'עומק השיחה', onChange: (v) => { st.depth = v; paint(); } });
+    const typeChips = chipGroup({ options: [{ v: 'all', t: 'כל הסוגים' }, ...CARD_TYPES.map((x) => ({ v: x.id, t: x.t }))], value: st.axis, cls: 'sm', label: 'סוג השיחה', onChange: (v) => { st.axis = v; paint(); } });
+    add(root, [cardsHeader(dp && !tp ? dp.t : tp && !dp ? tp.t : 'שיחה מותאמת', sub, ['/tools/cards/depth', 'לעומק ולסוג']),
+      h('section', { class: 'frame' }, h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'עומק השיחה'), depthChips), h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'סוג השיחה'), typeChips), h('p', { class: 'micro muted' }, `${list.length} קלפים מתאימים. שאלה יכולה להתאים ליותר מסוג אחד.`)),
+      list.length ? cardDeck({ list }) : h('section', { class: 'frame' }, h('p', { class: 'muted' }, 'אין קלפים בשילוב הזה. אפשר לבחור "כל הרמות" או "כל הסוגים".'))]);
+  }
+  paint();
+  return root;
 }
 
 /* ---------- דפדוף בכל הקלפים: חפיסה או פריסה, עם סינון ---------- */
@@ -710,7 +731,8 @@ function viewCards(p) {
   if (sub === 'pictures') return cardsPictures();
   if (sub === 'random') return cardsRandom();
   if (sub === 'depth') return cardsDepthHome();
-  if ((m = /^depth\/([123])$/.exec(sub))) return cardsDepth(Number(m[1]));
+  if ((m = /^depth\/([123])$/.exec(sub))) return cardsFocus({ depth: Number(m[1]) });
+  if ((m = /^type\/(identity|goals|agency)$/.exec(sub))) return cardsFocus({ axis: m[1] });
   if (sub === 'browse') return cardsBrowse();
   return redirect('/tools/cards');
 }
