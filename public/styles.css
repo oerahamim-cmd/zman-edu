@@ -341,3 +341,18 @@ table.mx { border-collapse: separate; border-spacing: 0 6px; width: 100%; min-wi
 @media (min-width: 900px) { .picks { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 520px) { .cardshero { grid-template-columns: 1fr; } .cardshero img { order: -1; } }
 .cardmodes { grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }
+
+/* ---------- מסך מלא לקלפי שיח ---------- */
+body.cards-full { overflow: hidden; }
+.cardsview.full { position: fixed; inset: 0; z-index: 3000; overflow: auto; background: #f0f0f0; padding: 12px; -webkit-overflow-scrolling: touch; }
+.cardsview.full > .stack { min-height: 100%; justify-content: center; max-width: 1280px; margin-inline: auto; gap: 12px; }
+.cardsview.full .cardhead { padding: 10px 16px; }
+.cardsview.full .cardhead > p, .cardsview.full .cardextras, .cardsview.full .cardstage > .micro, .cardsview.full .cardshero img { display: none; }
+.cardsview.full .cardstage { padding: 14px; }
+.cardsview.full .cardslider { width: min(100%, calc((100vh - 260px) * 1.3333), 1200px); }
+@supports (height: 100dvh) { .cardsview.full .cardslider { width: min(100%, calc((100dvh - 260px) * 1.3333), 1200px); } }
+.cardsview.full .picks { max-width: 1280px; margin-inline: auto; }
+.cardsview.full .cattiles { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.cardsview.full .cardq { font-size: clamp(24px, 6vw, 54px); }
+@media (orientation: landscape) and (min-width: 700px) { .cardsview.full .picks { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 520px) { .cardsview.full { padding: 6px; } .cardsview.full .cardstage { padding: 8px; } .cardsview.full .cardhead { padding: 8px 12px; } }

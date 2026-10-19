@@ -328,6 +328,7 @@ function render() {
   const y0 = window.scrollY, same = p === lastRoute;
   lastRoute = p;
   if (!p.startsWith('/tools/cards') && typeof cardsWakeLock !== 'undefined' && cardsWakeLock) cardsSetWake(false);
+  if (!p.startsWith('/tools/cards') && typeof cardsFull !== 'undefined' && cardsFull) cardsSetFull(false);
   state.area = p.startsWith('/admin') || p.startsWith('/lead') ? 'admin' : 'public';
   const view = resolve(p);
   clear(app);
@@ -422,7 +423,7 @@ function viewTools() {
     h('section', { class: 'frame' }, h('h2', null, 'ארגז כלים'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'כלים ופרקטיקות לשיחות אישיות. פתוח לכולם, בלי כניסה. התכנים יתווספו כאן לאורך השנה.')),
     h('a', { class: 'frame cardsfeature', href: '#/tools/cards', onclick: (e) => { e.preventDefault(); go('/tools/cards'); } },
       h('img', { src: 'cards/t05.webp', alt: '', loading: 'lazy' }),
-      h('div', { class: 'stack' }, h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'חדש'), h('h3', null, 'קלפי שיח וקשר אישי'), h('p', { class: 'muted' }, '48 קלפים עם שאלה בצד אחד ותמונה בצד השני: לפי נושא, דרך תמונה, קלף מעורבב או לפי עומק וסוג השיחה. עובד גם בטלפון, בשיחה אישית.'), h('span', { class: 'btn', style: 'align-self:flex-start' }, 'לפתיחת הקלפים'))),
+      h('div', { class: 'stack' }, h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'חדש'), h('h3', null, 'קלפי שיח וקשר אישי'), h('p', { class: 'muted' }, `${((window.ZMAN_CARDS || {}).cards || []).length || 63} קלפים עם שאלה בצד אחד ותמונה בצד השני: לפי נושא, דרך תמונה, קלף מעורבב או לפי עומק וסוג השיחה. עובד גם בטלפון, בשיחה אישית.`), h('span', { class: 'btn', style: 'align-self:flex-start' }, 'לפתיחת הקלפים'))),
     h('div', { class: 'grid' }, FOLDERS.map((f) => h('a', { class: 'folder', href: '#/tools/' + f.id, onclick: (e) => { e.preventDefault(); go('/tools/' + f.id); } },
       h('span', { class: 'ic-big' }, ic(f.icon, { size: 38, tone: 'blue' })), h('h3', null, f.t), h('p', { class: 'muted' }, f.d),
       h('span', { class: 'tag', style: 'align-self:flex-start' }, `${count(f.id)} כלים`)))));
@@ -450,11 +451,23 @@ function toolCard(t) {
    מסך פתיחה שבו בוחרים דרך עבודה: לפי נושא, דרך תמונה, קלף מעורבב, לפי עומק השיחה, או דפדוף בכל הקלפים.
    בכל קלף: שאלה בצד אחד, תמונה בצד השני. הקלפים נשארים בדפדפן, ושום דבר לא נשלח או נשמר.
    ===================================================================== */
-let cardsMutual = false, cardsWakeWanted = false, cardsWakeLock = null;
+let cardsMutual = false, cardsWakeWanted = false, cardsWakeLock = null, cardsFull = false;
+function cardsSetFull(on) {
+  cardsFull = on;
+  const v = document.querySelector('.cardsview');
+  if (v) v.classList.toggle('full', on);
+  document.body.classList.toggle('cards-full', on);
+  document.querySelectorAll('.fsbtn').forEach((b) => { b.textContent = on ? 'יציאה ממסך מלא' : 'מסך מלא'; });
+  if (on) { if (document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => { /* נשארים עם מסך מלא בתוך האתר */ }); }
+  else if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  window.scrollTo(0, 0);
+}
+const cardsFsButton = () => h('button', { class: 'btn soft sm fsbtn', type: 'button', onclick: () => cardsSetFull(!cardsFull) }, cardsFull ? 'יציאה ממסך מלא' : 'מסך מלא');
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && cardsFull) cardsSetFull(false); });
 const cardsData = () => window.ZMAN_CARDS || { categories: [], cards: [] };
 const cPad = (n) => String(n).padStart(2, '0');
-const cImg = (c) => `cards/c${cPad(c.n)}.webp`;
-const cThumb = (c) => `cards/t${cPad(c.n)}.webp`;
+const cImg = (c) => `cards/c${cPad(c.p || c.n)}.webp`;
+const cThumb = (c) => `cards/t${cPad(c.p || c.n)}.webp`;
 const cCat = (id) => (cardsData().categories.find((x) => x.id === id) || {}).t || '';
 const cShuffle = (a) => { const r = a.slice(); for (let k = r.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [r[k], r[j]] = [r[j], r[k]]; } return r; };
 const DEPTHS = [
@@ -502,11 +515,11 @@ function cardsExtras(stage) {
   const row = h('div', { class: 'row cardextras' },
     h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsMutual, onchange: (e) => { cardsMutual = e.target.checked; note.hidden = !cardsMutual; } }), 'שיחה הדדית: גם המחנך/ת עונה'),
     navigator.wakeLock && navigator.wakeLock.request ? h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsWakeWanted, onchange: (e) => { cardsWakeWanted = e.target.checked; cardsSetWake(cardsWakeWanted); } }), 'לא לכבות את המסך') : null,
-    document.documentElement.requestFullscreen ? h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen().catch(() => toast('הדפדפן לא אפשר מסך מלא')); } }, 'מסך מלא') : null);
+    null);
   return [note, row];
 }
 function cardsHeader(title, sub, back = ['/tools/cards', 'בחירת דרך אחרת']) {
-  return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, title), link(back[0], back[1], 'btn ghost sm')), sub ? h('p', { class: 'muted small', style: 'max-width:62ch' }, sub) : null);
+  return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, title), h('div', { class: 'row' }, cardsFsButton(), link(back[0], back[1], 'btn ghost sm'))), sub ? h('p', { class: 'muted small', style: 'max-width:62ch' }, sub) : null);
 }
 
 // חפיסה שמחליקים בה: ימינה = הקלף הבא (כמו דפדוף בעברית), הקשה = הפיכה
@@ -604,18 +617,27 @@ function cardsTopic(id) {
 /* ---------- 2. דרך תמונה: ארבע תמונות, בוחרים אחת והקלף מסתובב לשאלה ---------- */
 function cardsPictures() {
   const D = cardsData();
-  const seen = new Set();
-  let shown = [];
+  const groups = new Map();
+  D.cards.forEach((c) => { const k = c.p || c.n; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(c); });
+  const seen = new Set(), usedQ = new Set();
+  let shown = []; // מספרי תמונות
   const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
   function draw() {
-    let pool = D.cards.filter((c) => !seen.has(c.n));
-    if (pool.length < 4) { seen.clear(); pool = D.cards.slice(); }
+    let pool = [...groups.keys()].filter((k) => !seen.has(k));
+    if (pool.length < 4) { seen.clear(); pool = [...groups.keys()]; }
     shown = cShuffle(pool).slice(0, 4);
-    shown.forEach((c) => seen.add(c.n));
+    shown.forEach((k) => seen.add(k));
+  }
+  function chooseCard(k) {
+    const cs = groups.get(k);
+    const fresh = cs.filter((c) => !usedQ.has(c.n));
+    const c = cShuffle(fresh.length ? fresh : cs)[0];
+    usedQ.add(c.n); if (usedQ.size >= D.cards.length) usedQ.clear();
+    return c;
   }
   function pick() {
     clear(root);
-    const grid = h('div', { class: 'picks' }, shown.map((c, idx) => h('button', { class: 'picktile', type: 'button', 'aria-label': `תמונה ${idx + 1}`, onclick: () => { if (!swallow) show(c); } }, h('img', { src: cImg(c), alt: '', draggable: 'false' }))));
+    const grid = h('div', { class: 'picks' }, shown.map((k, idx) => h('button', { class: 'picktile', type: 'button', 'aria-label': `תמונה ${idx + 1}`, onclick: () => { if (!swallow) show(chooseCard(k)); } }, h('img', { src: cImg(groups.get(k)[0]), alt: '', draggable: 'false' }))));
     // החלקה על התמונות מחליפה את כל הארבע
     let sx = null, swallow = false;
     grid.addEventListener('pointerdown', (e) => { sx = e.clientX; });
@@ -704,12 +726,12 @@ function cardsBrowse() {
   }
   function head() {
     const view = chipGroup({ options: [{ v: 'deck', t: 'חפיסה' }, { v: 'spread', t: 'פריסה' }], value: st.view, cls: 'sm', label: 'תצוגה', onChange: (v) => { st.view = v; st.filtersOpen = v === 'spread'; paint(); } });
-    return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, 'כל הקלפים'), link('/tools/cards', 'בחירת דרך אחרת', 'btn ghost sm')), h('p', { class: 'muted small' }, 'מדפדפים בכל הקלפים, בחפיסה או בפריסה.'), view);
+    return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, 'כל הקלפים'), h('div', { class: 'row' }, cardsFsButton(), link('/tools/cards', 'בחירת דרך אחרת', 'btn ghost sm'))), h('p', { class: 'muted small' }, 'מדפדפים בכל הקלפים, בחפיסה או בפריסה.'), view);
   }
   function spread() {
     const picture = st.first === 'img';
     return h('section', { class: 'frame' }, h('h3', null, picture ? 'בוחרים תמונה' : 'בוחרים שאלה'),
-      h('div', { class: 'cardgrid' }, st.list.map((c, idx) => h('button', { class: 'cardtile ' + (picture ? 'pic' : 'ques'), type: 'button', 'aria-label': picture ? `תמונה ${idx + 1}` : c.q, onclick: () => { st.view = 'deck'; st.i = idx; paint(); window.scrollTo(0, 0); } },
+      h('div', { class: 'cardgrid' }, (picture ? st.list.filter((c, i, arr) => arr.findIndex((x) => (x.p || x.n) === (c.p || c.n)) === i) : st.list).map((c, idx) => h('button', { class: 'cardtile ' + (picture ? 'pic' : 'ques'), type: 'button', 'aria-label': picture ? `תמונה ${idx + 1}` : c.q, onclick: () => { st.view = 'deck'; st.i = st.list.indexOf(c); paint(); window.scrollTo(0, 0); } },
         picture ? h('img', { src: cThumb(c), alt: '', loading: 'lazy', draggable: 'false' }) : h('span', null, c.q)))));
   }
   function paint() {
@@ -723,6 +745,10 @@ function cardsBrowse() {
 }
 
 function viewCards(p) {
+  document.body.classList.toggle('cards-full', cardsFull);
+  return h('div', { class: 'cardsview' + (cardsFull ? ' full' : '') }, cardsRoute(p));
+}
+function cardsRoute(p) {
   const sub = p.replace(/^\/tools\/cards\/?/, '');
   let m;
   if (!sub) return cardsHome();
