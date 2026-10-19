@@ -515,7 +515,7 @@ function viewMappingHome() {
     privacyNote(),
     h('div', { class: 'grid' },
       step('1', 'הכיתה שלי', 'מדביקים או מעלים את רשימת השמות של הכיתה, פעם אחת.', '/mapping/class', n ? 'לרשימה שלי' : 'להוספת הרשימה', n ? `${n} תלמידים ברשימה` : 'עוד אין רשימה'),
-      step('2', 'עוזר לקשר', 'לא בטוחים מה רמת הקשר עם תלמיד/ה? עד שלוש שאלות קצרות, והצעה איפה למקם אותם.', '/mapping/helper', 'להתחיל שיחה עם העוזר', '', true),
+      step('2', 'עוזר לקשר', 'לא בטוחים מה רמת הקשר עם תלמיד/ה? עד שלוש שאלות של כן או לא, והמלצה באיזה מעגל למקם אותם.', '/mapping/helper', 'להתחיל שיחה עם העוזר', '', true),
       step('3', 'מעגלי קשר', 'גוררים כל תלמיד/ה למעגל שמתאים: תמונה אחת של כל הכיתה.', '/mapping/circles', 'למעגלי קשר', n ? `${placed} מתוך ${n} כבר ממוקמים` : ''),
       step('4', 'מפת שיחות', 'אותם נתונים בטבלה: דחוף, ציר שיחה, סבבים ושיחה אחרונה, וסדר מוצע לשיחות.', '/mapping/map', 'למפת שיחות', '')),
     h('details', { class: 'frame' }, h('summary', { style: 'font-weight:700;font-size:19px;cursor:pointer' }, 'הקבצים המקוריים של המפה והמעגלים'),
@@ -598,31 +598,20 @@ const LEVEL_COPY = {
   2: { title: 'קשר 2 · מכירים את הבסיס', text: 'יש היכרות ויש בסיס, ועוד לא נבנה אמון עמוק.', tip: 'שיחה ממוקדת. בקשו מהם לספר על רגע מהשבוע שהם גאים בו, ושאלו מה עזר להם שם.' },
   3: { title: 'קשר 3 · קשר ושיח פתוח', text: 'יש אמון, והם פונים אליכם. כדאי לשמור עליו.', tip: 'אפשר לדבר על יעדים וצעדים: מה הוא או היא רוצים שיתחיל לזוז?' },
 };
-const HELPER_Q = {
-  know: { short: 'מה יודעים עליהם', text: (n) => `מה אתם יודעים על ${n} מעבר ללימודים? משהו שהוא או היא סיפרו לכם בעצמם.`, opts: [['כמעט כלום. מכירים בעיקר מהשיעור', 0], ['כמה דברים: תחביב, חברים, משפחה, מה אוהבים', 1], ['הרבה, כולל דברים אישיים שסומכים עליכם', 2]] },
-  initiative: { short: 'פנייה ביוזמתם', text: (n) => `מתי ${n} פנה או פנתה אליכם ביוזמתם לאחרונה, לא בגלל משימה?`, opts: [['לא קרה עדיין', 0], ['פעם או פעמיים', 1], ['קורה לא מעט', 2]] },
-  trust: { short: 'סיכוי שיספרו', text: () => 'אם משהו קשה היה קורה לתלמיד/ה, כמה סביר שהם יספרו לכם על זה בעצמם?', opts: [['לא סביר. כנראה הייתם שומעים ממישהו אחר', 0], ['תלוי במצב', 1], ['סביר מאוד, הם פונים אליכם', 2]] },
-  last: { short: 'השיחה האחרונה', text: () => 'איך נראתה השיחה האישית האחרונה ביניכם?', opts: [['עוד לא הייתה לנו שיחה אישית', 0], ['קצרה ועניינית, בלי להתעמק', 0], ['נעימה, אבל נשארנו על פני השטח', 1], ['פתוחה: הם שיתפו ואתם הקשבתם', 2]] },
+// מספר = הקשר שמומלץ. מחרוזת = השאלה הבאה.
+const HELPER_TREE = {
+  personal: { short: 'סיפרו משהו אישי', text: (n) => `האם ${n} סיפר/ה לכם בעצמם משהו אישי, שלא קשור ללימודים?`, no: 'initiative', yes: 'hard' },
+  initiative: { short: 'פנו ביוזמתם', text: (n) => `האם ${n} פנה/פנתה אליכם ביוזמתם, ולו פעם אחת?`, no: 1, yes: 2 },
+  hard: { short: 'ישתפו במשהו קשה', text: () => 'אם יקרה להם משהו קשה, סביר שתשמעו על זה מהם בעצמם?', no: 2, yes: 'open' },
+  open: { short: 'שיחה פתוחה', text: () => 'האם הייתה ביניכם שיחה אישית שבה הם שיתפו ואתם הקשבתם?', no: 2, yes: 3 },
 };
-// השאלה הבאה לפי מה שנענה. מסיימים מוקדם כשהתמונה כבר ברורה (שתי תשובות נמוכות, או שתיים גבוהות)
-function nextQuestion(scores) {
-  if (scores.length === 0) return 'know';
-  if (scores.length === 1) return scores[0] === 0 ? 'initiative' : 'trust';
-  if (scores.length === 2) return scores[0] + scores[1] === 0 || scores[0] + scores[1] === 4 ? null : 'last';
-  return null;
-}
-function suggestLevel(scores) {
-  const sum = scores.reduce((a, b) => a + b, 0);
-  if (scores.length <= 2) return sum <= 1 ? 1 : sum >= 3 ? 3 : 2;
-  return sum <= 1 ? 1 : sum <= 4 ? 2 : 3;
-}
 
 function viewHelper() {
   ensureMap();
   const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
   function paint(student) {
     clear(root);
-    add(root, [mapHead('עוזר לקשר', 'לא בטוחים מה רמת הקשר עם תלמיד/ה? העוזר שואל עד שלוש שאלות קצרות ומציע איפה למקם אותם. זה לא חובה: אפשר גם למקם ישר במעגלים.', '/mapping/helper'), privacyNote(), student ? chat(student) : picker()]);
+    add(root, [mapHead('עוזר לקשר', 'לא בטוחים מה רמת הקשר עם תלמיד/ה? העוזר שואל עד שלוש שאלות של כן או לא, ואחריהן ממליץ באיזה מעגל למקם אותם. זה לא חובה: אפשר גם למקם ישר במעגלים.', '/mapping/helper'), privacyNote(), student ? chat(student) : picker()]);
   }
   function picker() {
     const addOne = h('input', { class: 'input', placeholder: 'או כותבים שם חדש, ואז Enter', 'aria-label': 'שם תלמיד/ה חדש/ה', onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) { const [nm] = parseNames(e.target.value); applyNames([nm], false); paint(map.students.find((s) => nameKey(s) === nm.toLowerCase())); } } });
@@ -635,23 +624,28 @@ function viewHelper() {
     const log = h('div', { class: 'chatlog', 'aria-live': 'polite' });
     const opts = h('div', { class: 'chatopts' });
     const say = (who, ...content) => { const b = h('div', { class: 'bubble ' + who }, ...content); log.append(b); b.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return b; };
-    const scores = [], asked = [];
+    const trail = []; // [{ key, yes }]
     const name = student.name || 'התלמיד/ה';
-    function ask() {
+    function ask(key) {
       clear(opts);
-      const key = nextQuestion(scores);
-      if (!key) return finish();
-      const q = HELPER_Q[key];
-      asked.push(key);
-      say('bot', h('span', { class: 'micro muted', style: 'display:block' }, `שאלה ${asked.length}`), q.text(name));
-      q.opts.forEach(([t, score]) => opts.append(h('button', { class: 'btn soft chatopt', type: 'button', onclick: () => { scores.push(score); say('me', t); ask(); } }, t)));
+      const q = HELPER_TREE[key];
+      say('bot', h('span', { class: 'micro muted', style: 'display:block' }, `שאלה ${trail.length + 1} מתוך 3 לכל היותר`), q.text(name));
+      const answer = (yes) => {
+        trail.push({ key, yes });
+        say('me', yes ? 'כן' : 'לא');
+        const next = yes ? q.yes : q.no;
+        if (typeof next === 'number') finish(next); else ask(next);
+      };
+      opts.classList.add('yn');
+      opts.append(h('button', { class: 'btn chatopt', type: 'button', onclick: () => answer(true) }, 'כן'), h('button', { class: 'btn soft chatopt', type: 'button', onclick: () => answer(false) }, 'לא'));
     }
-    function finish() {
-      clear(opts);
-      const level = suggestLevel(scores), L = LEVEL_COPY[level];
-      const why = asked.map((k, i) => `${HELPER_Q[k].short}: ${HELPER_Q[k].opts.find((o) => o[1] === scores[i])[0]}`);
-      say('bot', h('b', null, `ההצעה שלי: ${L.title}`), h('p', null, L.text), h('ul', { class: 'why' }, why.map((w) => h('li', null, w))), h('p', null, h('b', null, 'צעד קטן להמשך: '), L.tip));
-      const urgent = h('button', { class: 'btn soft sm', type: 'button', 'aria-pressed': String(!!student.urgent), onclick: () => { student.urgent = !student.urgent; if (!student.urgent) student.word = ''; saveMap(); urgent.setAttribute('aria-pressed', String(student.urgent)); urgent.textContent = student.urgent ? 'מסומן כדחוף. לבטל?' : 'יש משהו שלא יכול לחכות? לסמן כדחוף'; } }, student.urgent ? 'מסומן כדחוף. לבטל?' : 'יש משהו שלא יכול לחכות? לסמן כדחוף');
+    function finish(level) {
+      clear(opts); opts.classList.remove('yn');
+      const L = LEVEL_COPY[level];
+      const why = trail.map((t) => `${HELPER_TREE[t.key].short}: ${t.yes ? 'כן' : 'לא'}`);
+      say('bot', h('b', null, `ההמלצה שלי: ${L.title}`), h('p', null, L.text), h('ul', { class: 'why' }, why.map((w) => h('li', null, w))), h('p', null, h('b', null, 'צעד קטן להמשך: '), L.tip));
+      const urgentLabel = () => (student.urgent ? 'מסומן כדחוף. לבטל?' : 'יש משהו שלא יכול לחכות? לסמן כדחוף');
+      const urgent = h('button', { class: 'btn soft sm', type: 'button', 'aria-pressed': String(!!student.urgent), onclick: () => { student.urgent = !student.urgent; if (!student.urgent) student.word = ''; saveMap(); urgent.setAttribute('aria-pressed', String(student.urgent)); urgent.textContent = urgentLabel(); } }, urgentLabel());
       const place = (v) => {
         student.link = v; delete student.x; delete student.y; saveMap(); clear(opts);
         say('bot', `מיקמתי את ${name} בקשר ${v} (${lab(LINKS, v)}). אפשר לשנות בכל רגע במעגלים או בטבלה.`);
@@ -661,9 +655,9 @@ function viewHelper() {
         h('div', { class: 'row' }, h('span', { class: 'small muted' }, 'או לבחור בעצמנו:'), [1, 2, 3].filter((v) => v !== level).map((v) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => { say('me', `ממקמים בקשר ${v}`); place(v); } }, `קשר ${v}`))), urgent,
         h('button', { class: 'btn ghost sm', type: 'button', onclick: () => paint(student) }, 'להתחיל מחדש'));
     }
-    say('bot', `היי! אשאל עד שלוש שאלות קצרות על ${name}, ואציע איפה למקם אותם. אין תשובות נכונות, והכול נשאר במכשיר שלכם.`);
+    say('bot', `היי! אשאל עד שלוש שאלות קצרות, כן או לא, על ${name}, ואמליץ באיזה מעגל למקם אותם. אין תשובות נכונות, והכול נשאר במכשיר שלכם.`);
     if (student.link) say('bot', `כרגע ${name} מוצבים בקשר ${student.link} (${lab(LINKS, student.link)}).`);
-    ask();
+    ask('personal');
     return h('section', { class: 'frame chat' }, h('div', { class: 'row between' }, h('h3', null, `שיחה על ${name}`), h('button', { class: 'btn ghost sm', type: 'button', onclick: () => paint(null) }, 'בחירת תלמיד/ה אחר/ת')), log, opts);
   }
   paint(null);
