@@ -279,3 +279,4 @@ table.mx { border-collapse: separate; border-spacing: 0 6px; width: 100%; min-wi
 .chatopt { justify-content: flex-start; text-align: start; white-space: normal; }
 @media (max-width: 520px) { .rosterrow { grid-template-columns: 22px minmax(0, 1fr) auto; } .rosterrow .tag { display: none; } .bubble { max-width: 94%; } }
 .chatopts.yn { grid-template-columns: 1fr 1fr; }
+.chatopts.yn .chatopt { justify-content: center; text-align: center; font-size: 18px; padding: 14px 20px; }
