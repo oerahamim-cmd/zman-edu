@@ -312,3 +312,32 @@ table.mx { border-collapse: separate; border-spacing: 0 6px; width: 100%; min-wi
 .cardtile.ques { background: #fff; border: 1px solid #dcdcdc; padding: 12px; display: flex; align-items: center; justify-content: center; text-align: center; font: 500 14px/1.4 var(--font); color: var(--ink); }
 @media (max-width: 520px) { .cardsfeature { grid-template-columns: 1fr; } .cardgrid { grid-template-columns: repeat(2, 1fr); } .cardbtns .btn { flex: 1 1 auto; } }
 @media (max-width: 520px) { .cardstage { padding-inline: 12px; } }
+
+/* ---------- קלפי שיח: מסך פתיחה, נושאים, ארבע תמונות, גב סגור ---------- */
+.cardshero { display: grid; grid-template-columns: 1fr minmax(120px, 300px); gap: 24px; align-items: center; background: var(--lead); color: #fff; }
+.cardshero .btn.ghost { color: #fff; }
+.cardshero img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 16px; display: block; }
+.cardmodes { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.cardmode { display: flex; gap: 18px; align-items: flex-start; text-decoration: none; color: inherit; transition: transform .15s ease; }
+.cardmode:hover, .cardmode:focus-visible { transform: translateY(-3px); outline: 3px solid var(--lead); outline-offset: 2px; }
+.cattiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 14px; }
+.cattile { position: relative; aspect-ratio: 4 / 3; border-radius: 20px; overflow: hidden; display: block; text-decoration: none; color: #fff; background: #222; }
+.cattile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s ease; }
+.cattile:hover img, .cattile:focus-visible img { transform: scale(1.06); }
+.cattile:focus-visible { outline: 3px solid var(--lead); outline-offset: 2px; }
+.cattext { position: absolute; inset-inline: 0; bottom: 0; padding: 40px 16px 14px; display: flex; flex-direction: column; gap: 2px; background: linear-gradient(transparent, rgba(0,0,0,.72)); }
+.cattext b { font: 700 19px/1.25 var(--font); }
+.cattext small { font-size: 14px; opacity: .9; }
+.picks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 14px; animation: cardin-next .3s ease; }
+.picktile { aspect-ratio: 4 / 3; padding: 0; border: 0; border-radius: 16px; overflow: hidden; cursor: pointer; background: #ddd; transition: transform .15s ease; }
+.picktile:hover, .picktile:focus-visible { transform: scale(1.03); outline: 3px solid var(--lead); outline-offset: 2px; }
+.picktile img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.cardcover { position: absolute; inset: 0; border-radius: 22px; background: var(--lead); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font-size: clamp(14px, 3.6vw, 18px); z-index: 2; }
+.cardcover[hidden] { display: none; }
+.covermark { font: 900 clamp(26px, 8vw, 44px)/1 var(--font); }
+.cardnote { margin: 0; padding: 10px 16px; border-radius: 12px; background: var(--soft); font-weight: 500; }
+.cardnote[hidden] { display: none; }
+.cardextras { justify-content: center; }
+@media (min-width: 900px) { .picks { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 520px) { .cardshero { grid-template-columns: 1fr; } .cardshero img { order: -1; } }
+.cardmodes { grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }

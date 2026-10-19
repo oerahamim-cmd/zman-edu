@@ -327,6 +327,7 @@ function render() {
   const p = route();
   const y0 = window.scrollY, same = p === lastRoute;
   lastRoute = p;
+  if (!p.startsWith('/tools/cards') && typeof cardsWakeLock !== 'undefined' && cardsWakeLock) cardsSetWake(false);
   state.area = p.startsWith('/admin') || p.startsWith('/lead') ? 'admin' : 'public';
   const view = resolve(p);
   clear(app);
@@ -338,7 +339,7 @@ function resolve(p) {
   let m;
   if (p === '/') return viewHome();
   if (p === '/tools') return viewTools();
-  if (p === '/tools/cards') return viewCards();
+  if (p === '/tools/cards' || p.startsWith('/tools/cards/')) return viewCards(p);
   if ((m = /^\/tools\/(identity|goals|agency)$/.exec(p))) return viewFolder(m[1]);
   const gate = (path, view) => (me() ? view() : isAdmin() || leadUser() ? viewEducatorsOnly() : viewEnter('new', path));
   const gateLead = (path, view) => (leadUser() ? view() : me() || isAdmin() ? viewLeadsOnly() : viewEnter('lead', path));
@@ -421,7 +422,7 @@ function viewTools() {
     h('section', { class: 'frame' }, h('h2', null, 'ארגז כלים'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'כלים ופרקטיקות לשיחות אישיות. פתוח לכולם, בלי כניסה. התכנים יתווספו כאן לאורך השנה.')),
     h('a', { class: 'frame cardsfeature', href: '#/tools/cards', onclick: (e) => { e.preventDefault(); go('/tools/cards'); } },
       h('img', { src: 'cards/t05.webp', alt: '', loading: 'lazy' }),
-      h('div', { class: 'stack' }, h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'חדש'), h('h3', null, 'קלפי שיח וקשר אישי'), h('p', { class: 'muted' }, '48 קלפים עם שאלה בצד אחד ותמונה בצד השני. מחליקים, הופכים ומשוחחים. עובד גם בטלפון, בשיחה אישית.'), h('span', { class: 'btn', style: 'align-self:flex-start' }, 'לפתיחת הקלפים'))),
+      h('div', { class: 'stack' }, h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'חדש'), h('h3', null, 'קלפי שיח וקשר אישי'), h('p', { class: 'muted' }, '48 קלפים עם שאלה בצד אחד ותמונה בצד השני: לפי נושא, דרך תמונה, קלף מעורבב או לפי עומק השיחה. עובד גם בטלפון, בשיחה אישית.'), h('span', { class: 'btn', style: 'align-self:flex-start' }, 'לפתיחת הקלפים'))),
     h('div', { class: 'grid' }, FOLDERS.map((f) => h('a', { class: 'folder', href: '#/tools/' + f.id, onclick: (e) => { e.preventDefault(); go('/tools/' + f.id); } },
       h('span', { class: 'ic-big' }, ic(f.icon, { size: 38, tone: 'blue' })), h('h3', null, f.t), h('p', { class: 'muted' }, f.d),
       h('span', { class: 'tag', style: 'align-self:flex-start' }, `${count(f.id)} כלים`)))));
@@ -445,135 +446,273 @@ function toolCard(t) {
 }
 
 /* =====================================================================
-   קלפי שיח וקשר אישי: חפיסה שמחליקים בה, והופכים כל קלף לתמונה (כלי בארגז הכלים, פתוח לכולם)
+   קלפי שיח וקשר אישי (כלי בארגז הכלים, פתוח לכולם)
+   מסך פתיחה שבו בוחרים דרך עבודה: לפי נושא, דרך תמונה, קלף מעורבב, לפי עומק השיחה, או דפדוף בכל הקלפים.
+   בכל קלף: שאלה בצד אחד, תמונה בצד השני. הקלפים נשארים בדפדפן, ושום דבר לא נשלח או נשמר.
    ===================================================================== */
-function viewCards() {
-  const D = window.ZMAN_CARDS || { categories: [], cards: [] };
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const img = (c) => `cards/c${pad2(c.n)}.webp`, thumb = (c) => `cards/t${pad2(c.n)}.webp`;
-  const catName = (id) => (D.categories.find((x) => x.id === id) || {}).t || '';
-  const st = { view: 'deck', cat: 'all', first: 'q', list: [], i: 0, flipped: false, wake: null };
-  const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  const pool = () => D.cards.filter((c) => st.cat === 'all' || c.cat === st.cat);
-  function reset(shuffle) {
-    st.list = pool();
-    if (shuffle) for (let k = st.list.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [st.list[k], st.list[j]] = [st.list[j], st.list[k]]; }
-    st.i = 0; st.flipped = st.first === 'img';
-  }
-  const canFullscreen = !!document.documentElement.requestFullscreen;
-  const canWake = !!(navigator.wakeLock && navigator.wakeLock.request);
+let cardsMutual = false, cardsWakeWanted = false, cardsWakeLock = null;
+const cardsData = () => window.ZMAN_CARDS || { categories: [], cards: [] };
+const cPad = (n) => String(n).padStart(2, '0');
+const cImg = (c) => `cards/c${cPad(c.n)}.webp`;
+const cThumb = (c) => `cards/t${cPad(c.n)}.webp`;
+const cCat = (id) => (cardsData().categories.find((x) => x.id === id) || {}).t || '';
+const cShuffle = (a) => { const r = a.slice(); for (let k = r.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [r[k], r[j]] = [r[j], r[k]]; } return r; };
+const DEPTHS = [
+  { n: 1, t: 'היכרות קלילה', d: 'לשיחות ראשונות ולקשר שרק מתחיל. שאלות קלות, בלי לחץ.', link: 'קשר 1 · כמעט לא מכירים' },
+  { n: 2, t: 'להעמיק', d: 'כשכבר יש היכרות ובסיס. שאלות על מה שחשוב, מרגש ומשפיע.', link: 'קשר 2 · מכירים את הבסיס' },
+  { n: 3, t: 'שיחה מעמיקה', d: 'כשיש אמון. שאלות כנות על ההרגשה, על הבית ועל מה שלא תמיד אומרים.', link: 'קשר 3 · קשר ושיח פתוח' },
+];
 
-  async function setWake(on) {
-    try {
-      if (on) { st.wake = await navigator.wakeLock.request('screen'); st.wake.addEventListener('release', () => { st.wake = null; }); }
-      else if (st.wake) { await st.wake.release(); st.wake = null; }
-    } catch { st.wake = null; toast('הדפדפן לא אפשר להשאיר את המסך דלוק'); }
-  }
-  // המסך חוזר לדלוק אחרי מעבר לאפליקציה אחרת וחזרה
-  document.addEventListener('visibilitychange', () => { if (st.wakeWanted && document.visibilityState === 'visible' && !st.wake && root.isConnected) setWake(true); });
+async function cardsSetWake(on) {
+  try {
+    if (on && navigator.wakeLock && !cardsWakeLock) { cardsWakeLock = await navigator.wakeLock.request('screen'); cardsWakeLock.addEventListener('release', () => { cardsWakeLock = null; }); }
+    else if (!on && cardsWakeLock) { await cardsWakeLock.release(); cardsWakeLock = null; }
+  } catch { cardsWakeLock = null; toast('הדפדפן לא אפשר להשאיר את המסך דלוק'); }
+}
+// המסך חוזר לדלוק אחרי מעבר לאפליקציה אחרת וחזרה
+document.addEventListener('visibilitychange', () => { if (cardsWakeWanted && document.visibilityState === 'visible' && !cardsWakeLock && route().startsWith('/tools/cards')) cardsSetWake(true); });
 
-  function head() {
-    const view = chipGroup({ options: [{ v: 'deck', t: 'חפיסה' }, { v: 'spread', t: 'פריסה' }], value: st.view, cls: 'sm', label: 'תצוגה', onChange: (v) => { st.view = v; st.filtersOpen = v === 'spread'; paint(); } });
-    return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, 'קלפי שיח וקשר אישי'), link('/tools', 'ארגז כלים', 'btn ghost sm')),
-      h('p', { class: 'muted small' }, 'בצד אחד שאלה, ובצד השני תמונה. מחליקים בין הקלפים ומהפכים אותם.'), view);
+// קלף אחד שמסתובב: שאלה בצד אחד, תמונה בצד השני. covered = גב סגור שצריך להקיש כדי למשוך את הקלף.
+function cFlipper() {
+  const front = h('div', { class: 'cardface qface' }), back = h('div', { class: 'cardface imgface' });
+  const cover = h('div', { class: 'cardcover', hidden: true }, h('span', { class: 'covermark' }, 'זמן לחינוך'), h('span', null, 'הקישו כדי למשוך קלף'));
+  const el = h('div', { class: 'cardflipper', role: 'button', tabindex: '0', 'aria-label': 'הפיכת הקלף' }, h('div', { class: 'cardinner' }, front, back), cover);
+  const api = {
+    el, flipped: false, covered: false,
+    set(c, flipped, covered = false) {
+      clear(front); clear(back);
+      front.append(h('p', { class: 'cardq' }, c.q), h('span', { class: 'cardcat' }, cCat(c.cat)));
+      back.append(h('img', { src: cImg(c), alt: 'תמונה לשיחה', draggable: 'false' }));
+      api.flipped = flipped; api.covered = covered;
+      el.classList.toggle('flipped', flipped); cover.hidden = !covered;
+      el.setAttribute('aria-label', covered ? 'משיכת קלף' : 'הפיכת הקלף');
+    },
+    flip(to) {
+      if (api.covered) { api.covered = false; cover.hidden = true; el.setAttribute('aria-label', 'הפיכת הקלף'); return; }
+      api.flipped = to === undefined ? !api.flipped : to;
+      el.classList.toggle('flipped', api.flipped);
+    },
+  };
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); api.flip(); } });
+  return api;
+}
+// הערה למצב הדדי, מסך דלוק ומסך מלא: משותפים לכל הדרכים
+function cardsExtras(stage) {
+  const note = h('p', { class: 'cardnote', hidden: !cardsMutual }, 'עונים שניכם: קודם התלמיד/ה, ואחר כך המחנך/ת.');
+  const row = h('div', { class: 'row cardextras' },
+    h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsMutual, onchange: (e) => { cardsMutual = e.target.checked; note.hidden = !cardsMutual; } }), 'שיחה הדדית: גם המחנך/ת עונה'),
+    navigator.wakeLock && navigator.wakeLock.request ? h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsWakeWanted, onchange: (e) => { cardsWakeWanted = e.target.checked; cardsSetWake(cardsWakeWanted); } }), 'לא לכבות את המסך') : null,
+    document.documentElement.requestFullscreen ? h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen().catch(() => toast('הדפדפן לא אפשר מסך מלא')); } }, 'מסך מלא') : null);
+  return [note, row];
+}
+function cardsHeader(title, sub, back = ['/tools/cards', 'בחירת דרך אחרת']) {
+  return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, title), link(back[0], back[1], 'btn ghost sm')), sub ? h('p', { class: 'muted small', style: 'max-width:62ch' }, sub) : null);
+}
+
+// חפיסה שמחליקים בה: ימינה = הקלף הבא (כמו דפדוף בעברית), הקשה = הפיכה
+function cardDeck({ list, first = 'q', cover = false, start = 0, label = '', onIndex }) {
+  const n = list.length; let i = start;
+  const fl = cFlipper();
+  const counter = h('p', { class: 'small muted cardcount', 'aria-live': 'polite' });
+  const anim = h('div', { class: 'cardanim' }, fl.el);
+  const slider = h('div', { class: 'cardslider' }, anim);
+  function render(dir) {
+    fl.set(list[i], first === 'img', cover);
+    counter.textContent = `${label}קלף ${i + 1} מתוך ${n}`;
+    [1, -1].forEach((d) => { new Image().src = cImg(list[(i + d + n) % n]); });
+    if (dir) { anim.classList.remove('in-next', 'in-prev'); void anim.offsetWidth; anim.classList.add(dir > 0 ? 'in-next' : 'in-prev'); }
+    if (onIndex) onIndex(i);
   }
-  function howto() {
-    return h('details', { class: 'frame' }, h('summary', { style: 'cursor:pointer;font-weight:700;color:var(--lead)' }, 'שלוש דרכים להשתמש בקלפים'),
+  const go = (d) => { i = (i + d + n) % n; render(d); };
+  let drag = null, swallowClick = false;
+  slider.addEventListener('pointerdown', (e) => { if (e.button) return; drag = { x: e.clientX, dx: 0, moved: false }; try { slider.setPointerCapture(e.pointerId); } catch { /* ממשיכים בלי לכידה */ } });
+  slider.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    drag.dx = e.clientX - drag.x;
+    if (Math.abs(drag.dx) > 8) drag.moved = true;
+    if (drag.moved) { slider.classList.add('dragging'); slider.style.transform = `translateX(${drag.dx}px) rotate(${drag.dx / 50}deg)`; }
+  });
+  const end = (e) => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    slider.classList.remove('dragging'); slider.style.transform = '';
+    if (e.type === 'pointercancel') return;
+    if (d.moved) { swallowClick = true; setTimeout(() => { swallowClick = false; }, 0); if (Math.abs(d.dx) > 70) go(d.dx > 0 ? 1 : -1); }
+  };
+  slider.addEventListener('pointerup', end); slider.addEventListener('pointercancel', end);
+  fl.el.addEventListener('click', () => { if (!swallowClick) fl.flip(); });
+  const onKey = (e) => {
+    if (!slider.isConnected) { document.removeEventListener('keydown', onKey); return; }
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName || '')) return;
+    if (e.key === 'ArrowLeft') go(1); else if (e.key === 'ArrowRight') go(-1);
+  };
+  document.addEventListener('keydown', onKey);
+  const stage = h('section', { class: 'frame cardstage' }, slider, counter,
+    h('div', { class: 'row cardbtns' },
+      h('button', { class: 'btn soft', type: 'button', onclick: () => go(-1) }, 'הקודם →'),
+      h('button', { class: 'btn', type: 'button', onclick: () => fl.flip() }, cover ? 'משיכה והפיכה' : 'הפיכת הקלף'),
+      h('button', { class: 'btn soft', type: 'button', onclick: () => go(1) }, '← הבא')),
+    h('p', { class: 'micro muted' }, 'החליקו ימינה לקלף הבא ושמאלה לקודם. הקישו על הקלף כדי להפוך אותו.'));
+  add(stage, cardsExtras(stage));
+  render(0);
+  return stage;
+}
+
+/* ---------- מסך הפתיחה: בוחרים דרך ---------- */
+function cardsHome() {
+  const D = cardsData();
+  const mode = (to, icon, title, desc, tag) => h('a', { class: 'frame cardmode', href: '#' + to, onclick: (e) => { e.preventDefault(); go(to); } },
+    ic(icon, { size: 40, tone: 'blue' }), h('div', { class: 'stack', style: 'gap:6px' }, h('div', { class: 'row' }, h('h3', null, title), tag ? h('span', { class: 'tag lead' }, tag) : null), h('p', { class: 'muted' }, desc)));
+  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
+    h('section', { class: 'frame cardshero' }, h('div', { class: 'stack' }, h('div', null, link('/tools', 'ארגז כלים', 'btn ghost sm')), h('h2', null, 'קלפי שיח וקשר אישי'),
+      h('p', { style: 'max-width:56ch;font-size:18px' }, `${D.cards.length} קלפים לשיחה אישית: בצד אחד שאלה, ובצד השני תמונה. אפשר לפתוח את הטלפון בשיחה ולעבוד איתו כמו עם קלפים אמיתיים. איך נעבוד היום?`)),
+      h('img', { src: 'cards/t05.webp', alt: '', loading: 'lazy' })),
+    h('div', { class: 'grid cardmodes' },
+      mode('/tools/cards/topics', 'checklist', 'לפי נושא', 'התלמיד/ה בוחר/ת נושא, ומשם מקבלים שאלות שקשורות אליו.'),
+      mode('/tools/cards/pictures', 'eye', 'דרך תמונה', 'ארבע תמונות על המסך. התלמיד/ה בוחר/ת תמונה אחת, והקלף מסתובב לשאלה.'),
+      mode('/tools/cards/random', 'idea', 'קלף מעורבב', 'כל השאלות מעורבבות, ומושכים קלף אחד. אפשר להפוך אותו לתמונה.'),
+      mode('/tools/cards/depth', 'steps', 'לפי עומק השיחה', 'שאלות קלילות להיכרות, שאלות להעמקה ושאלות לשיחה עמוקה, בהתאם לרמת הקשר.', 'חדש')),
+    h('div', { class: 'row' }, link('/tools/cards/browse', 'לדפדף בכל הקלפים', 'btn soft')),
+    h('details', { class: 'frame' }, h('summary', { style: 'cursor:pointer;font-weight:700;color:var(--lead)' }, 'איך משתמשים בשיחה'),
       h('div', { class: 'grid', style: 'margin-top:14px' },
-        h('div', { class: 'well' }, h('h4', null, 'שיח דרך תמונה'), h('p', { class: 'small' }, 'לפתיחת שיחה ושבירת קרח. מציגים פריסה של תמונות, והתלמיד/ה בוחר/ת דימוי שמספר על ההרגשה שלו/ה. להעמקה: הופכים את הקלף הנבחר וענים על השאלה.')),
-        h('div', { class: 'well' }, h('h4', null, 'שיח דרך שאלה'), h('p', { class: 'small' }, 'לשיח ישיר וכנה. מציגים את השאלות, והתלמיד/ה בוחר/ת שאלה שהוא/היא רוצה לענות עליה היום.')),
-        h('div', { class: 'well' }, h('h4', null, 'עבודה לפי נושא'), h('p', { class: 'small' }, 'להעמקה בנושא מסוים: בוחרים מראש נושא (לימודים, בית, חברות, כנות ועוד), ומציעים רק את הקלפים הרלוונטיים.'))));
+        h('div', { class: 'well' }, h('h4', null, 'מכינים'), h('p', { class: 'small' }, 'בוחרים דרך אחת, מוצאים מקום שקט, ופותחים את הטלפון. אפשר לסמן "לא לכבות את המסך" בתחתית הקלף.')),
+        h('div', { class: 'well' }, h('h4', null, 'משוחחים'), h('p', { class: 'small' }, 'התלמיד/ה בוחר/ת, ולא מחייבים לענות. אפשר תמיד להחליף קלף. אם רוצים, גם המחנך/ת עונה (סימון "שיחה הדדית").')),
+        h('div', { class: 'well' }, h('h4', null, 'ממשיכים'), h('p', { class: 'small' }, 'אחרי השיחה אפשר לעדכן את רמת הקשר ב"מיפוי הכיתה". העוזר לקשר מציע גם קלפים שמתאימים לרמה שיצאה.')))));
+}
+
+/* ---------- 1. לפי נושא ---------- */
+function cardsTopics() {
+  const D = cardsData();
+  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
+    cardsHeader('בוחרים נושא', 'התלמיד/ה בוחר/ת נושא שמעניין אותם, ומשם מקבלים שאלות שקשורות אליו.'),
+    h('div', { class: 'cattiles' }, D.categories.map((cat) => {
+      const cards = D.cards.filter((c) => c.cat === cat.id);
+      const rep = cards[Math.floor(Math.random() * cards.length)];
+      return h('a', { class: 'cattile', href: '#/tools/cards/topic/' + cat.id, onclick: (e) => { e.preventDefault(); go('/tools/cards/topic/' + cat.id); } },
+        h('img', { src: cThumb(rep), alt: '', loading: 'lazy' }), h('span', { class: 'cattext' }, h('b', null, cat.t), h('small', null, `${cards.length} שאלות`)));
+    })));
+}
+function cardsTopic(id) {
+  const D = cardsData();
+  const cat = D.categories.find((c) => c.id === id);
+  if (!cat) return redirect('/tools/cards/topics');
+  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
+    cardsHeader(cat.t, 'מחליקים בין השאלות בנושא, או חוזרים לבחור נושא אחר.', ['/tools/cards/topics', 'לנושאים']),
+    cardDeck({ list: cShuffle(D.cards.filter((c) => c.cat === id)) }));
+}
+
+/* ---------- 2. דרך תמונה: ארבע תמונות, בוחרים אחת והקלף מסתובב לשאלה ---------- */
+function cardsPictures() {
+  const D = cardsData();
+  const seen = new Set();
+  let shown = [];
+  const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
+  function draw() {
+    let pool = D.cards.filter((c) => !seen.has(c.n));
+    if (pool.length < 4) { seen.clear(); pool = D.cards.slice(); }
+    shown = cShuffle(pool).slice(0, 4);
+    shown.forEach((c) => seen.add(c.n));
   }
+  function pick() {
+    clear(root);
+    const grid = h('div', { class: 'picks' }, shown.map((c, idx) => h('button', { class: 'picktile', type: 'button', 'aria-label': `תמונה ${idx + 1}`, onclick: () => { if (!swallow) show(c); } }, h('img', { src: cImg(c), alt: '', draggable: 'false' }))));
+    // החלקה על התמונות מחליפה את כל הארבע
+    let sx = null, swallow = false;
+    grid.addEventListener('pointerdown', (e) => { sx = e.clientX; });
+    grid.addEventListener('pointerup', (e) => { if (sx === null) return; const dx = e.clientX - sx; sx = null; if (Math.abs(dx) > 70) { swallow = true; setTimeout(() => { swallow = false; }, 0); draw(); pick(); } });
+    add(root, [cardsHeader('בוחרים תמונה', 'התלמיד/ה בוחר/ת את התמונה שמדברת אליהם, והקלף יסתובב לשאלה.'),
+      h('section', { class: 'frame' }, grid, h('div', { class: 'row', style: 'justify-content:center' }, h('button', { class: 'btn soft', type: 'button', onclick: () => { draw(); pick(); } }, 'ארבע תמונות אחרות')), h('p', { class: 'micro muted', style: 'text-align:center' }, 'לא אהבו אף תמונה? מחליקים הצידה או לוחצים על הכפתור.'))]);
+    window.scrollTo(0, 0);
+  }
+  function show(c) {
+    clear(root);
+    const fl = cFlipper();
+    fl.set(c, true); // מתחילים מהתמונה שנבחרה, ואז הקלף מסתובב לשאלה
+    setTimeout(() => { if (fl.el.isConnected) fl.flip(false); }, 650);
+    fl.el.addEventListener('click', () => fl.flip());
+    const stage = h('section', { class: 'frame cardstage' }, h('div', { class: 'cardslider' }, h('div', { class: 'cardanim in-next' }, fl.el)),
+      h('div', { class: 'row cardbtns' }, h('button', { class: 'btn', type: 'button', onclick: () => fl.flip() }, 'הפיכת הקלף'), h('button', { class: 'btn soft', type: 'button', onclick: pick }, 'לאותן ארבע תמונות'), h('button', { class: 'btn soft', type: 'button', onclick: () => { draw(); pick(); } }, 'ארבע תמונות חדשות')),
+      h('p', { class: 'micro muted' }, 'לא מתאימה השאלה? חוזרים לתמונות ובוחרים אחרת. התמונה והשאלה הם שני צדדים של אותו קלף.'));
+    add(stage, cardsExtras(stage));
+    add(root, [cardsHeader('הקלף שנבחר', null), stage]);
+    window.scrollTo(0, 0);
+  }
+  draw(); pick();
+  return root;
+}
+
+/* ---------- 3. קלף מעורבב: משכו קלף ---------- */
+function cardsRandom() {
+  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
+    cardsHeader('קלף מעורבב', 'כל השאלות מעורבבות. מקישים כדי למשוך קלף, ושוב כדי להפוך אותו לתמונה. מחליקים לקלף הבא.'),
+    cardDeck({ list: cShuffle(cardsData().cards), cover: true }));
+}
+
+/* ---------- 4. לפי עומק השיחה (מתאים לרמת הקשר במיפוי) ---------- */
+function cardsDepthHome() {
+  const D = cardsData();
+  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
+    cardsHeader('לפי עומק השיחה', 'שאלות קלילות מתאימות להתחלה, ושאלות עמוקות לקשר שכבר יש בו אמון. כך מתאימים את הקלפים לרמת הקשר.'),
+    h('div', { class: 'grid cardmodes' }, DEPTHS.map((dp) => h('a', { class: 'frame cardmode depth', href: '#/tools/cards/depth/' + dp.n, onclick: (e) => { e.preventDefault(); go('/tools/cards/depth/' + dp.n); } },
+      h('span', { class: 'group-badge' }, dp.n), h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, dp.t), h('p', { class: 'muted' }, dp.d), h('span', { class: 'tag', style: 'align-self:flex-start' }, `${dp.link} · ${D.cards.filter((c) => c.d === dp.n).length} קלפים`))))),
+    h('p', { class: 'small muted' }, 'לא בטוחים באיזה קשר אתם? ', link('/mapping/helper', 'העוזר לקשר', 'btn ghost sm'), ' עוזר להבין, ואז מציע קלפים שמתאימים.'));
+}
+function cardsDepth(n) {
+  const dp = DEPTHS.find((x) => x.n === n);
+  if (!dp) return redirect('/tools/cards/depth');
+  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
+    cardsHeader(dp.t, `${dp.d} מתאים ל${dp.link}.`, ['/tools/cards/depth', 'לרמות העומק']),
+    cardDeck({ list: cShuffle(cardsData().cards.filter((c) => c.d === n)), label: `${dp.t}: ` }));
+}
+
+/* ---------- דפדוף בכל הקלפים: חפיסה או פריסה, עם סינון ---------- */
+function cardsBrowse() {
+  const D = cardsData();
+  const st = { view: 'deck', cat: 'all', first: 'q', i: 0, list: [], filtersOpen: undefined };
+  const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
+  const reset = (shuffle) => { const p = D.cards.filter((c) => st.cat === 'all' || c.cat === st.cat); st.list = shuffle ? cShuffle(p) : p; st.i = 0; };
   function filters() {
     const cat = chipGroup({ options: [{ v: 'all', t: 'כל הנושאים' }, ...D.categories.map((c) => ({ v: c.id, t: c.t }))], value: st.cat, cls: 'sm', label: 'נושא', onChange: (v) => { st.cat = v; reset(false); paint(); } });
-    const first = chipGroup({ options: [{ v: 'q', t: 'שאלה קודם' }, { v: 'img', t: 'תמונה קודם' }], value: st.first, cls: 'sm', label: 'מה רואים קודם', onChange: (v) => { st.first = v; st.flipped = v === 'img'; paint(); } });
+    const first = chipGroup({ options: [{ v: 'q', t: 'שאלה קודם' }, { v: 'img', t: 'תמונה קודם' }], value: st.first, cls: 'sm', label: 'מה רואים קודם', onChange: (v) => { st.first = v; paint(); } });
     const open = st.filtersOpen === undefined ? st.view === 'spread' : st.filtersOpen;
-    const summary = `${st.cat === 'all' ? 'כל הנושאים' : catName(st.cat)} · ${st.first === 'q' ? 'שאלה קודם' : 'תמונה קודם'}`;
-    const box = h('details', { class: 'frame filters', open }, h('summary', { style: 'cursor:pointer;font-weight:700;color:var(--lead);display:flex;gap:10px;flex-wrap:wrap;align-items:baseline' }, 'נושא וסידור הקלפים', h('span', { class: 'small muted', style: 'font-weight:400' }, summary)),
-      h('div', { class: 'stack', style: 'margin-top:14px' },
-        h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'נושא'), cat),
-        h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'מה רואים קודם'), first),
-        h('div', { class: 'row' }, h('button', { class: 'btn soft sm', type: 'button', onclick: () => { reset(true); paint(); toast('הקלפים עורבבו'); } }, 'ערבוב'),
-          st.view === 'deck' ? h('button', { class: 'btn soft sm', type: 'button', onclick: () => { st.i = Math.floor(Math.random() * st.list.length); st.flipped = st.first === 'img'; paint(); } }, 'קלף אקראי') : null,
-          canWake ? h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: !!st.wakeWanted, onchange: (e) => { st.wakeWanted = e.target.checked; setWake(e.target.checked); } }), 'לא לכבות את המסך בזמן שיחה') : null)));
+    const box = h('details', { class: 'frame filters', open }, h('summary', { style: 'cursor:pointer;font-weight:700;color:var(--lead);display:flex;gap:10px;flex-wrap:wrap;align-items:baseline' }, 'נושא וסידור הקלפים', h('span', { class: 'small muted', style: 'font-weight:400' }, `${st.cat === 'all' ? 'כל הנושאים' : cCat(st.cat)} · ${st.first === 'q' ? 'שאלה קודם' : 'תמונה קודם'}`)),
+      h('div', { class: 'stack', style: 'margin-top:14px' }, h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'נושא'), cat), h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'מה רואים קודם'), first),
+        h('div', { class: 'row' }, h('button', { class: 'btn soft sm', type: 'button', onclick: () => { reset(true); paint(); toast('הקלפים עורבבו'); } }, 'ערבוב'))));
     box.addEventListener('toggle', () => { st.filtersOpen = box.open; });
     return box;
   }
-
-  function deck() {
-    const counter = h('p', { class: 'small muted cardcount', 'aria-live': 'polite' });
-    const front = h('div', { class: 'cardface qface' }), back = h('div', { class: 'cardface imgface' });
-    const flipper = h('div', { class: 'cardflipper', role: 'button', tabindex: '0', 'aria-label': 'הפיכת הקלף' }, h('div', { class: 'cardinner' }, front, back));
-    const anim = h('div', { class: 'cardanim' }, flipper);
-    const slider = h('div', { class: 'cardslider' }, anim);
-    function render(dir) {
-      const c = st.list[st.i];
-      clear(front); clear(back);
-      front.append(h('p', { class: 'cardq' }, c.q), h('span', { class: 'cardcat' }, catName(c.cat)));
-      back.append(h('img', { src: img(c), alt: 'תמונה לשיחה', draggable: 'false' }));
-      flipper.classList.toggle('flipped', st.flipped);
-      counter.textContent = `קלף ${st.i + 1} מתוך ${st.list.length}`;
-      [1, -1].forEach((d) => { new Image().src = img(st.list[(st.i + d + st.list.length) % st.list.length]); });
-      if (dir) { anim.classList.remove('in-next', 'in-prev'); void anim.offsetWidth; anim.classList.add(dir > 0 ? 'in-next' : 'in-prev'); }
-    }
-    const go = (d) => { st.i = (st.i + d + st.list.length) % st.list.length; st.flipped = st.first === 'img'; render(d); };
-    const flip = () => { st.flipped = !st.flipped; flipper.classList.toggle('flipped', st.flipped); };
-    // החלקה: בעברית ימינה = הקלף הבא (כמו דפדוף). נגיעה בלי תנועה = הפיכה.
-    let drag = null;
-    let swallowClick = false;
-    slider.addEventListener('pointerdown', (e) => { if (e.button) return; drag = { x: e.clientX, dx: 0, moved: false }; try { slider.setPointerCapture(e.pointerId); } catch { /* ממשיכים בלי לכידה */ } });
-    slider.addEventListener('pointermove', (e) => {
-      if (!drag) return;
-      drag.dx = e.clientX - drag.x;
-      if (Math.abs(drag.dx) > 8) drag.moved = true;
-      if (drag.moved) { slider.classList.add('dragging'); slider.style.transform = `translateX(${drag.dx}px) rotate(${drag.dx / 50}deg)`; }
-    });
-    const end = (e) => {
-      if (!drag) return;
-      const d = drag; drag = null;
-      slider.classList.remove('dragging'); slider.style.transform = '';
-      if (e.type === 'pointercancel') return;
-      if (d.moved) { swallowClick = true; setTimeout(() => { swallowClick = false; }, 0); if (Math.abs(d.dx) > 70) go(d.dx > 0 ? 1 : -1); }
-    };
-    slider.addEventListener('pointerup', end); slider.addEventListener('pointercancel', end);
-    // הפיכה בלחיצה (נגיעה, עכבר, קורא מסך). אחרי החלקה הלחיצה מתעלמים ממנה.
-    flipper.addEventListener('click', () => { if (!swallowClick) flip(); });
-    flipper.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
-    const onKey = (e) => {
-      if (!slider.isConnected) { document.removeEventListener('keydown', onKey); return; }
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target.tagName || ''))) return;
-      if (e.key === 'ArrowLeft') go(1); else if (e.key === 'ArrowRight') go(-1);
-    };
-    document.addEventListener('keydown', onKey);
-    const stage = h('section', { class: 'frame cardstage' }, slider, counter,
-      h('div', { class: 'row cardbtns' },
-        h('button', { class: 'btn soft', type: 'button', onclick: () => go(-1) }, 'הקודם →'),
-        h('button', { class: 'btn', type: 'button', onclick: flip }, 'הפיכת הקלף'),
-        h('button', { class: 'btn soft', type: 'button', onclick: () => go(1) }, '← הבא')),
-      h('p', { class: 'micro muted' }, 'החליקו ימינה לקלף הבא ושמאלה לקודם. הקישו על הקלף כדי להפוך אותו.'),
-      canFullscreen ? h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen().catch(() => toast('הדפדפן לא אפשר מסך מלא')); } }, 'מסך מלא')) : null);
-    render(0);
-    return stage;
+  function head() {
+    const view = chipGroup({ options: [{ v: 'deck', t: 'חפיסה' }, { v: 'spread', t: 'פריסה' }], value: st.view, cls: 'sm', label: 'תצוגה', onChange: (v) => { st.view = v; st.filtersOpen = v === 'spread'; paint(); } });
+    return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, 'כל הקלפים'), link('/tools/cards', 'בחירת דרך אחרת', 'btn ghost sm')), h('p', { class: 'muted small' }, 'מדפדפים בכל הקלפים, בחפיסה או בפריסה.'), view);
   }
-
   function spread() {
     const picture = st.first === 'img';
     return h('section', { class: 'frame' }, h('h3', null, picture ? 'בוחרים תמונה' : 'בוחרים שאלה'),
-      h('p', { class: 'muted small' }, picture ? 'לוחצים על התמונה שמדברת אליכם. אפשר אחר כך להפוך אותה ולראות את השאלה.' : 'לוחצים על שאלה שרוצים לענות עליה. אפשר אחר כך להפוך אותה ולראות תמונה.'),
-      h('div', { class: 'cardgrid' }, st.list.map((c, idx) => h('button', { class: 'cardtile ' + (picture ? 'pic' : 'ques'), type: 'button', 'aria-label': picture ? `תמונה ${idx + 1}` : c.q, onclick: () => { st.view = 'deck'; st.i = idx; st.flipped = picture; paint(); window.scrollTo(0, 0); } },
-        picture ? h('img', { src: thumb(c), alt: '', loading: 'lazy', draggable: 'false' }) : h('span', null, c.q)))));
+      h('div', { class: 'cardgrid' }, st.list.map((c, idx) => h('button', { class: 'cardtile ' + (picture ? 'pic' : 'ques'), type: 'button', 'aria-label': picture ? `תמונה ${idx + 1}` : c.q, onclick: () => { st.view = 'deck'; st.i = idx; paint(); window.scrollTo(0, 0); } },
+        picture ? h('img', { src: cThumb(c), alt: '', loading: 'lazy', draggable: 'false' }) : h('span', null, c.q)))));
   }
-
   function paint() {
     const y0 = window.scrollY;
     clear(root);
-    if (!st.list.length) reset(false);
-    add(root, st.view === 'deck' ? [head(), deck(), filters(), howto()] : [head(), filters(), spread(), howto()]);
+    add(root, st.view === 'deck' ? [head(), cardDeck({ list: st.list, first: st.first, start: st.i, onIndex: (k) => { st.i = k; } }), filters()] : [head(), filters(), spread()]);
     window.scrollTo(0, y0);
   }
-  reset(false);
-  paint();
+  reset(false); paint();
   return root;
+}
+
+function viewCards(p) {
+  const sub = p.replace(/^\/tools\/cards\/?/, '');
+  let m;
+  if (!sub) return cardsHome();
+  if (sub === 'topics') return cardsTopics();
+  if ((m = /^topic\/([a-z]+)$/.exec(sub))) return cardsTopic(m[1]);
+  if (sub === 'pictures') return cardsPictures();
+  if (sub === 'random') return cardsRandom();
+  if (sub === 'depth') return cardsDepthHome();
+  if ((m = /^depth\/([123])$/.exec(sub))) return cardsDepth(Number(m[1]));
+  if (sub === 'browse') return cardsBrowse();
+  return redirect('/tools/cards');
 }
 
 /* =====================================================================
@@ -785,10 +924,11 @@ function viewHelper() {
       const place = (v) => {
         student.link = v; delete student.x; delete student.y; saveMap(); clear(opts);
         say('bot', `מיקמתי את ${name} בקשר ${v} (${lab(LINKS, v)}). אפשר לשנות בכל רגע במעגלים או בטבלה.`);
-        opts.append(h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => paint(null) }, 'תלמיד/ה נוספ/ת'), link('/mapping/circles', 'לראות במעגלי קשר', 'btn soft'), link('/mapping/map', 'למפת שיחות', 'btn soft')));
+        opts.append(h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => paint(null) }, 'תלמיד/ה נוספ/ת'), link('/mapping/circles', 'לראות במעגלי קשר', 'btn soft'), link('/tools/cards/depth/' + v, 'קלפי שיח לקשר הזה', 'btn soft'), link('/mapping/map', 'למפת שיחות', 'btn soft')));
       };
       opts.append(h('button', { class: 'btn chatopt', type: 'button', onclick: () => { say('me', `ממקמים בקשר ${level}`); place(level); } }, `למקם את ${name} בקשר ${level}`),
         h('div', { class: 'row' }, h('span', { class: 'small muted' }, 'או לבחור בעצמנו:'), [1, 2, 3].filter((v) => v !== level).map((v) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => { say('me', `ממקמים בקשר ${v}`); place(v); } }, `קשר ${v}`))), urgent,
+        h('div', { class: 'row' }, link('/tools/cards/depth/' + level, 'קלפי שיח שמתאימים לקשר הזה', 'btn soft sm')),
         h('button', { class: 'btn ghost sm', type: 'button', onclick: () => paint(student) }, 'להתחיל מחדש'));
     }
     say('bot', `היי! אשאל עד שלוש שאלות קצרות, כן או לא, על ${name}, ואמליץ באיזה מעגל למקם אותם. אין תשובות נכונות, והכול נשאר במכשיר שלכם.`);
