@@ -452,7 +452,7 @@ function toolCard(t) {
    ===================================================================== */
 let cardsMutual = false, cardsWakeWanted = false, cardsWakeLock = null;
 let cardsFull = true;   // העדפה: קלפים נפתחים במסך מלא (אפשר לכבות בכפתור "יציאה ממסך מלא")
-let cardsRot = false, cardsLocked = false, cardsContain = false;
+let cardsRot = false, cardsLocked = false, cardsContain = false, cardsChromeOff = false, cardsHinted = false;
 const CARDS_IMMERSIVE = (sub) => /^(topic\/|pictures$|random$|depth\/|type\/)/.test(sub);
 // ימינה/שמאלה בהחלקה: כשהמסך מסובב בעזרת CSS, כיוון ההחלקה מתחלף לציר האנכי
 const cAxisY = () => cardsRot && !!document.querySelector('.cardsview.rot');
@@ -460,11 +460,17 @@ function cardsApply() { // מעדכן את המסך הנוכחי בלי לבנו
   const v = document.querySelector('.cardsview');
   if (!v) return;
   const on = cardsFull && v.classList.contains('imm');
-  v.classList.toggle('full', on); v.classList.toggle('rot', on && cardsRot); v.classList.toggle('contain', cardsContain);
+  v.classList.toggle('full', on); v.classList.toggle('rot', on && cardsRot); v.classList.toggle('contain', cardsContain); v.classList.toggle('nochrome', on && cardsChromeOff);
   document.body.classList.toggle('cards-full', on);
   document.querySelectorAll('.fsbtn').forEach((b) => { b.textContent = cardsFull ? 'יציאה ממסך מלא' : 'מסך מלא'; });
   document.querySelectorAll('.rotbtn').forEach((b) => { b.textContent = cardsRot || cardsLocked ? 'חזרה לאורך' : 'סיבוב לרוחב'; });
   document.querySelectorAll('.fitbtn').forEach((b) => { b.textContent = cardsContain ? 'תמונה ממלאת' : 'תמונה שלמה'; });
+}
+function cardsSetChrome(show) { cardsChromeOff = !show; cardsApply(); }
+// הקשה על הקלף במסך מלא: הסרגלים נעלמים ונשאר רק הקלף. כשהם מוסתרים, הקשה הופכת את הקלף, ונקודה קטנה בפינה מחזירה אותם.
+function cardTap(flip) {
+  const v = document.querySelector('.cardsview.full');
+  if (v && !cardsChromeOff) cardsSetChrome(false); else flip();
 }
 function cardsNative(on) { // מסך מלא של הדפדפן (מסתיר סרגלים). לא נתמך בכל מכשיר, ואז נשארים עם מסך מלא בתוך האתר
   try {
@@ -486,11 +492,12 @@ async function cardsToggleRot() {
 }
 // יציאה מכל מסכי הקלפים (או מעבר למסך תפריט): משחררים מסך מלא, נעילת סיבוב ומסך דלוק
 function cardsLeave() {
-  document.body.classList.remove('cards-full');
+  document.body.classList.remove('cards-full'); cardsChromeOff = false;
   cardsNative(false); cardsUnlockRot();
   if (cardsWakeLock) cardsSetWake(false);
 }
 const cardsFsButton = () => h('button', { class: 'btn soft sm fsbtn', type: 'button', onclick: () => cardsSetFull(!cardsFull) }, cardsFull ? 'יציאה ממסך מלא' : 'מסך מלא');
+const cardsHideButton = () => h('button', { class: 'btn soft sm hidebtn', type: 'button', onclick: () => cardsSetChrome(false) }, 'הסתרת סרגל');
 const cardsRotButton = () => h('button', { class: 'btn soft sm rotbtn', type: 'button', onclick: cardsToggleRot }, cardsRot || cardsLocked ? 'חזרה לאורך' : 'סיבוב לרוחב');
 const cardsFitButton = () => h('button', { class: 'btn soft sm fitbtn', type: 'button', onclick: () => { cardsContain = !cardsContain; cardsApply(); } }, cardsContain ? 'תמונה ממלאת' : 'תמונה שלמה');
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && cardsFull && document.body.classList.contains('cards-full')) { cardsFull = false; cardsUnlockRot(); cardsApply(); } });
@@ -549,7 +556,7 @@ function cardsExtras(stage) {
   return [note, row];
 }
 function cardsHeader(title, sub, back = ['/tools/cards', 'בחירת דרך אחרת']) {
-  return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, title), h('div', { class: 'row' }, cardsFsButton(), cardsRotButton(), cardsFitButton(), link(back[0], back[1], 'btn ghost sm'))), sub ? h('p', { class: 'muted small', style: 'max-width:62ch' }, sub) : null);
+  return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, title), h('div', { class: 'row' }, cardsHideButton(), cardsFsButton(), cardsRotButton(), cardsFitButton(), link(back[0], back[1], 'btn ghost sm'))), sub ? h('p', { class: 'muted small', style: 'max-width:62ch' }, sub) : null);
 }
 
 // חפיסה שמחליקים בה: ימינה = הקלף הבא (כמו דפדוף בעברית), הקשה = הפיכה
@@ -583,7 +590,7 @@ function cardDeck({ list, first = 'q', cover = false, start = 0, label = '', onI
     if (d.moved) { swallowClick = true; setTimeout(() => { swallowClick = false; }, 0); if (Math.abs(d.dx) > 70) go(d.dx > 0 ? 1 : -1); }
   };
   slider.addEventListener('pointerup', end); slider.addEventListener('pointercancel', end);
-  fl.el.addEventListener('click', () => { if (!swallowClick) fl.flip(); });
+  fl.el.addEventListener('click', () => { if (!swallowClick) cardTap(() => fl.flip()); });
   const onKey = (e) => {
     if (!slider.isConnected) { document.removeEventListener('keydown', onKey); return; }
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName || '')) return;
@@ -684,7 +691,7 @@ function cardsPictures() {
     const fl = cFlipper();
     fl.set(c, true); // מתחילים מהתמונה שנבחרה, ואז הקלף מסתובב לשאלה
     setTimeout(() => { if (fl.el.isConnected) fl.flip(false); }, 650);
-    fl.el.addEventListener('click', () => fl.flip());
+    fl.el.addEventListener('click', () => cardTap(() => fl.flip()));
     const stage = h('section', { class: 'frame cardstage' }, h('div', { class: 'cardslider' }, h('div', { class: 'cardanim in-next' }, fl.el)),
       h('div', { class: 'row cardbtns' }, h('button', { class: 'btn', type: 'button', onclick: () => fl.flip() }, 'הפיכת הקלף'), h('button', { class: 'btn soft', type: 'button', onclick: pick }, 'לאותן ארבע תמונות'), h('button', { class: 'btn soft', type: 'button', onclick: () => { draw(); pick(); } }, 'ארבע תמונות חדשות')),
       h('p', { class: 'micro muted' }, 'לא מתאימה השאלה? חוזרים לתמונות ובוחרים אחרת. התמונה והשאלה הם שני צדדים של אותו קלף.'));
@@ -759,7 +766,7 @@ function cardsBrowse() {
   }
   function head() {
     const view = chipGroup({ options: [{ v: 'deck', t: 'חפיסה' }, { v: 'spread', t: 'פריסה' }], value: st.view, cls: 'sm', label: 'תצוגה', onChange: (v) => { st.view = v; st.filtersOpen = v === 'spread'; paint(); } });
-    return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, 'כל הקלפים'), h('div', { class: 'row' }, cardsFsButton(), cardsRotButton(), cardsFitButton(), link('/tools/cards', 'בחירת דרך אחרת', 'btn ghost sm'))), h('p', { class: 'muted small' }, 'מדפדפים בכל הקלפים, בחפיסה או בפריסה.'), view);
+    return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, 'כל הקלפים'), h('div', { class: 'row' }, cardsHideButton(), cardsFsButton(), cardsRotButton(), cardsFitButton(), link('/tools/cards', 'בחירת דרך אחרת', 'btn ghost sm'))), h('p', { class: 'muted small' }, 'מדפדפים בכל הקלפים, בחפיסה או בפריסה.'), view);
   }
   function spread() {
     const picture = st.first === 'img';
@@ -785,7 +792,9 @@ function viewCards(p) {
   document.body.classList.toggle('cards-full', on);
   // הקלף נפתח במסך מלא. הבקשה למסך מלא של הדפדפן נעשית מתוך הלחיצה שהביאה אותנו לכאן.
   if (on) { cardsNative(true); if (!cardsWakeLock) cardsSetWake(true); } else if (!imm && sub !== 'browse') cardsLeave();
-  return h('div', { class: 'cardsview' + (imm ? ' imm' : '') + (on ? ' full' : '') + (on && cardsRot ? ' rot' : '') + (cardsContain ? ' contain' : '') }, cardsRoute(p));
+  if (on && !cardsChromeOff && !cardsHinted) { cardsHinted = true; setTimeout(() => toast('הקישו על הקלף כדי להסתיר את הסרגל'), 700); }
+  return h('div', { class: 'cardsview' + (imm ? ' imm' : '') + (on ? ' full' : '') + (on && cardsRot ? ' rot' : '') + (cardsContain ? ' contain' : '') + (on && cardsChromeOff ? ' nochrome' : '') }, cardsRoute(p),
+    h('button', { class: 'chromehandle', type: 'button', 'aria-label': 'הצגת הסרגל', onclick: () => cardsSetChrome(true) }, '⋯'));
 }
 function cardsRoute(p) {
   const sub = p.replace(/^\/tools\/cards\/?/, '');
