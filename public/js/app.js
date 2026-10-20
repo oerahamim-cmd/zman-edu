@@ -327,8 +327,7 @@ function render() {
   const p = route();
   const y0 = window.scrollY, same = p === lastRoute;
   lastRoute = p;
-  if (!p.startsWith('/tools/cards') && typeof cardsWakeLock !== 'undefined' && cardsWakeLock) cardsSetWake(false);
-  if (!p.startsWith('/tools/cards') && typeof cardsFull !== 'undefined' && cardsFull) cardsSetFull(false);
+    if (!p.startsWith('/tools/cards') && typeof cardsLeave === 'function') cardsLeave();
   state.area = p.startsWith('/admin') || p.startsWith('/lead') ? 'admin' : 'public';
   const view = resolve(p);
   clear(app);
@@ -451,19 +450,50 @@ function toolCard(t) {
    מסך פתיחה שבו בוחרים דרך עבודה: לפי נושא, דרך תמונה, קלף מעורבב, לפי עומק השיחה, או דפדוף בכל הקלפים.
    בכל קלף: שאלה בצד אחד, תמונה בצד השני. הקלפים נשארים בדפדפן, ושום דבר לא נשלח או נשמר.
    ===================================================================== */
-let cardsMutual = false, cardsWakeWanted = false, cardsWakeLock = null, cardsFull = false;
+let cardsMutual = false, cardsWakeWanted = false, cardsWakeLock = null;
+let cardsFull = true;   // העדפה: קלפים נפתחים במסך מלא (אפשר לכבות בכפתור "יציאה ממסך מלא")
+let cardsRot = false, cardsLocked = false, cardsContain = false;
+const CARDS_IMMERSIVE = (sub) => /^(topic\/|pictures$|random$|depth\/|type\/)/.test(sub);
+// ימינה/שמאלה בהחלקה: כשהמסך מסובב בעזרת CSS, כיוון ההחלקה מתחלף לציר האנכי
+const cAxisY = () => cardsRot && !!document.querySelector('.cardsview.rot');
+function cardsApply() { // מעדכן את המסך הנוכחי בלי לבנות אותו מחדש (כדי לא לערבב קלפים)
+  const v = document.querySelector('.cardsview');
+  if (!v) return;
+  const on = cardsFull && v.classList.contains('imm');
+  v.classList.toggle('full', on); v.classList.toggle('rot', on && cardsRot); v.classList.toggle('contain', cardsContain);
+  document.body.classList.toggle('cards-full', on);
+  document.querySelectorAll('.fsbtn').forEach((b) => { b.textContent = cardsFull ? 'יציאה ממסך מלא' : 'מסך מלא'; });
+  document.querySelectorAll('.rotbtn').forEach((b) => { b.textContent = cardsRot || cardsLocked ? 'חזרה לאורך' : 'סיבוב לרוחב'; });
+  document.querySelectorAll('.fitbtn').forEach((b) => { b.textContent = cardsContain ? 'תמונה ממלאת' : 'תמונה שלמה'; });
+}
+function cardsNative(on) { // מסך מלא של הדפדפן (מסתיר סרגלים). לא נתמך בכל מכשיר, ואז נשארים עם מסך מלא בתוך האתר
+  try {
+    if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+    else if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  } catch { /* ממשיכים */ }
+}
+function cardsUnlockRot() { cardsRot = false; if (cardsLocked) { cardsLocked = false; try { screen.orientation.unlock(); } catch { /* לא נתמך */ } } }
 function cardsSetFull(on) {
   cardsFull = on;
-  const v = document.querySelector('.cardsview');
-  if (v) v.classList.toggle('full', on);
-  document.body.classList.toggle('cards-full', on);
-  document.querySelectorAll('.fsbtn').forEach((b) => { b.textContent = on ? 'יציאה ממסך מלא' : 'מסך מלא'; });
-  if (on) { if (document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => { /* נשארים עם מסך מלא בתוך האתר */ }); }
-  else if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  window.scrollTo(0, 0);
+  if (!on) cardsUnlockRot();
+  cardsApply(); cardsNative(on);
+  cardsWakeWanted = on; cardsSetWake(on);
+}
+async function cardsToggleRot() {
+  if (cardsRot || cardsLocked) { cardsUnlockRot(); cardsApply(); return; }
+  try { await screen.orientation.lock('landscape'); cardsLocked = true; } catch { cardsRot = true; } // אם אי אפשר לנעול, מסובבים את התצוגה בעצמנו
+  cardsApply();
+}
+// יציאה מכל מסכי הקלפים (או מעבר למסך תפריט): משחררים מסך מלא, נעילת סיבוב ומסך דלוק
+function cardsLeave() {
+  document.body.classList.remove('cards-full');
+  cardsNative(false); cardsUnlockRot();
+  if (cardsWakeLock) cardsSetWake(false);
 }
 const cardsFsButton = () => h('button', { class: 'btn soft sm fsbtn', type: 'button', onclick: () => cardsSetFull(!cardsFull) }, cardsFull ? 'יציאה ממסך מלא' : 'מסך מלא');
-document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && cardsFull) cardsSetFull(false); });
+const cardsRotButton = () => h('button', { class: 'btn soft sm rotbtn', type: 'button', onclick: cardsToggleRot }, cardsRot || cardsLocked ? 'חזרה לאורך' : 'סיבוב לרוחב');
+const cardsFitButton = () => h('button', { class: 'btn soft sm fitbtn', type: 'button', onclick: () => { cardsContain = !cardsContain; cardsApply(); } }, cardsContain ? 'תמונה ממלאת' : 'תמונה שלמה');
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && cardsFull && document.body.classList.contains('cards-full')) { cardsFull = false; cardsUnlockRot(); cardsApply(); } });
 const cardsData = () => window.ZMAN_CARDS || { categories: [], cards: [] };
 const cPad = (n) => String(n).padStart(2, '0');
 const cImg = (c) => `cards/c${cPad(c.p || c.n)}.webp`;
@@ -519,7 +549,7 @@ function cardsExtras(stage) {
   return [note, row];
 }
 function cardsHeader(title, sub, back = ['/tools/cards', 'בחירת דרך אחרת']) {
-  return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, title), h('div', { class: 'row' }, cardsFsButton(), link(back[0], back[1], 'btn ghost sm'))), sub ? h('p', { class: 'muted small', style: 'max-width:62ch' }, sub) : null);
+  return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, title), h('div', { class: 'row' }, cardsFsButton(), cardsRotButton(), cardsFitButton(), link(back[0], back[1], 'btn ghost sm'))), sub ? h('p', { class: 'muted small', style: 'max-width:62ch' }, sub) : null);
 }
 
 // חפיסה שמחליקים בה: ימינה = הקלף הבא (כמו דפדוף בעברית), הקשה = הפיכה
@@ -538,10 +568,10 @@ function cardDeck({ list, first = 'q', cover = false, start = 0, label = '', onI
   }
   const go = (d) => { i = (i + d + n) % n; render(d); };
   let drag = null, swallowClick = false;
-  slider.addEventListener('pointerdown', (e) => { if (e.button) return; drag = { x: e.clientX, dx: 0, moved: false }; try { slider.setPointerCapture(e.pointerId); } catch { /* ממשיכים בלי לכידה */ } });
+  slider.addEventListener('pointerdown', (e) => { if (e.button) return; drag = { x: e.clientX, y: e.clientY, dx: 0, moved: false }; try { slider.setPointerCapture(e.pointerId); } catch { /* ממשיכים בלי לכידה */ } });
   slider.addEventListener('pointermove', (e) => {
     if (!drag) return;
-    drag.dx = e.clientX - drag.x;
+    drag.dx = cAxisY() ? e.clientY - drag.y : e.clientX - drag.x;
     if (Math.abs(drag.dx) > 8) drag.moved = true;
     if (drag.moved) { slider.classList.add('dragging'); slider.style.transform = `translateX(${drag.dx}px) rotate(${drag.dx / 50}deg)`; }
   });
@@ -585,7 +615,10 @@ function cardsHome() {
       mode('/tools/cards/pictures', 'eye', 'דרך תמונה', 'ארבע תמונות על המסך. התלמיד/ה בוחר/ת תמונה אחת, והקלף מסתובב לשאלה.'),
       mode('/tools/cards/random', 'idea', 'קלף מעורבב', 'כל השאלות מעורבבות, ומושכים קלף אחד. אפשר להפוך אותו לתמונה.'),
       mode('/tools/cards/depth', 'steps', 'לפי עומק וסוג השיחה', 'עומק: קליל, להעמיק או מעמיק, בהתאם לרמת הקשר. סוג: זהות וחוזקות, יעדים ומטרות, אג\'נסי ושותפות. אפשר לשלב.', 'חדש')),
-    h('div', { class: 'row' }, link('/tools/cards/browse', 'לדפדף בכל הקלפים', 'btn soft')),
+    h('section', { class: 'frame' }, h('div', { class: 'row' },
+      h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsFull, onchange: (e) => { cardsFull = e.target.checked; } }), 'לפתוח את הקלפים במסך מלא (מומלץ בשיחה)'),
+      h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsMutual, onchange: (e) => { cardsMutual = e.target.checked; } }), 'שיחה הדדית: גם המחנך/ת עונה'),
+      link('/tools/cards/browse', 'לדפדף בכל הקלפים', 'btn soft sm'))),
     h('details', { class: 'frame' }, h('summary', { style: 'cursor:pointer;font-weight:700;color:var(--lead)' }, 'איך משתמשים בשיחה'),
       h('div', { class: 'grid', style: 'margin-top:14px' },
         h('div', { class: 'well' }, h('h4', null, 'מכינים'), h('p', { class: 'small' }, 'בוחרים דרך אחת, מוצאים מקום שקט, ופותחים את הטלפון. אפשר לסמן "לא לכבות את המסך" בתחתית הקלף.')),
@@ -640,10 +673,10 @@ function cardsPictures() {
     const grid = h('div', { class: 'picks' }, shown.map((k, idx) => h('button', { class: 'picktile', type: 'button', 'aria-label': `תמונה ${idx + 1}`, onclick: () => { if (!swallow) show(chooseCard(k)); } }, h('img', { src: cImg(groups.get(k)[0]), alt: '', draggable: 'false' }))));
     // החלקה על התמונות מחליפה את כל הארבע
     let sx = null, swallow = false;
-    grid.addEventListener('pointerdown', (e) => { sx = e.clientX; });
-    grid.addEventListener('pointerup', (e) => { if (sx === null) return; const dx = e.clientX - sx; sx = null; if (Math.abs(dx) > 70) { swallow = true; setTimeout(() => { swallow = false; }, 0); draw(); pick(); } });
+    grid.addEventListener('pointerdown', (e) => { sx = cAxisY() ? e.clientY : e.clientX; });
+    grid.addEventListener('pointerup', (e) => { if (sx === null) return; const dx = (cAxisY() ? e.clientY : e.clientX) - sx; sx = null; if (Math.abs(dx) > 70) { swallow = true; setTimeout(() => { swallow = false; }, 0); draw(); pick(); } });
     add(root, [cardsHeader('בוחרים תמונה', 'התלמיד/ה בוחר/ת את התמונה שמדברת אליהם, והקלף יסתובב לשאלה.'),
-      h('section', { class: 'frame' }, grid, h('div', { class: 'row', style: 'justify-content:center' }, h('button', { class: 'btn soft', type: 'button', onclick: () => { draw(); pick(); } }, 'ארבע תמונות אחרות')), h('p', { class: 'micro muted', style: 'text-align:center' }, 'לא אהבו אף תמונה? מחליקים הצידה או לוחצים על הכפתור.'))]);
+      h('section', { class: 'frame pickframe' }, grid, h('div', { class: 'row picksrow', style: 'justify-content:center' }, h('button', { class: 'btn soft', type: 'button', onclick: () => { draw(); pick(); } }, 'ארבע תמונות אחרות')), h('p', { class: 'micro muted', style: 'text-align:center' }, 'לא אהבו אף תמונה? מחליקים הצידה או לוחצים על הכפתור.'))]);
     window.scrollTo(0, 0);
   }
   function show(c) {
@@ -726,7 +759,7 @@ function cardsBrowse() {
   }
   function head() {
     const view = chipGroup({ options: [{ v: 'deck', t: 'חפיסה' }, { v: 'spread', t: 'פריסה' }], value: st.view, cls: 'sm', label: 'תצוגה', onChange: (v) => { st.view = v; st.filtersOpen = v === 'spread'; paint(); } });
-    return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, 'כל הקלפים'), h('div', { class: 'row' }, cardsFsButton(), link('/tools/cards', 'בחירת דרך אחרת', 'btn ghost sm'))), h('p', { class: 'muted small' }, 'מדפדפים בכל הקלפים, בחפיסה או בפריסה.'), view);
+    return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, 'כל הקלפים'), h('div', { class: 'row' }, cardsFsButton(), cardsRotButton(), cardsFitButton(), link('/tools/cards', 'בחירת דרך אחרת', 'btn ghost sm'))), h('p', { class: 'muted small' }, 'מדפדפים בכל הקלפים, בחפיסה או בפריסה.'), view);
   }
   function spread() {
     const picture = st.first === 'img';
@@ -738,6 +771,7 @@ function cardsBrowse() {
     const y0 = window.scrollY;
     clear(root);
     add(root, st.view === 'deck' ? [head(), cardDeck({ list: st.list, first: st.first, start: st.i, onIndex: (k) => { st.i = k; } }), filters()] : [head(), filters(), spread()]);
+    setTimeout(() => { const v = document.querySelector('.cardsview'); if (v) { v.classList.toggle('imm', st.view === 'deck'); cardsApply(); if (st.view === 'deck' && cardsFull && !cardsWakeLock) cardsSetWake(true); } }, 0);
     window.scrollTo(0, y0);
   }
   reset(false); paint();
@@ -745,8 +779,13 @@ function cardsBrowse() {
 }
 
 function viewCards(p) {
-  document.body.classList.toggle('cards-full', cardsFull);
-  return h('div', { class: 'cardsview' + (cardsFull ? ' full' : '') }, cardsRoute(p));
+  const sub = p.replace(/^\/tools\/cards\/?/, '');
+  const imm = CARDS_IMMERSIVE(sub);
+  const on = imm && cardsFull;
+  document.body.classList.toggle('cards-full', on);
+  // הקלף נפתח במסך מלא. הבקשה למסך מלא של הדפדפן נעשית מתוך הלחיצה שהביאה אותנו לכאן.
+  if (on) { cardsNative(true); if (!cardsWakeLock) cardsSetWake(true); } else if (!imm && sub !== 'browse') cardsLeave();
+  return h('div', { class: 'cardsview' + (imm ? ' imm' : '') + (on ? ' full' : '') + (on && cardsRot ? ' rot' : '') + (cardsContain ? ' contain' : '') }, cardsRoute(p));
 }
 function cardsRoute(p) {
   const sub = p.replace(/^\/tools\/cards\/?/, '');

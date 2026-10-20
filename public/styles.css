@@ -356,3 +356,36 @@ body.cards-full { overflow: hidden; }
 .cardsview.full .cardq { font-size: clamp(24px, 6vw, 54px); }
 @media (orientation: landscape) and (min-width: 700px) { .cardsview.full .picks { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 520px) { .cardsview.full { padding: 6px; } .cardsview.full .cardstage { padding: 8px; } .cardsview.full .cardhead { padding: 8px 12px; } }
+
+/* ---------- מסך מלא אמיתי: הקלף ממלא את כל המסך, הפקדים צפים מעליו ---------- */
+.cardsview:not(.imm) .fsbtn, .cardsview:not(.imm) .rotbtn, .cardsview:not(.imm) .fitbtn, .cardsview:not(.full) .rotbtn, .cardsview:not(.full) .fitbtn { display: none; }
+.cardsview.full { background: #000; padding: 0; overflow: hidden; }
+.cardsview.full > .stack { display: block; max-width: none; margin: 0; min-height: 0; height: 100%; gap: 0; }
+.cardsview.full .cardstage { position: fixed; inset: 0; display: block; padding: 0; margin: 0; border-radius: 0; background: #000; }
+.cardsview.full .cardstage .cardslider { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; }
+.cardsview.full .cardanim, .cardsview.full .cardflipper { width: 100%; height: 100%; aspect-ratio: auto; }
+.cardsview.full .cardinner, .cardsview.full .cardface, .cardsview.full .cardcover { border-radius: 0; }
+.cardsview.full .imgface img { object-fit: cover; }
+.cardsview.full.contain .imgface img { object-fit: contain; background: #000; }
+.cardsview.full .qface { padding: 12vmin 10vmin 16vmin; border: 0; }
+.cardsview.full .qface::before { inset: 3vmin; border-radius: 3vmin; }
+.cardsview.full .cardq { font-size: clamp(28px, 7.5vmin, 84px); }
+.cardsview.full .cardcat { bottom: 11vmin; font-size: clamp(14px, 3vmin, 26px); }
+.cardsview.full .cardhead { position: fixed; top: 10px; inset-inline-end: 10px; inset-inline-start: auto; width: auto; z-index: 30; background: rgba(255,255,255,.92); border-radius: 999px; padding: 6px 10px; }
+.cardsview.full .cardhead h2, .cardsview.full .cardhead > p { display: none; }
+.cardsview.full .cardhead .row.between { justify-content: flex-end; }
+.cardsview.full .cardhead .row { flex-wrap: wrap; gap: 6px; }
+.cardsview.full .cardcount { position: fixed; top: 14px; inset-inline-start: 14px; z-index: 30; background: rgba(0,0,0,.55); color: #fff; padding: 3px 12px; border-radius: 999px; }
+.cardsview.full .cardbtns { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 30; background: rgba(255,255,255,.92); padding: 8px; border-radius: 999px; flex-wrap: nowrap; gap: 8px; }
+.cardsview.full .cardnote { position: fixed; bottom: 76px; left: 12px; right: 12px; z-index: 30; text-align: center; background: rgba(255,255,255,.95); }
+.cardsview.full .cardextras, .cardsview.full .cardstage > .micro { display: none; }
+.cardsview.full .pickframe { position: fixed; inset: 0; padding: 0; margin: 0; border-radius: 0; background: #000; }
+.cardsview.full .picks { position: absolute; inset: 0; margin: 0; gap: 3px; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; animation: none; }
+.cardsview.full .picktile { aspect-ratio: auto; width: 100%; height: 100%; border-radius: 0; }
+.cardsview.full .pickframe > p { display: none; }
+.cardsview.full .pickframe .picksrow { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 30; background: rgba(255,255,255,.92); padding: 8px; border-radius: 999px; }
+/* סיבוב לרוחב כשאי אפשר לנעול את כיוון המסך (למשל באייפון): מסובבים את כל התצוגה ב-90 מעלות */
+.cardsview.full.rot { inset: auto; top: 0; left: 0; right: auto; bottom: auto; width: 100vh; height: 100vw; transform-origin: top left; transform: translateX(100vw) rotate(90deg); }
+@supports (height: 100dvh) { .cardsview.full.rot { width: 100dvh; height: 100dvw; transform: translateX(100dvw) rotate(90deg); } }
+@media (max-width: 520px) { .cardsview.full .cardhead { padding: 4px 8px; } .cardsview.full .cardbtns { padding: 6px; gap: 6px; } .cardsview.full .cardbtns .btn { padding: 10px 14px; } }
+.cardsview.full, .cardsview.full .cardslider, .cardsview.full .picks { touch-action: none; overscroll-behavior: none; }
