@@ -71,7 +71,7 @@ test('אין בשום מקום שדה לתלמיד: שדות מיותרים נז
   const c = await newEducator('בדיקה חמש');
   const r = await c.put('/api/me/reports/2026-10-11', { studentName: 'דני כהן', convs: [{ ...conv(), student: 'דני', studentId: 123, name: 'דני' }] });
   assert.equal(r.status, 200);
-  assert.deepEqual(Object.keys(r.json.report.convs[0]).sort(), ['axis', 'axisOther', 'feeling', 'kind', 'kindOther', 'note', 'round']);
+  assert.deepEqual(Object.keys(r.json.report.convs[0]).sort(), ['axis', 'axisOther', 'depth', 'feeling', 'kind', 'kindOther', 'note', 'round', 'talk']);
   assert.ok(!r.text.includes('דני'));
   // גם בסכמה: אין עמודה שמחזיקה מידע על תלמיד
   const cols = await db.all(`SELECT column_name FROM information_schema.columns WHERE table_name IN ('conversations', 'reports')`);
@@ -103,4 +103,32 @@ test('ההגדרות הציבוריות: שבוע נוכחי ותחילת התכ
   assert.equal(r.json.today, '2026-10-14');
   assert.equal(r.json.curWeek, '2026-10-11');
   assert.equal(r.json.programStart, '2026-09-06');
+});
+
+test('שתי שאלות הציר: אופי השיחה וחלוקת הדיבור, בסולם 1 עד 5, נשמרות ומוחזרות', async () => {
+  const c = await newEducator('בדיקה שמונה');
+  const ok = await c.put('/api/me/reports/2026-10-11', { convs: [conv({ kind: 'intro', depth: 5, talk: 2 }), conv({ depth: 1, talk: 5 })] });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(ok.json.report.convs.map((x) => [x.kind, x.depth, x.talk]), [['intro', 5, 2], ['notebook', 1, 5]]);
+  for (const bad of [{ depth: 0 }, { depth: 6 }, { talk: '3' }, { talk: 2.5 }, { depth: 'x' }]) {
+    assert.equal((await c.put('/api/me/reports/2026-10-11', { convs: [conv(bad)] })).status, 400, JSON.stringify(bad));
+  }
+  assert.equal((await c.put('/api/me/reports/2026-10-11', { convs: [conv({ kind: 'deep' })] })).status, 400, 'שיחת עומק כבר לא סוג שיחה');
+  // מבט ישן בלי שתי השאלות עדיין תקין
+  assert.equal((await c.put('/api/me/reports/2026-10-11', { convs: [conv()] })).status, 200);
+  assert.deepEqual((await c.get('/api/me')).json.reports[0].convs.map((x) => [x.depth, x.talk]), [[null, null]]);
+});
+
+test('שימוש במיפוי הכיתה: נרשם רק מי ומתי, בלי תוכן, ורק למחנכת', async () => {
+  const c = await newEducator('בדיקה תשע');
+  assert.equal((await app.client().post('/api/me/usage', { tool: 'mapping' })).status, 401, 'בלי כניסה');
+  assert.equal((await c.post('/api/me/usage', { tool: 'other' })).status, 400, 'כלי לא מוכר');
+  assert.equal((await c.post('/api/me/usage', { tool: 'mapping' })).status, 200);
+  assert.equal((await c.post('/api/me/usage', { tool: 'mapping', started: true })).status, 200);
+  assert.equal((await c.post('/api/me/usage', { tool: 'mapping' })).status, 200);
+  const row = await db.get(`SELECT t.* FROM tool_usage t JOIN users u ON u.id = t.user_id WHERE u.name = ?`, ['בדיקה תשע']);
+  assert.equal(row.days, 1, 'אותו יום נספר פעם אחת');
+  assert.ok(row.started_day, 'started נשמר ולא נמחק בפתיחה רגילה');
+  const cols = await db.all(`SELECT column_name FROM information_schema.columns WHERE table_name = 'tool_usage'`);
+  assert.deepEqual(cols.map((x) => x.column_name).sort(), ['days', 'first_day', 'last_day', 'started_day', 'tool', 'user_id']);
 });

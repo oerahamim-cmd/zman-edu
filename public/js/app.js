@@ -16,13 +16,17 @@ const AXES = [
   { v: 'other', t: `אחר` },
 ];
 const KINDS = [
+  { v: 'intro', t: `שיחת היכרות` },
   { v: 'notebook', t: `שיחת מחברת` },
   { v: 'complex', t: `שיחה מורכבת` },
   { v: 'grades', t: `הערכה לקראת תעודות` },
-  { v: 'parents', t: `יום הורים` },
-  { v: 'deep', t: `שיחת עומק` },
+  { v: 'parents', t: `לקראת יום הורים` },
   { v: 'other', t: `אחר` },
 ];
+// שתי שאלות ציר, בסולם של 1 עד 5. הצד הימני (1) הוא הראשון שקוראים.
+const DEPTH_SCALE = { q: 'מה היה אופי השיחה?', from: 'אינפורמטיבית', to: 'מעמיקה', labels: [`אינפורמטיבית מאוד`, `יותר אינפורמטיבית`, `באמצע`, `יותר מעמיקה`, `מעמיקה מאוד`] };
+const TALK_SCALE = { q: 'מי דיבר יותר בשיחה?', from: 'אני דיברתי יותר', to: 'התלמיד/ה דיברו יותר', labels: [`אני דיברתי הרבה יותר`, `אני דיברתי קצת יותר`, `חלוקה שווה בערך`, `התלמיד/ה דיברו קצת יותר`, `התלמיד/ה דיברו הרבה יותר`] };
+const scaleOpts = (s) => s.labels.map((t, i) => ({ v: i + 1, t: `${i + 1} · ${t}` }));
 const FEELINGS = [
   { v: 'inspired', e: '🤩', t: `מעורר השראה` },
   { v: 'good', e: '😊', t: `טוב ומספק` },
@@ -103,6 +107,17 @@ function chipGroup({ options, value, onChange, cls = '', multi = false, label })
   });
   return box;
 }
+// סולם של חמש נקודות בין שני קצוות (למשל אינפורמטיבית ... מעמיקה). מתחת מופיע מה שנבחר, במילים.
+function scaleGroup({ value, onChange, scale }) {
+  const name = nid('sc');
+  const readout = h('p', { class: 'scaleread', 'aria-live': 'polite' }, value ? scale.labels[value - 1] : '');
+  const box = h('div', { class: 'scale' }, h('div', { class: 'scalebtns', role: 'radiogroup', 'aria-label': scale.q }, scale.labels.map((t, i) => {
+    const inp = h('input', { type: 'radio', name, value: String(i + 1), checked: value === i + 1 });
+    inp.addEventListener('change', () => { readout.textContent = t; onChange(i + 1); });
+    return h('label', { class: 'scalepick', title: t }, inp, h('span', null, String(i + 1)));
+  })), h('div', { class: 'scaleends', 'aria-hidden': 'true' }, h('span', null, scale.from), h('span', null, scale.to)), readout);
+  return box;
+}
 function moodGroup({ value, onChange }) {
   const name = nid('m');
   const box = h('div', { class: 'moods', role: 'radiogroup', 'aria-label': 'איך יצאתם מהשיחה' });
@@ -139,7 +154,7 @@ function field(label, input, hint) {
    כל מה שמוצג מגיע מהשרת, והשרת הוא שמחליט מי רואה מה. רק שני דברים נשארים במכשיר:
    מיפוי הכיתה (שמות או ראשי תיבות של תלמידים) וטיוטות של מבט שעוד לא נשלח.
    ===================================================================== */
-const MAP_KEY = 'zmw.map.v1', DRAFT_KEY = 'zmw.draft.v1';
+const MAP_KEY = 'zmw.map.v1', DRAFT_KEY = 'zmw.draft.v1', RETURN_KEY = 'zmw.returning', SCHOOL_KEY = 'zmw.school';
 const mem = {};
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return k in mem ? mem[k] : null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { mem[k] = v; } };
@@ -302,9 +317,8 @@ const route = () => (current || '/').split('?')[0];
 
 function header() {
   const p = route();
-  const links = [{ to: '/', t: 'בית' }, { to: '/tools', t: 'ארגז כלים' }, { to: '/mapping', t: 'מיפוי הכיתה' }];
-  links.push({ to: '/me', t: 'שיחות אישיות' });
-  links.push({ to: '/lead', t: 'מובילות' });
+  const links = [{ to: '/', t: 'בית' }, { to: '/me', t: 'שיחות אישיות' }, { to: '/mapping', t: 'מיפוי הכיתה' }, { to: '/tools', t: 'ארגז כלים' }];
+  if (leadUser()) links.push({ to: '/lead', t: 'מובילות' });
   if (isAdmin()) links.push({ to: '/admin', t: 'מנהלת התכנית' });
   const active = (to) => (to === '/' ? p === '/' : p === to || p.startsWith(to + '/'));
   return h('header', { class: 'frame top' },
@@ -342,12 +356,13 @@ function resolve(p) {
   if (p === '/tools/cards' || p.startsWith('/tools/cards/')) return viewCards(p);
   if ((m = /^\/tools\/(identity|goals|agency)$/.exec(p))) return viewFolder(m[1]);
   const gate = (path, view) => (me() ? view() : isAdmin() || leadUser() ? viewEducatorsOnly() : viewEnter('new', path));
+  const gateMap = (path, view) => gate(path, () => { ensureMap(); pingMapping(); return view(); });
   const gateLead = (path, view) => (leadUser() ? view() : me() || isAdmin() ? viewLeadsOnly() : viewEnter('lead', path));
-  if (p === '/mapping') return gate(p, viewMappingHome);
-  if (p === '/mapping/map') return gate(p, viewMap);
-  if (p === '/mapping/circles') return gate(p, viewCircles);
-  if (p === '/mapping/class') return gate(p, viewClass);
-  if (p === '/mapping/helper') return gate(p, viewHelper);
+  if (p === '/mapping') return gateMap(p, viewMappingHome);
+  if (p === '/mapping/map') return gateMap(p, viewMap);
+  if (p === '/mapping/circles') return gateMap(p, viewCircles);
+  if (p === '/mapping/class') return gateMap(p, viewClass);
+  if (p === '/mapping/helper') return gateMap(p, viewHelper);
   if (p.startsWith('/tools/mapping')) return redirect(p.replace('/tools/mapping', '/mapping'));
   if (p === '/enter') return viewEnter('new', '/me');
   if (p === '/enter/manager') return viewEnter('manager', '/admin');
@@ -359,7 +374,7 @@ function resolve(p) {
 }
 function viewEducatorsOnly() {
   return h('section', { class: 'frame' }, h('h2', null, 'האזור הזה אישי לכל מחנכת'),
-    h('p', { class: 'muted', style: 'max-width:56ch' }, 'השיחות האישיות והמיפוי נפתחים בכניסה של המחנכת, בקוד האישי שלה. מנהלת התכנית והמובילות רואות את המבטים במסכים שלהן, ואת המיפוי הן לא רואות.'),
+    h('p', { class: 'muted', style: 'max-width:56ch' }, 'השיחות האישיות והמיפוי נפתחים בכניסה של המחנכת, בקוד האישי שלה. מנהלת התכנית והמובילות רואות את המבטים במסכים שלהן, ואת תוכן המיפוי הן לא רואות.'),
     h('div', { class: 'row' }, isAdmin() ? link('/admin', 'למסך מנהלת התכנית') : link('/lead', 'למסך המובילה')));
 }
 function viewLeadsOnly() {
@@ -379,36 +394,38 @@ const link = (to, text, cls = 'btn') => h('a', { class: cls, href: '#' + to, onc
    ===================================================================== */
 
 function viewHome() {
-  const hero = h('section', { class: 'frame lead' },
-    h('p', { class: 'small muted' }, 'תכנית זמן לחינוך · חותם ורשת אורט'),
-    h('h1', null, 'מבט שבועי', h('br'), h('span', { class: 'reg' }, 'שיחות אישיות')),
-    h('p', { style: 'max-width:46ch;font-size:19px' }, 'מביטים אחורה על השבוע: כמה שיחות אישיות קיימתם, ועל כל שיחה עונים על ארבע שאלות קצרות. דקה אחת בשבוע, בלי שמות תלמידים ובלי תיעוד על ילד או ילדה.'),
-    h('div', { class: 'row' }, link(me() ? '/me' : '/enter', 'למבט השבועי', 'btn white'), link('/tools', 'לארגז הכלים', 'btn soft')));
-  const a = h('section', { class: 'frame' }, ic('calendar', { size: 40 }), h('h3', null, 'המבט השבועי'),
-    h('ul', { class: 'stack', style: 'margin:0;padding-inline-start:20px' },
-      h('li', null, 'כניסה בקוד אישי בן ארבע ספרות, שבוחרים בעצמכם בפעם הראשונה.'),
-      h('li', null, 'פעם בשבוע, לפי תאריכים. אפשר גם להשלים שבוע שפספסתם.'),
-      h('li', null, 'מנהלת התכנית רואה את המבטים של כל המחנכות.')),
-    h('div', null, link(me() ? '/me' : '/enter', me() ? 'להמשך למבט שלי' : 'כניסה או הרשמה ראשונה')));
-  const b = h('section', { class: 'frame' }, ic('book', { size: 40 }), h('h3', null, 'ארגז הכלים'),
-    h('p', null, 'כלים ופרקטיקות לשיחות אישיות, בתיקיות לפי ציר. פתוח לכולם, בלי כניסה.'),
-    h('div', { class: 'chips' }, FOLDERS.map((f) => h('a', { class: 'tag', href: '#/tools/' + f.id, style: 'text-decoration:none;color:inherit', onclick: (e) => { e.preventDefault(); go('/tools/' + f.id); } }, f.t))),
-    h('div', null, link('/tools', 'לארגז הכלים', 'btn soft')));
-  const c = h('section', { class: 'frame' }, ic('compass', { size: 40 }), h('h3', null, 'מיפוי הכיתה'),
-    h('p', null, 'מפת שיחות ומעגלי קשר: שני כלים למילוי דיגיטלי שעוזרים להחליט עם מי לשוחח ומתי. אישי לכל מחנכת, באותו קוד כניסה, והנתונים נשארים במכשיר שלכם.'),
-    h('div', null, link('/mapping', 'למיפוי הכיתה', 'btn soft')));
-  const priv = h('section', { class: 'frame' }, h('div', { class: 'row' }, ic('lock', { size: 36 }), h('h3', null, 'מה נשמר ומה לא')),
-    h('div', { class: 'grid' },
-      h('div', { class: 'well' }, h('h4', null, 'לא נשמר'), h('p', null, 'שמות תלמידים, פרטים מזהים, ותיעוד שיחה לפי ילד או ילדה.')),
-      h('div', { class: 'well' }, h('h4', null, 'נשמר'), h('p', null, 'לכל שבוע: מספר השיחות. ולכל שיחה: סבב, ציר, אופי, תחושה והערה חופשית.')),
-      h('div', { class: 'well' }, h('h4', null, 'נשאר במכשיר שלכם'), h('p', null, 'מיפוי הכיתה (שמות או ראשי תיבות) לא נשלח לשרת, ומנהלת התכנית לא רואה אותו.')),
-      h('div', { class: 'well' }, h('h4', null, 'מי רואה מה'), h('p', null, pub.leadSeesNames ? 'מנהלת התכנית רואה את כל המבטים. מובילת בית הספר רואה רק את בית הספר שלה, כולל שמות והערות.' : 'מנהלת התכנית רואה את כל המבטים. מובילת בית הספר רואה רק נתונים מצטברים של בית הספר שלה, בלי שמות.'))));
-  const tryIt = h('section', { class: 'frame' }, h('h3', null, 'איך מתחילים'), h('ol', { class: 'stack', style: 'margin:0;padding-inline-start:22px' },
-    h('li', null, 'מחנכות: בלשונית "שיחות אישיות" בוחרים "זו הפעם הראשונה שלי", מזינים את קוד ההצטרפות של בית הספר (מקבלים ממנהלת התכנית) ובוחרים קוד אישי בן ארבע ספרות.'),
-    h('li', null, 'פעם בשבוע נכנסים וממלאים את המבט: כמה שיחות אישיות קיימתם, ועל כל שיחה ארבע שאלות קצרות.'),
-    h('li', null, 'אחרי הכניסה אפשר לפתוח גם את "מיפוי הכיתה": מפת שיחות ומעגלי קשר, שנשמרים רק במכשיר שלכם.'),
-    h('li', null, 'מובילות ומנהלת התכנית נכנסות מהלשוניות "מובילות" ו"מנהלת התכנית".')));
-  return h('div', { class: 'stack', style: 'gap:var(--gap)' }, hero, h('div', { class: 'grid' }, a, b, c), priv, tryIt);
+  const staff = leadUser() || isAdmin();
+  const hello = session ? `שלום ${firstName(session.name)}` : null;
+  const actions = !session ? [link('/me', 'כניסה למחנכות', 'btn'), link('/tools', 'לארגז הכלים', 'btn soft')]
+    : me() ? [link('/me', 'למבט השבועי', 'btn'), link('/mapping', 'למיפוי הכיתה', 'btn soft')]
+      : [link(leadUser() ? '/lead' : '/admin', leadUser() ? 'למסך המובילה' : 'למסך מנהלת התכנית', 'btn'), link('/tools', 'לארגז הכלים', 'btn soft')];
+  const hero = h('section', { class: 'frame hero' },
+    h('p', { class: 'kicker' }, 'זמן לחינוך'),
+    h('h1', null, hello || 'שיחות אישיות עם התלמידים'),
+    h('p', { class: 'herosub' }, session ? (me() ? 'מה נעשה היום?' : 'ברוכים הבאים.') : 'כלים קצרים שעוזרים לתכנן שיחות אישיות ולהעמיק אותן.'),
+    h('div', { class: 'row' }, actions));
+  const tile = (to, icon, title, line, tag) => h('a', { class: 'folder tile', href: '#' + to, onclick: (e) => { e.preventDefault(); go(to); } },
+    h('span', { class: 'ic-big' }, ic(icon, { size: 38, tone: 'blue' })), h('h3', null, title), h('p', { class: 'muted' }, line), h('span', { class: 'tag', style: 'align-self:flex-start' }, tag));
+  const tiles = h('div', { class: 'grid tiles' },
+    tile('/me', 'calendar', 'המבט השבועי', 'דקה בשבוע: איך היו השיחות?', 'למחנכות, בכניסה'),
+    tile('/mapping', 'compass', 'מיפוי הכיתה', 'עם מי לשוחח, ומתי.', 'למחנכות, בכניסה'),
+    tile('/tools/cards', 'idea', 'קלפי שיח', 'שאלות ותמונות לשיחה אישית.', 'פתוח לכולם'),
+    tile('/tools', 'book', 'ארגז כלים', 'כלים ופרקטיקות לשיחות.', 'פתוח לכולם'));
+  const who = pub.leadSeesNames ? 'מנהלת התכנית רואה את כל המבטים. מובילת בית הספר רואה רק את בית הספר שלה, כולל שמות והערות.' : 'מנהלת התכנית רואה את כל המבטים. מובילת בית הספר רואה רק נתונים מצטברים של בית הספר שלה, בלי שמות.';
+  const more = h('section', { class: 'frame quiet' },
+    h('details', null, h('summary', null, ic('lock', { size: 20 }), 'מה נשמר, ומי רואה?'),
+      h('ul', { class: 'plain' },
+        h('li', null, 'לא נשמרים שמות תלמידים ולא תיעוד על ילד או ילדה.'),
+        h('li', null, 'בכל שבוע נשמר מספר השיחות, ולכל שיחה כמה בחירות קצרות והערה חופשית.'),
+        h('li', null, 'מיפוי הכיתה נשאר במכשיר שלכם. מנהלת התכנית יודעת רק אם פתחתם אותו.'),
+        h('li', null, who))),
+    session ? null : h('details', null, h('summary', null, ic('question', { size: 20 }), 'פעם ראשונה? איך נכנסים'),
+      h('ol', { class: 'plain' },
+        h('li', null, 'לוחצים "כניסה למחנכות" ובוחרים "זו הפעם הראשונה שלי".'),
+        h('li', null, 'מזינים את קוד ההצטרפות של בית הספר (מקבלים מהתכנית) ובוחרים קוד אישי בן ארבע ספרות.'),
+        h('li', null, 'מכאן נכנסים עם בית ספר, שם והקוד. אותו קוד פותח גם את מיפוי הכיתה.'))));
+  return h('div', { class: 'stack', style: 'gap:var(--gap)' }, hero, tiles, more,
+    staff ? null : h('p', { class: 'small muted', style: 'text-align:center' }, 'מובילה או מנהלת התכנית? ', h('a', { href: '#/lead', onclick: (e) => { e.preventDefault(); go('/lead'); } }, 'כניסת צוות')));
 }
 
 
@@ -820,12 +837,12 @@ function mapNav(active) {
   return h('nav', { class: 'nav mapnav', 'aria-label': 'שלבי המיפוי' }, [['/mapping', 'סקירה'], ...MAP_TABS].map(([to, t]) => h('a', { href: '#' + to, 'aria-current': to === active ? 'page' : null, onclick: (e) => { e.preventDefault(); go(to); } }, t)));
 }
 function mapHead(title, sub, active) {
-  return h('section', { class: 'frame' }, h('h2', null, title), h('p', { class: 'muted', style: 'max-width:62ch' }, sub), mapNav(active));
+  return h('section', { class: 'frame' }, h('div', { class: 'row between' }, h('h2', null, title), active === '/mapping/map' || active === '/mapping/circles' ? pdfButton('btn sm') : null), h('p', { class: 'muted', style: 'max-width:62ch' }, sub), mapNav(active));
 }
 function privacyNote() {
   const e = me();
   return h('details', { class: 'privnote' }, h('summary', null, ic('lock', { size: 18 }), h('span', null, 'הרשימה והמיפוי נשארים רק במכשיר הזה. הם לא נשלחים לשרת, ואף אחד אחר לא רואה אותם.'), h('span', { class: 'small', style: 'margin-inline-start:auto;color:var(--lead);font-weight:500' }, 'מה זה אומר?')),
-    h('p', { class: 'small', style: 'margin-top:10px;max-width:70ch' }, `${e ? `המיפוי של ${e.name} ` : 'המיפוי '}נשמר על שמה במכשיר הזה, ונפתח בכל כניסה (באותו קוד של השיחות האישיות). מנהלת התכנית והמובילות לא רואות אותו. כדי לעבוד ממכשיר אחר, מעתיקים את הנתונים (בתחתית הדף "הכיתה שלי") וטוענים אותם שם. כדאי לרשום ראשי תיבות במקום שם מלא, ולמחוק את הנתונים אם המכשיר משותף.`));
+    h('p', { class: 'small', style: 'margin-top:10px;max-width:70ch' }, `${e ? `המיפוי של ${e.name} ` : 'המיפוי '}נשמר על שמה במכשיר הזה, ונפתח בכל כניסה (באותו קוד של השיחות האישיות). מנהלת התכנית והמובילות לא רואות אותו ולא את השמות. מנהלת התכנית יכולה לדעת רק שנכנסת למיפוי ומתי, ושום דבר מהתוכן. כדי לעבוד ממכשיר אחר, מעתיקים את הנתונים (בתחתית הדף "הכיתה שלי") וטוענים אותם שם. כדאי לרשום ראשי תיבות במקום שם מלא, ולמחוק את הנתונים אם המכשיר משותף.`));
 }
 function emptyRoster() {
   return h('div', { class: 'well stack' }, h('b', null, 'עדיין אין תלמידים ברשימה'), h('p', { class: 'muted' }, 'מתחילים בשלב 1: מדביקים או מעלים את רשימת השמות של הכיתה, ואז היא מופיעה כאן וגם במעגלי הקשר.'), h('div', null, link('/mapping/class', 'להוספת רשימת הכיתה')));
@@ -1049,7 +1066,16 @@ function ensureMap() {
   mapOwner = id; map = emptyMap();
   if (id) { try { const m = JSON.parse(lsGet(MAP_KEY + '.' + id) || 'null'); if (m && Array.isArray(m.students)) map = m; } catch { /* ריק */ } }
 }
-const saveMap = () => { if (mapOwner) lsSet(MAP_KEY + '.' + mapOwner, JSON.stringify(map)); };
+const saveMap = () => { if (mapOwner) { lsSet(MAP_KEY + '.' + mapOwner, JSON.stringify(map)); pingMapping(); } };
+// מנהלת התכנית רואה רק שהמחנכת השתמשה במיפוי ומתי. נשלח רק "נפתח" ו"יש רשימה", בלי שמות ובלי שום תוכן. שגיאה לא מפריעה לעבודה.
+let mapPing = { at: 0, started: false };
+function pingMapping() {
+  if (!me() || !mapOwner) return;
+  const started = map.students.length > 0;
+  if (Date.now() - mapPing.at < 3600000 && (mapPing.started || !started)) return;
+  mapPing = { at: Date.now(), started };
+  api('POST', '/api/me/usage', { tool: 'mapping', started }).catch(() => { mapPing.at = 0; });
+}
 const newStudent = (name = '') => ({ id: nid('s') + Math.random().toString(36).slice(2, 6), name, link: null, urgent: false, word: '', axis: null, rounds: [false, false, false], last: '' });
 const groupOf = (s) => (!s.link ? null : s.urgent ? 1 : s.link === 1 ? 2 : s.link === 2 ? 3 : 4);
 const chipText = (name) => {
@@ -1057,6 +1083,26 @@ const chipText = (name) => {
   const parts = t.split(/[\s.]+/).filter(Boolean);
   return parts.length > 1 ? parts.slice(0, 2).map((p) => p[0]).join('') : t.slice(0, 3);
 };
+// הורדת המיפוי כקובץ PDF (נבנה במכשיר, לא עובר בשרת)
+function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = h('a', { href: url, download: name });
+  if (!('download' in a)) { window.open(url, '_blank'); return; }
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+function pdfButton(cls = 'btn soft sm') {
+  return h('button', { class: cls, type: 'button', onclick: async (e) => {
+    if (!map.students.length) return toast('עוד אין תלמידים במיפוי. מוסיפים רשימה בשלב 1.');
+    const b = e.currentTarget, label = b.textContent;
+    b.disabled = true; b.textContent = 'מכין את הקובץ…';
+    try {
+      const blob = await window.ZmanPdf.mappingPdf(map, { date: new Date().toLocaleDateString('he-IL') });
+      saveBlob(blob, `מיפוי-כיתה${(map.cls || '').trim() ? '-' + map.cls.trim().replace(/\s+/g, '-') : ''}.pdf`);
+      toast('קובץ ה-PDF ירד למכשיר');
+    } catch { toast('לא הצלחנו להכין את הקובץ. אפשר לנסות שוב.'); } finally { b.disabled = false; b.textContent = label; }
+  } }, 'הורדה כ-PDF');
+}
 function mapActions(rerender) {
   const host = h('div', { class: 'stack' });
   const row = h('div', { class: 'row' },
@@ -1068,7 +1114,7 @@ function mapActions(rerender) {
           try { const m = JSON.parse(ta.value); if (!m || !Array.isArray(m.students)) throw new Error('x'); map = m; saveMap(); close(); rerender(); toast('הנתונים נטענו'); } catch { toast('הטקסט לא נראה כמו נתוני מפה'); }
         } }, 'טעינה'), h('button', { class: 'btn soft', onclick: close }, 'ביטול'))];
     }) }, 'טעינת נתונים שנשמרו'),
-    h('button', { class: 'btn soft sm', onclick: () => { if (download('mapping-zman-lachinuch.json', JSON.stringify(map, null, 1), 'application/json')) toast('הקובץ נשמר'); } }, 'הורדה כקובץ'),
+    pdfButton('btn sm'),
     h('button', { class: 'btn soft sm', onclick: () => confirmInline(host, 'למחוק את כל נתוני המיפוי מהמכשיר הזה? אי אפשר לשחזר.', 'מחיקה', () => { map = { cls: '', round: 1, students: [] }; saveMap(); rerender(); toast('הנתונים נמחקו מהמכשיר'); }) }, 'מחיקת הנתונים מהמכשיר'));
   host.append(row);
   return host;
@@ -1266,8 +1312,8 @@ function viewCircles() {
    ===================================================================== */
 function viewEnter(mode, next = '/me') {
   const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  let tab = mode === 'manager' ? 'manager' : mode === 'lead' ? 'lead' : 'new';
-  let school = '';
+  let tab = mode === 'manager' ? 'manager' : mode === 'lead' ? 'lead' : lsGet(RETURN_KEY) ? 'back' : 'new';
+  let school = (SCHOOLS.find((x) => x.id === lsGet(SCHOOL_KEY)) || {}).id || '';
   let leadFirst = false, managerReset = false;
   const pinInput = (label, auto) => h('input', { class: 'input pin', type: 'password', inputmode: 'numeric', maxlength: '4', autocomplete: auto, 'aria-label': label });
   const textInput = (label, extra = {}) => h('input', { class: 'input', 'aria-label': label, ...extra });
@@ -1284,11 +1330,13 @@ function viewEnter(mode, next = '/me') {
     if (pin.value !== pin2.value) { err.textContent = 'שני הקודים צריכים להיות זהים.'; return false; }
     return true;
   };
-  const done = async (res, to, fresh) => { await enter(res.user); justRegistered = !!fresh; go(to); };
+  const done = async (res, to, fresh) => { await enter(res.user); justRegistered = !!fresh; if (res.user.role !== 'manager') { lsSet(RETURN_KEY, '1'); if (school) lsSet(SCHOOL_KEY, school); } go(to); };
 
   function paint() {
     clear(root);
-    const tabs = chipGroup({ options: [{ v: 'new', t: 'זו הפעם הראשונה שלי' }, { v: 'back', t: 'כבר יש לי קוד' }, { v: 'lead', t: 'מובילה זמן לחינוך' }, { v: 'manager', t: 'מנהלת התכנית' }], value: tab, label: 'סוג כניסה', onChange: (v) => { tab = v; paint(); } });
+    const staffTab = tab === 'lead' || tab === 'manager';
+    const tabs = h('div', { class: 'stack', style: 'gap:10px' }, chipGroup({ options: staffTab ? [{ v: 'lead', t: 'מובילה זמן לחינוך' }, { v: 'manager', t: 'מנהלת התכנית' }] : [{ v: 'new', t: 'זו הפעם הראשונה שלי' }, { v: 'back', t: 'כבר יש לי קוד' }], value: tab, label: 'סוג כניסה', onChange: (v) => { tab = v; paint(); } }),
+      h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { tab = staffTab ? (lsGet(RETURN_KEY) ? 'back' : 'new') : 'lead'; paint(); } }, staffTab ? 'חזרה לכניסת מחנכות' : 'מובילה או מנהלת התכנית? כניסת צוות')));
     const err = h('p', { class: 'err', role: 'alert' });
     const keep = h('input', { type: 'checkbox', id: 'keep' });
     const keepRow = h('label', { class: 'row small', for: 'keep', style: 'gap:8px' }, keep, 'להישאר מחוברים במכשיר הזה (לא במחשב משותף)');
@@ -1363,10 +1411,10 @@ function viewEnter(mode, next = '/me') {
 
     const leadCtx = tab === 'lead' || next.startsWith('/lead');
     const ctxTitle = leadCtx ? 'כניסה למובילות זמן לחינוך' : tab === 'manager' ? 'כניסה למנהלת התכנית' : next.startsWith('/mapping') ? 'כניסה למיפוי הכיתה' : 'כניסה לשיחות אישיות';
-    const ctxText = leadCtx ? 'בכל בית ספר יש מובילה, והיא רואה רק את הנתונים של בית הספר שלה. נכנסים בשם ובקוד אישי, ובפעם הראשונה נרשמים עם קוד ההצטרפות של המובילות.'
-      : tab === 'manager' ? 'מנהלת התכנית רואה את כל המבטים של כל בתי הספר, ומנהלת את הכלים, את הקודים ואת הרשאות המובילות.'
-        : next.startsWith('/mapping') ? 'המיפוי אישי לכל מחנכת. נכנסים באותו קוד אישי של השיחות האישיות: מי שכבר נכנסה לאחד מהם, מחוברת גם לשני, והמיפוי שלה נשמר לה במכשיר.'
-          : 'בפעם הראשונה נרשמים עם קוד ההצטרפות של בית הספר ובוחרים קוד אישי בן ארבע ספרות. בכל פעם הבאה נכנסים עם בית ספר, שם וקוד. אותו קוד פותח גם את מיפוי הכיתה.';
+    const ctxText = leadCtx ? 'נכנסים בשם ובקוד אישי. בפעם הראשונה נרשמים עם קוד ההצטרפות של המובילות.'
+      : tab === 'manager' ? 'כניסה בדואל ובסיסמה.'
+        : tab === 'back' ? 'נכנסים עם בית ספר, שם והקוד האישי.'
+          : 'בוחרים בית ספר, מזינים את קוד ההצטרפות שקיבלתם מהתכנית ובוחרים קוד אישי בן ארבע ספרות.';
     add(root, [h('section', { class: 'frame' }, h('h2', null, ctxTitle), h('p', { class: 'muted', style: 'max-width:56ch' }, ctxText), tabs), h('section', { class: 'frame' }, form)]);
   }
   paint();
@@ -1424,8 +1472,9 @@ function viewMe() {
   });
 }
 
-function newConv() { return { round: null, axis: null, axisOther: '', kind: null, kindOther: '', feeling: null, note: '' }; }
-const convDone = (c) => !!(c.round && c.axis && (c.axis !== 'other' || c.axisOther.trim()) && c.kind && (c.kind !== 'other' || c.kindOther.trim()) && c.feeling);
+function newConv() { return { round: null, axis: null, axisOther: '', kind: null, kindOther: '', depth: null, talk: null, feeling: null, note: '' }; }
+// שיחה ממבט ישן (לפני שתי שאלות הציר) נחשבת שלמה גם בלעדיהן. אפשר להשלים אותן, אבל לא חייבים.
+const convDone = (c) => !!(c.round && c.axis && (c.axis !== 'other' || c.axisOther.trim()) && c.kind && (c.kind !== 'other' || c.kindOther.trim()) && (c.legacy || (c.depth && c.talk)) && c.feeling);
 
 function viewReport(week) {
   const e = session;
@@ -1434,7 +1483,9 @@ function viewReport(week) {
   // טיוטה של מבט שעוד לא נשלח נשמרת רק במכשיר הזה, ונמחקת כשהמבט נשלח
   const dkey = `${DRAFT_KEY}.${e.id}.${week}`;
   const saved = (() => { try { return JSON.parse(lsGet(dkey) || 'null'); } catch { return null; } })();
-  const draft = JSON.parse(JSON.stringify(saved && Array.isArray(saved.convs) ? saved : existing ? { convs: existing.convs, noneReason: existing.noneReason || '' } : { convs: [], noneReason: '' }));
+  const draft = JSON.parse(JSON.stringify(saved && Array.isArray(saved.convs) ? saved : existing ? { convs: existing.convs.map((c) => ({ ...c, legacy: c.depth == null && c.talk == null })), noneReason: existing.noneReason || '' } : { convs: [], noneReason: '' }));
+  // טיוטה ישנה מהמכשיר: "שיחת עומק" כבר לא ברשימה, ולכן עוברת ל"אחר" עם אותו טקסט
+  draft.convs.forEach((c) => { if (c.kind === 'deep') { c.kind = 'other'; c.kindOther = c.kindOther || 'שיחת עומק'; } });
   const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
   const cardsHost = h('div', { class: 'stack', style: 'gap:var(--gap)' });
   const noneHost = h('div');
@@ -1476,9 +1527,11 @@ function viewReport(week) {
       const q = (n, label, ...body) => h('div', { class: 'q' }, h('div', { class: 'qlabel' }, h('span', { class: 'qn' }, String(n)), label), ...body);
       cardsHost.append(h('section', { class: 'frame conv' }, h('div', { class: 'conv-head' }, h('h3', null, `שיחה ${i + 1}`), badge),
         q(1, 'איזה סבב זה עם התלמיד/ה?', chipGroup({ options: ROUNDS, value: c.round, label: 'סבב', onChange: (v) => { c.round = v; touch(); } })),
-        q(2, 'איזה סוג שיחה זו הייתה?', chipGroup({ options: AXES, value: c.axis, label: 'ציר השיחה', onChange: (v) => { c.axis = v; axisOther.hidden = v !== 'other'; touch(); } }), axisOther),
-        q(3, 'מה היה אופי השיחה?', chipGroup({ options: KINDS, value: c.kind, label: 'אופי השיחה', onChange: (v) => { c.kind = v; kindOther.hidden = v !== 'other'; touch(); } }), kindOther),
-        q(4, 'איך יצאתם מהשיחה?', moodGroup({ value: c.feeling, onChange: (v) => { c.feeling = v; touch(); } }), h('div', { class: 'field' }, h('label', { class: 'hint', for: (note.id = nid('n')) }, 'עוד משהו חשוב להוסיף? (לא חובה)'), note), warn)));
+        q(2, 'על איזה ציר דיברתם?', chipGroup({ options: AXES, value: c.axis, label: 'ציר השיחה', onChange: (v) => { c.axis = v; axisOther.hidden = v !== 'other'; touch(); } }), axisOther),
+        q(3, 'איזה סוג שיחה זו הייתה?', chipGroup({ options: KINDS, value: c.kind, label: 'סוג השיחה', onChange: (v) => { c.kind = v; kindOther.hidden = v !== 'other'; touch(); } }), kindOther),
+        q(4, DEPTH_SCALE.q, scaleGroup({ scale: DEPTH_SCALE, value: c.depth, onChange: (v) => { c.depth = v; touch(); } })),
+        q(5, TALK_SCALE.q, scaleGroup({ scale: TALK_SCALE, value: c.talk, onChange: (v) => { c.talk = v; touch(); } })),
+        q(6, 'איך יצאתם מהשיחה?', moodGroup({ value: c.feeling, onChange: (v) => { c.feeling = v; touch(); } }), h('div', { class: 'field' }, h('label', { class: 'hint', for: (note.id = nid('n')) }, 'עוד משהו חשוב להוסיף? (לא חובה)'), note), warn)));
       checkNames();
     });
     status();
@@ -1486,7 +1539,7 @@ function viewReport(week) {
   function setCount(n) {
     if (n > draft.convs.length) { while (draft.convs.length < n) draft.convs.push(newConv()); buildCards(); touch(); return; }
     const last = draft.convs[draft.convs.length - 1];
-    const hasData = last && (last.round || last.axis || last.kind || last.feeling || last.note.trim());
+    const hasData = last && (last.round || last.axis || last.kind || last.depth || last.talk || last.feeling || last.note.trim());
     const doRemove = () => { draft.convs.pop(); buildCards(); touch(); };
     if (hasData) confirmInline(countHost, `למחוק את שיחה ${draft.convs.length} ואת מה שנכתב בה?`, 'מחיקה', doRemove); else doRemove();
   }
@@ -1623,13 +1676,27 @@ function paintOverview(d, sc) {
   } else {
     out.push(h('section', { class: 'frame' }, h('h3', null, `טרם שלחו: ${d.missingCount}`), h('p', { class: 'muted' }, 'מספר המחנכות בבית הספר שעוד לא שלחו מבט לשבוע הזה. שמות המחנכות לא מוצגים.')));
   }
+  if (d.mapping) {
+    const m = d.mapping, usedIds = new Set(m.users.map((u) => u.id));
+    const notUsed = (d.matrix ? d.matrix.rows : []).filter((r) => !usedIds.has(r.id));
+    const chip = (u, cls) => h('a', { class: cls, href: '#' + sc.base + '/educators/' + u.id, style: 'text-decoration:none', onclick: (ev) => { ev.preventDefault(); go(sc.base + '/educators/' + u.id); } }, sc.admin ? `${u.name} · ${u.schoolName.replace('תיכון אורט ', '')}` : u.name);
+    out.push(h('section', { class: 'frame' }, h('div', { class: 'row between' }, h('h3', null, 'מיפוי הכיתה: מי משתמשת'), h('span', { class: 'tag' }, 'רואים רק שימוש, בלי תוכן')),
+      h('div', { class: 'grid kpis' }, kpi('פתחו את המיפוי', `${m.opened} מתוך ${m.of}`, 'לפחות פעם אחת'), kpi('התחילו למפות', `${m.started} מתוך ${m.of}`, 'יש רשימה של תלמידים')),
+      h('div', { class: 'stack' }, h('h4', null, `השתמשו (${m.users.length})`),
+        m.users.length ? h('div', { class: 'chips' }, m.users.map((u) => chip(u, u.started ? 'tag lead' : 'tag'))) : h('p', { class: 'muted small' }, 'עדיין אף מחנכת לא פתחה את המיפוי.'),
+        h('p', { class: 'micro muted' }, 'כחול: התחילה למפות (יש רשימה). אפור: נכנסה למיפוי בלי רשימה עדיין.')),
+      notUsed.length ? h('div', { class: 'stack' }, h('h4', null, `עוד לא פתחו (${notUsed.length})`), h('div', { class: 'chips' }, notUsed.map((r) => chip({ id: r.id, name: r.name, schoolName: r.schoolName }, 'tag todo')))) : null,
+      h('p', { class: 'small muted' }, 'המיפוי עצמו (שמות התלמידים, המעגלים והסימונים) נשאר במכשיר של כל מחנכת, ואין לך גישה אליו. השרת מקבל רק את העובדה שנפתח, ומתי.')));
+  }
   out.push(h('div', { class: 'grid' },
     h('section', { class: 'frame' }, h('h3', null, 'אחוז השליחה לפי שבוע'), columns(rate, curIdx)),
     h('section', { class: 'frame' }, h('h3', null, 'שיחות לפי שבוע'), columns(convsPerWeek, curIdx))));
   out.push(h('div', { class: 'grid' },
     h('section', { class: 'frame' }, h('h3', null, 'לפי סבב'), barRows(distRows(d.dist.round, ROUNDS))),
-    h('section', { class: 'frame' }, h('h3', null, 'לפי סוג שיחה'), barRows(distRows(d.dist.axis, AXES))),
-    h('section', { class: 'frame' }, h('h3', null, 'לפי אופי השיחה'), barRows(distRows(d.dist.kind, KINDS))),
+    h('section', { class: 'frame' }, h('h3', null, 'לפי ציר'), barRows(distRows(d.dist.axis, AXES))),
+    h('section', { class: 'frame' }, h('h3', null, 'לפי סוג שיחה'), barRows(distRows(d.dist.kind, KINDS))),
+    h('section', { class: 'frame' }, h('h3', null, 'אופי השיחה'), h('p', { class: 'small muted' }, 'מאינפורמטיבית (1) עד מעמיקה (5)'), barRows(distRows(d.dist.depth, scaleOpts(DEPTH_SCALE)))),
+    h('section', { class: 'frame' }, h('h3', null, 'מי דיבר יותר'), h('p', { class: 'small muted' }, 'מאני דיברתי (1) עד התלמיד/ה דיברו (5)'), barRows(distRows(d.dist.talk, scaleOpts(TALK_SCALE)))),
     h('section', { class: 'frame' }, h('h3', null, 'איך יצאו מהשיחה'), barRows(distRows(d.dist.feeling, FEELINGS)))));
   out.push(h('p', { class: 'muted small' }, d.masked ? 'ההתפלגויות מתחילת התכנית, לבית הספר שלך. ערכים קטנים מ-5 מוסתרים. אין כאן שום מידע על תלמידים.' : 'ההתפלגויות מתחילת התכנית, לפי בית הספר שנבחר. אין כאן שום מידע על תלמידים.'));
   return out;
@@ -1638,7 +1705,7 @@ function paintOverview(d, sc) {
 function convLine(c) {
   const ax = c.axis === 'other' ? `אחר: ${c.axisOther}` : lab(AXES, c.axis), kd = c.kind === 'other' ? `אחר: ${c.kindOther}` : lab(KINDS, c.kind);
   const f = FEELINGS.find((x) => x.v === c.feeling);
-  return h('div', { class: 'well stack' }, h('div', { class: 'chips' }, h('span', { class: 'tag lead' }, lab(ROUNDS, c.round)), h('span', { class: 'tag' }, ax), h('span', { class: 'tag' }, kd), f ? h('span', { class: 'tag emo', title: f.t }, f.e, h('span', { class: 'micro', style: 'margin-inline-start:6px' }, f.t)) : null), c.note ? h('p', null, c.note) : null);
+  return h('div', { class: 'well stack' }, h('div', { class: 'chips' }, h('span', { class: 'tag lead' }, lab(ROUNDS, c.round)), h('span', { class: 'tag' }, ax), h('span', { class: 'tag' }, kd), c.depth ? h('span', { class: 'tag', title: DEPTH_SCALE.q }, `אופי: ${DEPTH_SCALE.labels[c.depth - 1]}`) : null, c.talk ? h('span', { class: 'tag', title: TALK_SCALE.q }, `דיבור: ${TALK_SCALE.labels[c.talk - 1]}`) : null, f ? h('span', { class: 'tag emo', title: f.t }, f.e, h('span', { class: 'micro', style: 'margin-inline-start:6px' }, f.t)) : null), c.note ? h('p', null, c.note) : null);
 }
 async function openReportSheet(sc, eid, week) {
   try {
@@ -1652,14 +1719,20 @@ async function openReportSheet(sc, eid, week) {
 }
 
 /* ---------- מחנכות ---------- */
+// שימוש במיפוי הכיתה: רק עצם השימוש (נפתח, התחילה למפות, ומתי). בלי תוכן.
+function mappingTag(m) {
+  if (!m) return h('span', { class: 'tag todo' }, 'עוד לא נכנסה');
+  return h('span', { class: m.started ? 'tag lead' : 'tag', title: `${m.days} ימי שימוש · פעם אחרונה ${shortDate(m.lastDay)}` }, m.started ? 'התחילה למפות' : 'נכנסה', h('span', { class: 'micro', style: 'margin-inline-start:6px' }, shortDate(m.lastDay)));
+}
 function adminEducators(sc) {
   const host = h('div', { class: 'stack' });
   const act = async (path, okMsg) => { try { await api('POST', path); toast(okMsg); render(); } catch (ex) { toast(ex.message); } };
   return asyncView(() => api('GET', `${sc.api}/educators${qs({ school: scopeSchool(sc) })}`), (d) => h('section', { class: 'frame' }, h('h3', null, `מחנכות (${d.educators.length})`), sc.admin ? schoolPills(() => adm.school, (v) => { adm.school = v; }) : null,
-    d.educators.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'mx', style: 'min-width:640px' }, h('thead', null, h('tr', null, h('th', null, 'שם'), h('th', null, 'בית ספר'), h('th', null, 'מבטים'), h('th', null, 'שיחות'), h('th', null, 'מבט אחרון'), h('th', null, ''))),
+    d.educators.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'mx', style: 'min-width:640px' }, h('thead', null, h('tr', null, h('th', null, 'שם'), h('th', null, 'בית ספר'), h('th', null, 'מבטים'), h('th', null, 'שיחות'), h('th', null, 'מבט אחרון'), sc.admin ? h('th', null, 'מיפוי הכיתה') : null, h('th', null, ''))),
       h('tbody', null, d.educators.map((e) => h('tr', null,
         h('td', null, e.name, sc.admin && !e.hasCode ? h('span', { class: 'tag todo', style: 'margin-inline-start:8px' }, 'ממתינה לקוד') : null), h('td', { class: 'small' }, e.schoolName.replace('תיכון אורט ', '')), h('td', { class: 'num' }, `${e.reports} מתוך ${e.weeksExpected}`), h('td', { class: 'num' }, String(e.convs)),
         h('td', { class: 'num' }, e.lastAt ? shortDate(e.lastAt) : '–'),
+        sc.admin ? h('td', { class: 'small' }, mappingTag(e.mapping)) : null,
         h('td', null, h('div', { class: 'row', style: 'justify-content:flex-end;flex-wrap:nowrap' }, link(sc.base + '/educators/' + e.id, 'פתיחה', 'btn sm'),
           sc.admin ? h('button', { class: 'btn soft sm', onclick: () => confirmInline(host, `לאפס את הקוד של ${e.name}? היא תיבחר קוד חדש בהרשמה מחדש עם קוד ההצטרפות, והמבטים שלה יישמרו.`, 'איפוס קוד', () => act(`/api/admin/educators/${e.id}/reset-code`, `הקוד של ${e.name} אופס`)) }, 'איפוס קוד') : null,
           sc.admin ? h('button', { class: 'btn soft sm', onclick: () => confirmInline(host, `להסיר את ${e.name} מהרשימות? המבטים שלה לא ייספרו יותר. אפשר לשחזר על ידי הרשמה מחדש עם אותו שם.`, 'הסרה', () => act(`/api/admin/educators/${e.id}/remove`, `${e.name} הוסרה`)) }, 'הסרה') : null))))))) : h('p', { class: 'muted' }, 'עדיין לא נרשמו מחנכות.'), host), backToLead(sc));
@@ -1668,7 +1741,7 @@ function adminEducator(id, sc) {
   const notFound = () => h('section', { class: 'frame' }, h('h3', null, 'המחנכת לא נמצאה'), link(sc.base + '/educators', 'לרשימה'));
   return asyncView(() => api('GET', `${sc.api}/educators/${encodeURIComponent(id)}`), (d) => [
     h('section', { class: 'frame' }, h('div', null, link(sc.base + '/educators', 'מחנכות', 'btn ghost')), h('h2', null, d.educator.name), h('p', { class: 'muted' }, `${d.educator.schoolName} · הצטרפות ב-${shortDate(d.educator.joinedWeek)}`),
-      h('div', { class: 'chips' }, h('span', { class: 'tag lead' }, `${d.reportsCount} מתוך ${d.weeks.length} שבועות`), h('span', { class: 'tag' }, nConv(d.convs)))),
+      h('div', { class: 'chips' }, h('span', { class: 'tag lead' }, `${d.reportsCount} מתוך ${d.weeks.length} שבועות`), h('span', { class: 'tag' }, nConv(d.convs)), sc.admin ? h('span', { class: 'row small', style: 'gap:6px' }, 'מיפוי הכיתה:', mappingTag(d.educator.mapping)) : null)),
     ...d.weeks.map(({ week: w, report: r }) => h('section', { class: 'frame' }, h('div', { class: 'row between' }, h('h4', null, `שבוע ${weekNo(w)} · ${weekLabel(w)}`), r ? h('span', { class: 'tag lead' }, nConv(r.convs.length)) : h('span', { class: 'tag todo' }, 'טרם נשלח')), ...(r ? r.convs.map(convLine) : [])))],
     (err, host) => { if (err.status === 404) { add(host, [notFound()]); return true; } return backToLead(sc)(err); });
 }
@@ -1677,7 +1750,7 @@ function adminNotes(sc) {
     h('section', { class: 'frame' }, h('h3', null, `תובנות ושאלות (${d.total})`), h('p', { class: 'muted' }, 'ההערות החופשיות מכל המבטים: תובנות, שאלות שהמחנכות יצאו איתן ורעיונות.'),
       sc.admin ? schoolPills(() => adm.notesSchool, (v) => { adm.notesSchool = v; }) : null,
       h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'תחושה'), chipGroup({ options: [{ v: 'all', t: 'הכול' }, ...FEELINGS.map((x) => ({ v: x.v, t: `${x.e} ${x.t}` }))], value: adm.notesFeeling, cls: 'sm', label: 'תחושה', onChange: (v) => { adm.notesFeeling = v; render(); } })),
-      h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'סוג שיחה'), chipGroup({ options: [{ v: 'all', t: 'הכול' }, ...AXES], value: adm.notesAxis, cls: 'sm', label: 'סוג שיחה', onChange: (v) => { adm.notesAxis = v; render(); } })),
+      h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'ציר'), chipGroup({ options: [{ v: 'all', t: 'הכול' }, ...AXES], value: adm.notesAxis, cls: 'sm', label: 'ציר', onChange: (v) => { adm.notesAxis = v; render(); } })),
       h('div', { class: 'grid' }, d.items.length ? d.items.map((it) => h('article', { class: 'well note' }, h('div', { class: 'chips' }, h('span', { class: 'tag lead' }, it.educator), h('span', { class: 'tag' }, `שבוע ${weekNo(it.week)}`), h('span', { class: 'tag' }, it.axis === 'other' ? 'אחר' : lab(AXES, it.axis)), (() => { const fe = FEELINGS.find((x) => x.v === it.feeling); return fe ? h('span', { class: 'tag emo', title: fe.t }, fe.e) : null; })()), h('blockquote', null, it.note))) : h('p', { class: 'muted' }, 'אין הערות שמתאימות לסינון.'))),
     backToLead(sc));
 }
@@ -1699,7 +1772,7 @@ function adminLeads() {
       const host = h('div', { class: 'stack' });
       const invite = which === 'educator'
         ? `שלום, זמן לחינוך · מבט שבועי עולה לאוויר. נכנסים ל-${location.origin}, לשונית "שיחות אישיות", ובוחרים "זו הפעם הראשונה שלי". בית הספר: ${s.name}. קוד ההצטרפות: ${code}. אחר כך בוחרים קוד אישי בן ארבע ספרות. תודה!`
-        : `שלום, כמובילה של זמן לחינוך ב${s.name}: נכנסים ל-${location.origin}, לשונית "מובילות", ובוחרים "זו הכניסה הראשונה שלי כמובילה". קוד ההצטרפות של המובילות: ${code}.`;
+        : `שלום, כמובילה של זמן לחינוך ב${s.name}: נכנסים לקישור ${location.origin}/#/lead ובוחרים "זו הכניסה הראשונה שלי כמובילה". קוד ההצטרפות של המובילות: ${code}.`;
       return h('div', { class: 'stack', style: 'gap:10px' }, h('div', { class: 'row between' }, h('span', { class: 'qlabel' }, label), h('div', { class: 'row' }, h('code', { class: 'joincode', dir: 'ltr' }, code),
         h('button', { class: 'btn soft sm', onclick: () => copyText(code, 'הקוד הועתק') }, 'העתקת הקוד'), h('button', { class: 'btn soft sm', onclick: () => copyText(invite, 'נוסח ההודעה הועתק') }, 'העתקת נוסח הודעה'),
         h('button', { class: 'btn soft sm', onclick: () => confirmInline(host, 'להחליף את הקוד? מי שכבר נרשמה לא מושפעת. מי שעוד לא נרשמה תצטרך את הקוד החדש.', 'החלפת הקוד', () => act(() => api('POST', `/api/admin/schools/${s.slug}/codes`, { which }), 'הקוד הוחלף')) }, 'החלפת קוד'))), host);

@@ -6,7 +6,7 @@ const stats = require('./stats');
 const reports = require('./reports');
 const db = require('./db');
 const { route, HttpError, CsvResponse } = require('./http');
-const { FOLDERS } = require('./constants');
+const { FOLDERS, USAGE_TOOLS } = require('./constants');
 
 const { nowIso, audit, nameKey, cleanName, normalizeCode, newJoinCode, programStart, leadSeesNames, setSetting } = db;
 
@@ -216,6 +216,18 @@ route('PUT', '/api/me/reports/:week', ['educator'], async (ctx) => {
   await reports.upsertReport(ctx.user.id, ctx.params.week, data);
   const saved = ((await reports.loadReports([ctx.user.id])).get(ctx.user.id) || []).find((r) => r.week === ctx.params.week);
   return { report: reports.publicReport(saved) };
+});
+
+// עצם השימוש בכלי אישי (כרגע: מיפוי הכיתה), כדי שמנהלת התכנית תדע מי משתמשת. נשמר רק מי, מתי וכמה ימים. לא נשלח ולא נשמר שום תוכן.
+route('POST', '/api/me/usage', ['educator'], async (ctx) => {
+  const tool = ctx.body.tool;
+  if (!USAGE_TOOLS.includes(tool)) throw new HttpError(400, 'ערך לא תקין.');
+  const today = weeks.today();
+  await db.run(`INSERT INTO tool_usage (user_id, tool, first_day, last_day, days, started_day) VALUES (?, ?, ?, ?, 1, ?)
+    ON CONFLICT (user_id, tool) DO UPDATE SET
+      days = tool_usage.days + CASE WHEN tool_usage.last_day = excluded.last_day THEN 0 ELSE 1 END,
+      last_day = excluded.last_day,
+      started_day = COALESCE(tool_usage.started_day, excluded.started_day)`, [ctx.user.id, tool, today, today, ctx.body.started === true ? today : null]);
 });
 
 // ====================== מנהלת התכנית ומובילות: תצוגות לפי היקף ======================

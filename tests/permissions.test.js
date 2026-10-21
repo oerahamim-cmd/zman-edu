@@ -169,3 +169,23 @@ test('החלפת קוד הצטרפות מבטלת את הישן', async () => {
   const bad = await app.client().post('/api/auth/educator/register', { school: 'rabin', name: 'מחנכת חדשה בדיקה', joinCode: before, code: '4321' });
   assert.equal(bad.status, 403);
 });
+
+test('מי השתמשה במיפוי: רק מנהלת התכנית רואה, ובלי נתוני מיפוי', async () => {
+  const id = await idOf(NAOMI[1]);
+  await db.run('INSERT INTO tool_usage (user_id, tool, first_day, last_day, days, started_day) VALUES (?, ?, ?, ?, 2, ?) ON CONFLICT (user_id, tool) DO NOTHING', [id, 'mapping', '2026-10-12', '2026-10-13', '2026-10-12']);
+  const m = await manager();
+  const list = await m.get('/api/admin/educators');
+  const mine = list.json.educators.find((e) => e.id === id);
+  assert.equal(mine.mapping.started, true);
+  assert.deepEqual(Object.keys(mine.mapping).sort(), ['days', 'firstDay', 'lastDay', 'started']);
+  const ov = await m.get('/api/admin/overview');
+  assert.ok(ov.json.mapping.opened >= 1 && ov.json.mapping.users.some((u) => u.id === id));
+  assert.equal((await m.get(`/api/admin/educators/${id}`)).json.educator.mapping.days, 2);
+  // מובילה לא מקבלת את זה, גם כשהיא רואה שמות
+  await m.put('/api/admin/settings', { leadSeesNames: true });
+  const lead = await leadNaomi();
+  assert.ok(!('mapping' in (await lead.get('/api/lead/overview')).json));
+  assert.ok(!(await lead.get('/api/lead/educators')).json.educators.some((e) => 'mapping' in e));
+  assert.ok(!('mapping' in (await lead.get(`/api/lead/educators/${id}`)).json.educator));
+  await m.put('/api/admin/settings', { leadSeesNames: false });
+});

@@ -6,7 +6,7 @@
 const db = require('./db');
 const weeks = require('./weeks');
 const config = require('./config');
-const { ROUNDS, AXES, KINDS, FEELINGS, LABELS } = require('./constants');
+const { ROUNDS, AXES, KINDS, SCALE, FEELINGS, LABELS } = require('./constants');
 const { loadReports } = require('./reports');
 const { HttpError } = require('./http');
 
@@ -27,6 +27,15 @@ async function resolveSchool(scope, schoolParam) {
   return row.id;
 }
 
+// מי השתמשה במיפוי הכיתה: רק עצם הפתיחה (ומתי), לא תוכן. מגיע רק למנהלת התכנית.
+async function usageOf(ids, tool = 'mapping') {
+  const out = new Map();
+  if (!ids.length) return out;
+  for (const u of await db.all(`SELECT user_id, first_day, last_day, days, started_day FROM tool_usage WHERE tool = ? AND user_id IN ${db.inList(ids)}`, [tool, ...ids])) {
+    out.set(u.user_id, { firstDay: u.first_day, lastDay: u.last_day, days: u.days, started: !!u.started_day });
+  }
+  return out;
+}
 const joinWeekOf = (e, start) => (e.joined_week > start ? e.joined_week : start);
 
 function distribution(allConvs, getter, values, mask) {
@@ -77,10 +86,19 @@ async function overview(scope, { week, school } = {}) {
       axis: distribution(allConvs, (c) => c.axis, AXES, mask),
       kind: distribution(allConvs, (c) => c.kind, KINDS, mask),
       feeling: distribution(allConvs, (c) => c.feeling, FEELINGS, mask),
+      depth: distribution(allConvs, (c) => c.depth, SCALE, mask),
+      talk: distribution(allConvs, (c) => c.talk, SCALE, mask),
     },
     masked: mask,
   };
 
+  if (scope.admin) {
+    const use = await usageOf(edus.map((e) => e.id));
+    out.mapping = {
+      of: edus.length, opened: use.size, started: [...use.values()].filter((u) => u.started).length,
+      users: edus.filter((e) => use.has(e.id)).map((e) => ({ id: e.id, name: e.name, schoolName: e.school_name, ...use.get(e.id) })),
+    };
+  }
   if (scope.names) {
     out.missing = missing.map((e) => ({ id: e.id, name: e.name, schoolName: e.school_name }));
     const firstCol = weeks.addDays(w, -35) < start ? start : weeks.addDays(w, -35);
@@ -102,12 +120,14 @@ async function educatorList(scope, { school } = {}) {
   const edus = await educatorsOf(schoolId);
   const reports = await loadReports(edus.map((e) => e.id));
   const cur = weeks.curWeek();
+  const use = scope.admin ? await usageOf(edus.map((e) => e.id)) : null;
   return edus.map((e) => {
     const rp = (reports.get(e.id) || []).slice().sort((a, b) => (a.week < b.week ? 1 : -1));
     return {
       id: e.id, name: e.name, schoolSlug: e.school_slug, schoolName: e.school_name, hasCode: !!e.has_code,
       reports: rp.length, weeksExpected: weeks.weeksBetween(joinWeekOf(e, start), cur).length,
       convs: rp.reduce((n, r) => n + r.convs.length, 0), lastAt: rp[0] ? rp[0].at : null,
+      ...(use ? { mapping: use.get(e.id) || null } : {}),
     };
   });
 }
@@ -123,7 +143,8 @@ async function educatorDetail(scope, id) {
     const r = reports.find((x) => x.week === wk);
     return { week: wk, report: r ? { week: r.week, noneReason: r.noneReason, at: r.at, convs: r.convs } : null };
   });
-  return { educator: { id: e.id, name: e.name, schoolName: e.school_name, joinedWeek: joinWeek }, weeks: list, reportsCount: reports.length, convs: reports.reduce((n, r) => n + r.convs.length, 0) };
+  const mapping = scope.admin ? ((await usageOf([e.id])).get(e.id) || null) : undefined;
+  return { educator: { id: e.id, name: e.name, schoolName: e.school_name, joinedWeek: joinWeek, ...(scope.admin ? { mapping } : {}) }, weeks: list, reportsCount: reports.length, convs: reports.reduce((n, r) => n + r.convs.length, 0) };
 }
 
 async function notes(scope, { school, feeling, axis } = {}) {
@@ -149,16 +170,16 @@ async function exportRows() {
   const start = await db.programStart();
   const edus = await educatorsOf(null);
   const reports = await loadReports(edus.map((e) => e.id));
-  const rows = [['שבוע (תאריך תחילה)', 'שבוע בתכנית', 'בית ספר', 'מחנכת', 'שיחות בשבוע', 'סבב', 'סוג שיחה', 'אופי השיחה', 'תחושה', 'הערה', 'תאריך שליחה']];
+  const rows = [['שבוע (תאריך תחילה)', 'שבוע בתכנית', 'בית ספר', 'מחנכת', 'שיחות בשבוע', 'סבב', 'ציר', 'סוג שיחה', 'אופי השיחה (1 אינפורמטיבית עד 5 מעמיקה)', 'חלוקת הדיבור (1 אני דיברתי עד 5 התלמיד/ה דיברו)', 'תחושה', 'הערה', 'תאריך שליחה']];
   const weekNo = (wk) => Math.round((weeks.fromYmd(wk) - weeks.fromYmd(start)) / (7 * 86400000)) + 1;
   const all = [];
   for (const e of edus) for (const r of reports.get(e.id) || []) all.push({ e, r });
   all.sort((a, b) => (a.r.week < b.r.week ? -1 : a.r.week > b.r.week ? 1 : a.e.name.localeCompare(b.e.name, 'he')));
   for (const { e, r } of all) {
     const base = [r.week, weekNo(r.week), e.school_name, e.name, r.convs.length];
-    if (!r.convs.length) rows.push([...base, '', '', '', '', r.noneReason ? `ללא שיחות: ${LABELS.none[r.noneReason] || ''}` : '', '', r.at]);
+    if (!r.convs.length) rows.push([...base, '', '', '', '', '', '', r.noneReason ? `ללא שיחות: ${LABELS.none[r.noneReason] || ''}` : '', r.at]);
     for (const c of r.convs) {
-      rows.push([...base, LABELS.round[c.round], c.axis === 'other' ? `אחר: ${c.axisOther}` : LABELS.axis[c.axis], c.kind === 'other' ? `אחר: ${c.kindOther}` : LABELS.kind[c.kind], LABELS.feeling[c.feeling], c.note || '', r.at]);
+      rows.push([...base, LABELS.round[c.round], c.axis === 'other' ? `אחר: ${c.axisOther}` : LABELS.axis[c.axis], c.kind === 'other' ? `אחר: ${c.kindOther}` : LABELS.kind[c.kind], c.depth ?? '', c.talk ?? '', LABELS.feeling[c.feeling], c.note || '', r.at]);
     }
   }
   return rows;

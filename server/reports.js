@@ -2,7 +2,7 @@
 const db = require('./db');
 const weeks = require('./weeks');
 const config = require('./config');
-const { ROUNDS, AXES, KINDS, FEELINGS, NONE_REASONS } = require('./constants');
+const { ROUNDS, AXES, KINDS, SCALE, FEELINGS, NONE_REASONS } = require('./constants');
 const { HttpError } = require('./http');
 
 const clip = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -24,11 +24,13 @@ function validateReport(body) {
     if (!AXES.includes(c.axis)) throw new HttpError(400, `בשיחה ${i + 1} חסר סוג שיחה.`);
     if (!KINDS.includes(c.kind)) throw new HttpError(400, `בשיחה ${i + 1} חסר אופי שיחה.`);
     if (!FEELINGS.includes(c.feeling)) throw new HttpError(400, `בשיחה ${i + 1} חסר איך יצאו מהשיחה.`);
+    // שתי שאלות הציר אופציונליות בשרת (מבטים ישנים נשמרו בלעדיהן), אבל אם נשלחו הן חייבות להיות בסולם
+    for (const f of ['depth', 'talk']) if (c[f] !== undefined && c[f] !== null && !SCALE.includes(c[f])) throw new HttpError(400, `בשיחה ${i + 1} ערך לא תקין בשאלת הציר.`);
     const axisOther = c.axis === 'other' ? clip(c.axisOther, 120) : '';
     const kindOther = c.kind === 'other' ? clip(c.kindOther, 120) : '';
     if (c.axis === 'other' && !axisOther) throw new HttpError(400, `בשיחה ${i + 1} צריך לכתוב על מה דיברתם.`);
     if (c.kind === 'other' && !kindOther) throw new HttpError(400, `בשיחה ${i + 1} צריך לכתוב איזו שיחה זו הייתה.`);
-    return { round: c.round, axis: c.axis, axisOther, kind: c.kind, kindOther, feeling: c.feeling, note: clip(c.note, 1000) };
+    return { round: c.round, axis: c.axis, axisOther, kind: c.kind, kindOther, depth: c.depth ?? null, talk: c.talk ?? null, feeling: c.feeling, note: clip(c.note, 1000) };
   });
   let noneReason = '';
   if (!convs.length && body.noneReason) {
@@ -48,14 +50,14 @@ async function upsertReport(educatorId, week, { convs, noneReason }) {
     await t.run('DELETE FROM conversations WHERE report_id = ?', [rep.id]);
     let seq = 0;
     for (const c of convs) {
-      await t.run('INSERT INTO conversations (report_id, seq, round, axis, axis_other, kind, kind_other, feeling, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [rep.id, ++seq, c.round, c.axis, c.axisOther || null, c.kind, c.kindOther || null, c.feeling, c.note || null]);
+      await t.run('INSERT INTO conversations (report_id, seq, round, axis, axis_other, kind, kind_other, depth, talk, feeling, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [rep.id, ++seq, c.round, c.axis, c.axisOther || null, c.kind, c.kindOther || null, c.depth, c.talk, c.feeling, c.note || null]);
     }
     return rep.id;
   });
 }
 
-const serializeConv = (c) => ({ round: c.round, axis: c.axis, axisOther: c.axis_other || '', kind: c.kind, kindOther: c.kind_other || '', feeling: c.feeling, note: c.note || '' });
+const serializeConv = (c) => ({ round: c.round, axis: c.axis, axisOther: c.axis_other || '', kind: c.kind, kindOther: c.kind_other || '', depth: c.depth ?? null, talk: c.talk ?? null, feeling: c.feeling, note: c.note || '' });
 
 // כל המבטים של קבוצת מחנכות (מזהים), עם השיחות. החזרה: Map(educatorId -> [report])
 async function loadReports(educatorIds) {

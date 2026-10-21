@@ -109,7 +109,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS conversations (
     id ${ID}, report_id INTEGER NOT NULL REFERENCES reports(id) ON DELETE CASCADE, seq INTEGER NOT NULL,
     round INTEGER NOT NULL CHECK (round BETWEEN 1 AND 3), axis TEXT NOT NULL, axis_other TEXT,
-    kind TEXT NOT NULL, kind_other TEXT, feeling TEXT NOT NULL, note TEXT)`,
+    kind TEXT NOT NULL, kind_other TEXT, feeling TEXT NOT NULL, note TEXT, depth INTEGER, talk INTEGER)`,
   `CREATE INDEX IF NOT EXISTS idx_conv_report ON conversations(report_id)`,
   `CREATE TABLE IF NOT EXISTS tools (
     id ${ID}, folder TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
@@ -137,6 +137,17 @@ async function init() {
     await t.query('SELECT pg_advisory_xact_lock(424242)');
     const has = await get(`SELECT to_regclass('public.schools') AS t`);
     if (!has.t) for (const stmt of SCHEMA) await t.query(stmt);
+
+    // שינויים לבסיס נתונים שכבר קיים (רצים בכל עלייה, ובטוחים להרצה חוזרת)
+    await run('ALTER TABLE conversations ADD COLUMN IF NOT EXISTS depth INTEGER');
+    await run('ALTER TABLE conversations ADD COLUMN IF NOT EXISTS talk INTEGER');
+    // "שיחת עומק" יצאה מרשימת הסוגים: שיחות ישנות נשמרות כ"אחר" עם הטקסט המקורי
+    await run("UPDATE conversations SET kind = 'other', kind_other = 'שיחת עומק' WHERE kind = 'deep'");
+    // שימוש בכלים: רק מי פתחה ומתי. בלי שום תוכן, ובלי שום מידע על תלמידים.
+    await run(`CREATE TABLE IF NOT EXISTS tool_usage (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, tool TEXT NOT NULL,
+      first_day TEXT NOT NULL, last_day TEXT NOT NULL, days INTEGER NOT NULL DEFAULT 1, started_day TEXT,
+      PRIMARY KEY (user_id, tool))`);
 
     for (const s of SCHOOLS) await run('INSERT INTO schools (slug, name, sort_order) VALUES (?, ?, ?) ON CONFLICT (slug) DO NOTHING', [s.slug, s.name, s.order]);
     // קודי הצטרפות: נוצרים פעם אחת, ומנהלת התכנית יכולה להחליף אותם בכל רגע

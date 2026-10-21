@@ -55,7 +55,7 @@ test('דרך pg: הרשמה, כניסה, שליחת מבט בטרנזקציה ו
   const reg = await call('POST', '/api/auth/educator/register', { school: 'rabin', name: 'בדיקת רשת', code: '2468', joinCode: rabin });
   assert.equal(reg.status, 200);
   assert.equal(typeof reg.json.user.id, 'number');
-  const put = await call('PUT', '/api/me/reports/2026-10-11', { convs: [{ round: 1, axis: 'identity', kind: 'notebook', feeling: 'good', note: 'בדיקה' }, { round: 2, axis: 'goals', kind: 'deep', feeling: 'inspired', note: '' }] }, reg.sid);
+  const put = await call('PUT', '/api/me/reports/2026-10-11', { convs: [{ round: 1, axis: 'identity', kind: 'notebook', feeling: 'good', note: 'בדיקה' }, { round: 2, axis: 'goals', kind: 'intro', feeling: 'inspired', note: '' }] }, reg.sid);
   assert.equal(put.status, 200);
   assert.equal(put.json.report.convs.length, 2);
   const again = await call('PUT', '/api/me/reports/2026-10-11', { convs: [{ round: 3, axis: 'agency', kind: 'complex', feeling: 'heavy', note: '' }] }, reg.sid);

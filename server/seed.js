@@ -53,6 +53,10 @@ async function seedDemo() {
       const id = (await t.get('INSERT INTO users (role, school_id, name, name_key, secret_hash, active, created_at, joined_week) VALUES (?, ?, ?, ?, ?, 1, ?, ?) RETURNING id',
         ['educator', schoolId[slug], name, db.nameKey(name), eduHashes[i], now, joined])).id;
       const reliab = 0.55 + r() * 0.4;
+      if (r() < 0.45) { // כחלק מהמחנכות כבר פתחו את מיפוי הכיתה (רק עצם השימוש נשמר)
+        const first = weeks.addDays(joined, Math.floor(r() * 4));
+        await t.run('INSERT INTO tool_usage (user_id, tool, first_day, last_day, days, started_day) VALUES (?, ?, ?, ?, ?, ?)', [id, 'mapping', first, weeks.addDays(first, 2 + Math.floor(r() * 5)), 1 + Math.floor(r() * 5), r() < 0.7 ? first : null]);
+      }
       for (const [wi, w] of weeks.weeksBetween(joined, cur).entries()) {
         const isCur = w === cur;
         if (!(isCur ? r() < 0.45 : r() < reliab)) continue;
@@ -62,9 +66,10 @@ async function seedDemo() {
         for (let k = 0; k < n; k++) {
           const roundW = wi < 3 ? [[1, 0.85], [2, 0.12], [3, 0.03]] : wi < 6 ? [[1, 0.5], [2, 0.4], [3, 0.1]] : [[1, 0.3], [2, 0.45], [3, 0.25]];
           const axis = weighted(r, [['identity', 0.4], ['goals', 0.3], ['agency', 0.25], ['other', 0.05]]);
-          const kind = weighted(r, [['notebook', 0.3], ['complex', 0.2], ['grades', 0.1], ['parents', 0.1], ['deep', 0.25], ['other', 0.05]]);
-          await t.run('INSERT INTO conversations (report_id, seq, round, axis, axis_other, kind, kind_other, feeling, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          const kind = weighted(r, [['intro', 0.15], ['notebook', 0.3], ['complex', 0.2], ['grades', 0.1], ['parents', 0.1], ['other', 0.15]]);
+          await t.run('INSERT INTO conversations (report_id, seq, round, axis, axis_other, kind, kind_other, depth, talk, feeling, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [rid, k + 1, weighted(r, roundW), axis, axis === 'other' ? 'שיחה על איזון בין לימודים לפעילות אחר הצהריים' : null, kind, kind === 'other' ? 'שיחה מיוזמת התלמיד/ה' : null,
+              weighted(r, [[1, 0.1], [2, 0.2], [3, 0.3], [4, 0.25], [5, 0.15]]), weighted(r, [[1, 0.1], [2, 0.3], [3, 0.3], [4, 0.2], [5, 0.1]]),
               weighted(r, [['inspired', 0.2], ['good', 0.35], ['neutral', 0.15], ['thoughtful', 0.15], ['frustrated', 0.1], ['heavy', 0.05]]), r() < 0.4 ? NOTE_POOL[Math.floor(r() * NOTE_POOL.length)] : null]);
         }
       }

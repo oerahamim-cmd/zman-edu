@@ -397,3 +397,39 @@ body.cards-full { overflow: hidden; }
 .cardsview.full.nochrome .cardhead, .cardsview.full.nochrome .cardcount, .cardsview.full.nochrome .cardbtns, .cardsview.full.nochrome .cardnote, .cardsview.full.nochrome .pickframe .picksrow { display: none; }
 .cardsview.full.nochrome .qface { padding: 6vmin 8vmin; }
 .cardsview.full.nochrome .cardcat { bottom: 5vmin; }
+
+/* ---------- סולם של חמש נקודות (שאלות הציר בשיחה) ---------- */
+.scale { display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
+.scalebtns { display: flex; gap: 10px; }
+.scalepick { position: relative; flex: 1 1 0; }
+.scalepick input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.scalepick span { display: flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 16px; background: var(--soft); font-weight: 700; font-size: 20px; user-select: none; }
+.scalepick input:checked + span { background: var(--lead); color: #fff; }
+.scalepick input:focus-visible + span { outline: 3px solid var(--sky); outline-offset: 2px; }
+.scaleends { display: flex; justify-content: space-between; font-size: 15px; color: var(--ink2); }
+.scaleread { min-height: 1.4em; font-size: 15px; font-weight: 500; color: var(--lead); }
+
+/* ---------- דף הבית: בהיר, מעט מלל, ארבע אריחים ברורים ---------- */
+.frame.hero { background: #e8efff; padding: clamp(26px, 5vw, 56px); gap: 14px; }
+.hero .kicker { color: var(--lead); font-weight: 700; font-size: 17px; }
+.hero h1 { color: var(--ink); }
+.hero .herosub { font-size: clamp(18px, 2.4vw, 22px); color: var(--ink2); max-width: 40ch; }
+.hero .row { margin-top: 8px; }
+.tiles { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+.tile { min-height: 0; }
+.tile .ic-big { width: 56px; height: 56px; }
+.frame.quiet { gap: 6px; padding-block: 14px; }
+.quiet summary { cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: 500; padding-block: 8px; list-style: none; }
+.quiet summary::-webkit-details-marker { display: none; }
+.quiet summary::after { content: '＋'; margin-inline-start: auto; color: var(--lead); font-weight: 700; }
+.quiet details[open] summary::after { content: '－'; }
+.quiet ul.plain, .quiet ol.plain { margin: 4px 0 10px; padding-inline-start: 22px; display: flex; flex-direction: column; gap: 8px; color: var(--ink2); max-width: 64ch; }
+.quiet details + details { border-top: 1px solid #ececf0; }
+@media (max-width: 560px) {
+  .tiles { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tile { padding: 16px; gap: 8px; }
+  .tile h3 { font-size: 19px; }
+  .tile p { font-size: 15px; line-height: 1.35; }
+  .tile .ic-big { width: 46px; height: 46px; }
+  .tile .tag { font-size: 12px; padding: 3px 9px; white-space: normal; }
+}
