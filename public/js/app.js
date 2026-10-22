@@ -342,6 +342,7 @@ function render() {
   const y0 = window.scrollY, same = p === lastRoute;
   lastRoute = p;
     if (!p.startsWith('/tools/cards') && typeof cardsLeave === 'function') cardsLeave();
+  if (p !== '/tools/identity/cards') sc = null;
   state.area = p.startsWith('/admin') || p.startsWith('/lead') ? 'admin' : 'public';
   const view = resolve(p);
   clear(app);
@@ -354,6 +355,8 @@ function resolve(p) {
   if (p === '/') return viewHome();
   if (p === '/tools') return viewTools();
   if (p === '/tools/cards' || p.startsWith('/tools/cards/')) return viewCards(p);
+  if (p === '/tools/identity/listen') return viewListen();
+  if (p === '/tools/identity/cards') return viewStrengthCards();
   if ((m = /^\/tools\/(identity|goals|agency)$/.exec(p))) return viewFolder(m[1]);
   const gate = (path, view) => (me() ? view() : isAdmin() || leadUser() ? viewEducatorsOnly() : viewEnter('new', path));
   const gateMap = (path, view) => gate(path, () => { ensureMap(); pingMapping(); return view(); });
@@ -434,7 +437,7 @@ function viewHome() {
    ארגז כלים (פתוח לכולם)
    ===================================================================== */
 function viewTools() {
-  const count = (id) => pub.tools.filter((t) => t.folder === id && !t.example).length;
+  const count = (id) => pub.tools.filter((t) => t.folder === id && !t.example).length + (id === 'identity' ? IDENTITY_TOOLS.length : 0);
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
     h('section', { class: 'frame' }, h('h2', null, 'ארגז כלים'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'כלים ופרקטיקות לשיחות אישיות. פתוח לכולם, בלי כניסה. התכנים יתווספו כאן לאורך השנה.')),
     h('a', { class: 'frame cardsfeature', href: '#/tools/cards', onclick: (e) => { e.preventDefault(); go('/tools/cards'); } },
@@ -449,7 +452,8 @@ function viewFolder(id) {
   const f = FOLDERS.find((x) => x.id === id);
   const back = link('/tools', 'ארגז כלים', 'btn ghost');
   const items = pub.tools.filter((t) => t.folder === id);
-  const list = items.length ? items.map(toolCard) : [h('div', { class: 'frame' }, h('p', { class: 'muted' }, 'הכלים והפרקטיקות בציר הזה יתווספו כאן.'))];
+  const builtin = id === 'identity' ? IDENTITY_TOOLS.map(identityTile) : [];
+  const list = builtin.length || items.length ? [...builtin, ...items.filter((t) => !builtin.length || !t.example).map(toolCard)] : [h('div', { class: 'frame' }, h('p', { class: 'muted' }, 'הכלים והפרקטיקות בציר הזה יתווספו כאן.'))];
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
     h('section', { class: 'frame' }, h('div', null, back), h('div', { class: 'row' }, ic(f.icon, { size: 44, tone: 'blue' }), h('h2', null, f.t)), h('p', { class: 'muted' }, f.d)),
     h('div', { class: 'grid' }, list),
@@ -460,6 +464,231 @@ function toolCard(t) {
     h('div', { class: 'row' }, h('span', { class: 'tag lead' }, t.type || 'כלי'), t.example ? h('span', { class: 'tag' }, 'דוגמה לתצוגה') : null),
     h('h3', null, t.title), h('p', { class: 'muted' }, t.desc),
     t.url ? h('div', null, h('a', { class: 'btn sm', href: t.url, target: '_blank', rel: 'noopener' }, 'פתיחה')) : null);
+}
+
+/* =====================================================================
+   זהות וחוזקות: שני כלים. "להקשיב לכוחות" (למחנכת) ו"יש בי יותר ממה שרואים" (שיחה משותפת)
+   התוכן ב-js/identity-data.js. שום דבר לא נשלח לשרת ולא נשמר: הכול נשאר על המסך.
+   ===================================================================== */
+const IDT = () => window.ZMAN_IDENTITY;
+const IDENTITY_TOOLS = [
+  { to: '/tools/identity/listen', icon: 'eye', t: 'להקשיב לכוחות', who: 'למחנכת', d: 'ארבע עדשות להקשבה לסיפור של התלמיד/ה, וארבעה שלבים לשיקוף חוזקה בלי לתייג.' },
+  { to: '/tools/identity/cards', icon: 'care', t: 'יש בי יותר ממה שרואים', who: 'שיחה משותפת', d: 'התלמיד/ה בוחר/ת קלף ומספר/ת סיפור, והמחנכת מציעה חוזקות. התלמיד/ה מסכימ/ה, מדייק/ת או דוחה.' },
+];
+function identityTile(x) {
+  return h('a', { class: 'folder tile idtool', href: '#' + x.to, onclick: (e) => { e.preventDefault(); go(x.to); } },
+    h('span', { class: 'ic-big' }, ic(x.icon, { size: 38, tone: 'blue' })),
+    h('div', { class: 'row', style: 'gap:8px' }, h('span', { class: 'tag lead' }, x.who), h('span', { class: 'tag' }, 'בלי תיעוד')),
+    h('h3', null, x.t), h('p', { class: 'muted' }, x.d), h('span', { class: 'btn sm', style: 'align-self:flex-start' }, 'לפתיחה'));
+}
+function idHead(title, sub) {
+  return h('section', { class: 'frame' }, h('div', null, link('/tools/identity', 'זהות וחוזקות', 'btn ghost sm')), h('h2', null, title), sub ? h('p', { class: 'muted', style: 'max-width:62ch' }, sub) : null);
+}
+
+/* ---------- כלי 1: להקשיב לכוחות ---------- */
+let listenTab = 'lenses', listenLens = null, listenEx = 0, listenStep = 1;
+const LISTEN_NEXT = ['', 'מה אפשר לשמוע כאן?', 'איזו שאלת בירור היית שואלת?', 'מה התלמיד/ה עשוי/ה לענות?', 'איך היית משקפת?', 'ואיך מרחיבים, אם מתאים?'];
+function viewListen() {
+  const D = IDT().listen;
+  const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
+  const TABS = [['lenses', 'ארבע עדשות'], ['flow', 'מהקשבה לשיקוף'], ['examples', 'דוגמאות חיות']];
+  const lenses = () => h('section', { class: 'frame' },
+    h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'ארבע עדשות להקשבה'), h('p', { class: 'muted' }, 'בכל שיחה אפשר להקשיב דרך עדשה אחת או יותר. מקישים על עדשה כדי לראות למה להקשיב ואילו שאלות אפשר לשאול.')),
+    h('div', { class: 'lensgrid' }, D.lenses.map((l, i) => {
+      const open = listenLens === l.id;
+      return h('div', { class: 'lens', 'data-open': String(open) },
+        h('button', { class: 'lenshead', type: 'button', 'aria-expanded': String(open), onclick: () => { listenLens = open ? null : l.id; paint(); } },
+          h('span', { class: 'lensnum', 'aria-hidden': 'true' }, String(i + 1)), h('span', { class: 'stack', style: 'gap:4px' }, h('b', { class: 'lenstitle' }, l.title), h('span', { class: 'muted' }, l.prompt))),
+        open ? h('div', { class: 'lensbody' },
+          h('div', { class: 'stack', style: 'gap:8px' }, h('h4', null, 'רמזים להקשבה'), h('div', { class: 'row', style: 'gap:8px' }, l.signals.map((s) => h('span', { class: 'tag' }, s)))),
+          h('div', { class: 'stack', style: 'gap:8px' }, h('h4', null, 'שאלות שאפשר לשאול'), l.examples.map((q) => h('p', { class: 'qquote' }, q)))) : null);
+    })),
+    h('p', { class: 'small muted' }, 'לא כל שיחה צריכה להסתיים בחוזקה. לפעמים הקשבה בלבד היא הדבר הנכון.'));
+  const flow = () => h('section', { class: 'frame' },
+    h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'מהקשבה לשיקוף'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'זה רצף אפשרי, לא טופס חובה. אפשר להישאר בשלב ההקשבה אם זה מה שהתלמיד/ה צריך/ה, ואין חובה להגיע להרחבה.')),
+    h('ol', { class: 'flow' }, D.flow.map((s, i) => h('li', { class: 'flowstep' },
+      h('span', { class: 'flowdot', 'aria-hidden': 'true' }, String(i + 1)),
+      h('div', { class: 'stack', style: 'gap:8px' },
+        h('div', { class: 'row', style: 'gap:10px' }, h('h3', null, s.micro), h('span', { class: 'tag lead' }, s.title)),
+        h('p', null, s.instruction),
+        h('p', { class: 'qquote' }, h('small', { class: 'qlab' }, 'דוגמה'), s.example))))));
+  const examples = () => {
+    const e = D.examples[listenEx];
+    const msgs = [
+      { k: 'st', label: 'התלמיד/ה מספר/ת', text: e.story },
+      { k: 'hint' },
+      { k: 'ed', label: 'שאלת בירור', text: e.ask },
+      { k: 'st', label: 'התלמיד/ה עונה', text: e.reply },
+      { k: 'ed', label: 'שיקוף', text: e.reflect },
+      { k: 'ed', label: 'הרחבה, אם מתאים', text: e.extend },
+    ];
+    const shown = msgs.slice(0, listenStep);
+    const done = listenStep >= msgs.length;
+    const bubbles = shown.map((m, i) => {
+      const fresh = i === shown.length - 1 && i > 0 ? ' msg-in' : '';
+      if (m.k === 'hint') return h('div', { class: 'hintbox' + fresh }, h('b', null, 'מה אפשר לשמוע כאן? השערות, לא קביעות'), h('div', { class: 'row', style: 'gap:8px' }, e.hints.map((x) => h('span', { class: 'tag' }, x))));
+      return h('div', { class: 'msg ' + m.k + fresh }, h('small', null, m.label), h('div', { class: 'mb' }, m.text));
+    });
+    const controls = h('div', { class: 'row' });
+    if (done) add(controls, [h('span', { class: 'tag' }, 'זה סוף הדוגמה')]);
+    else add(controls, [h('span', { class: 'muted small' }, LISTEN_NEXT[listenStep]),
+      h('button', { class: 'btn', type: 'button', onclick: () => { listenStep++; paint(); } }, 'הצעד הבא'),
+      h('button', { class: 'btn soft sm', type: 'button', onclick: () => { listenStep = msgs.length; paint(); } }, 'הצגת הכול')]);
+    if (listenStep > 1) add(controls, [h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { listenStep = 1; paint(); } }, 'מההתחלה')]);
+    return h('section', { class: 'frame' },
+      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'דוגמאות חיות'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'בוחרות נושא ועוברות על השיחה צעד אחר צעד. לפני שמקישים "הצעד הבא", כדאי לחשוב מה היית עושה. הדוגמאות אינן תסריט.')),
+      chipGroup({ options: D.examples.map((x, i) => ({ v: i, t: x.category })), value: listenEx, label: 'נושא הדוגמה', onChange: (v) => { listenEx = v; listenStep = 1; paint(); } }),
+      h('div', { class: 'idchat', 'aria-live': 'polite' }, bubbles),
+      controls,
+      h('p', { class: 'small muted' }, 'חוזקות מוצגות כהשערות ולא כאבחנות: התלמיד/ה יכול/ה לדייק או לדחות.'));
+  };
+  const principles = h('section', { class: 'frame quiet' }, h('details', null, h('summary', null, ic('insight', { size: 20 }), 'עקרונות להקשבה'),
+    h('ul', { class: 'plain' },
+      h('li', null, 'לא מחפשות חוזקה בכוח בכל סיפור. לפעמים הקשבה בלבד היא הדבר הנכון.'),
+      h('li', null, 'לא הופכות קושי לחוזקה באופן אוטומטי.'),
+      h('li', null, 'לא מייחסות לתלמיד/ה תכונה על סמך אירוע אחד.'),
+      h('li', null, 'שיקוף טוב מתחיל בהתנהגות שנצפתה ולא בתווית אישיות.'),
+      h('li', null, 'התלמיד/ה שותפ/ה לפרשנות, ויכול/ה לדחות או לשנות אותה.'))));
+  function paint() {
+    clear(host);
+    const body = { lenses, flow, examples }[listenTab]();
+    add(host, [
+      idHead('להקשיב לכוחות', 'תזכורת קצרה למחנכת, בכל שיחה אישית, גם כשהנושא אינו חוזקות. אין מה למלא ואין תיעוד: זה כלי להקשבה.'),
+      h('div', { class: 'idtabs', role: 'tablist', 'aria-label': 'חלקי הכלי' }, TABS.map(([id, t]) => h('button', { class: 'idtab', type: 'button', role: 'tab', 'aria-selected': String(listenTab === id), onclick: () => { listenTab = id; paint(); } }, t))),
+      body, principles]);
+  }
+  paint();
+  return host;
+}
+
+/* ---------- כלי 2: יש בי יותר ממה שרואים ---------- */
+let sc = null; // מצב השיחה: חי רק כל עוד נשארים בכלי, ולא נשמר בשום מקום
+const scFresh = () => ({ step: 1, q: null, offered: [], resp: {}, own: [], ownText: '' });
+const SC_MAX = 3;
+const SC_STEPS = ['קלף שאלה', 'הסיפור', 'חוזקות', 'סיכום'];
+const SC_RESP = [{ v: 'yes', t: 'מתאים' }, { v: 'close', t: 'קרוב, לא בדיוק' }, { v: 'no', t: 'לא מתאים' }];
+function viewStrengthCards() {
+  const D = IDT().cards;
+  const L = IDT().listen.lenses;
+  if (!sc) sc = scFresh();
+  const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
+  const strength = (id) => D.strengths.find((s) => s.id === id);
+  const go2 = (step) => { sc.step = step; paint(); window.scrollTo(0, 0); };
+  const restart = () => { sc = scFresh(); paint(); window.scrollTo(0, 0); };
+  const progress = () => h('ol', { class: 'idprog', 'aria-label': 'שלבי השיחה' }, SC_STEPS.map((t, i) => h('li', { class: i + 1 < sc.step ? 'done' : i + 1 === sc.step ? 'cur' : '', 'aria-current': i + 1 === sc.step ? 'step' : null }, `${i + 1}. ${t}`)));
+
+  // 1. בוחרים קלף שאלה
+  const stepPick = () => {
+    const choose = (q) => { sc.q = q; go2(2); };
+    return h('section', { class: 'frame' },
+      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'בוחרים קלף שאלה'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'התלמיד/ה בוחר/ת קלף אחד שיש לו/ה על מה לספר. אין תשובה נכונה, ואפשר תמיד להחליף.')),
+      h('div', { class: 'qcards' }, D.questions.map((q) => h('button', { class: 'qcard', type: 'button', onclick: () => choose(q) }, h('span', null, q.title)))),
+      h('div', { class: 'row' }, h('button', { class: 'btn soft', type: 'button', onclick: () => choose(D.questions[Math.floor(Math.random() * D.questions.length)]) }, 'קלף מעורבב'), h('span', { class: 'small muted' }, 'כשקשה להחליט.')));
+  };
+
+  // 2. הסיפור
+  const stepStory = () => h('section', { class: 'frame' },
+    h('div', { class: 'storycard' }, h('p', { class: 'qlab' }, 'הקלף שנבחר'), h('p', { class: 'storyq' }, sc.q.title), h('p', { class: 'storyf' }, h('small', null, 'שאלת המשך: '), sc.q.follow)),
+    h('div', { class: 'grid' },
+      h('div', { class: 'well stack', style: 'gap:6px' }, h('h4', null, 'התלמיד/ה'), h('p', null, 'מספר/ת בחופשיות, כמה שבא לו/ה. אפשר לדלג על חלקים.')),
+      h('div', { class: 'well stack', style: 'gap:6px' }, h('h4', null, 'המחנכת'), h('p', null, 'מקשיבה, שואלת שאלות המשך, ועוד לא נותנת שם. השם בא בשלב הבא.'))),
+    h('details', { class: 'idlens' }, h('summary', null, 'תזכורת: שאלות המשך לפי ארבע עדשות'),
+      h('div', { class: 'grid', style: 'margin-top:12px' }, L.map((l) => h('div', { class: 'well stack', style: 'gap:6px' }, h('h4', null, l.title), h('p', { class: 'small' }, l.examples[0]))))),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn', type: 'button', onclick: () => go2(3) }, 'סיימנו לספר: לחוזקות'),
+      h('button', { class: 'btn soft', type: 'button', onclick: () => go2(4) }, 'לסיים בלי חוזקות'),
+      h('button', { class: 'btn ghost', type: 'button', onclick: () => go2(1) }, 'החלפת קלף')),
+    h('p', { class: 'small muted' }, 'לא כל שיחה צריכה להסתיים בחוזקה. הסיפור לבדו שווה את הזמן.'));
+
+  // 3. המחנכת מציעה חוזקות כהשערות
+  const stepOffer = () => {
+    const search = h('input', { class: 'input', type: 'search', placeholder: 'חיפוש חוזקה', 'aria-label': 'חיפוש חוזקה' });
+    const counter = h('p', { class: 'tag lead', 'aria-live': 'polite' });
+    const next = h('button', { class: 'btn', type: 'button', onclick: () => go2(4) });
+    const els = D.strengths.map((s) => {
+      const b = h('button', { class: 'scard', type: 'button', onclick: () => {
+        const i = sc.offered.indexOf(s.id);
+        if (i >= 0) sc.offered.splice(i, 1);
+        else if (sc.offered.length < SC_MAX) sc.offered.push(s.id);
+        sync();
+      } }, h('b', null, s.name), h('span', null, s.desc));
+      return { s, b };
+    });
+    const empty = h('p', { class: 'muted', hidden: true }, 'לא נמצאה חוזקה בשם הזה. אפשר לנסות מילה אחרת.');
+    function sync() {
+      const full = sc.offered.length >= SC_MAX;
+      els.forEach(({ s, b }) => {
+        const on = sc.offered.includes(s.id);
+        b.setAttribute('aria-pressed', String(on));
+        b.setAttribute('aria-disabled', String(full && !on));
+      });
+      counter.textContent = `הוצעו ${sc.offered.length} מתוך ${SC_MAX}`;
+      next.textContent = sc.offered.length ? 'להמשך: מה מתאים לתלמיד/ה?' : 'להמשיך בלי להציע';
+    }
+    search.addEventListener('input', () => {
+      const q = search.value.trim();
+      let any = false;
+      els.forEach(({ s, b }) => { const ok = !q || (s.name + ' ' + s.desc).includes(q); b.hidden = !ok; if (ok) any = true; });
+      empty.hidden = any;
+    });
+    sync();
+    return h('section', { class: 'frame' },
+      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'המחנכת מציעה חוזקות, כהשערות'), h('p', { class: 'muted', style: 'max-width:62ch' }, `בוחרות עד ${SC_MAX} קלפים שנשמעו בסיפור, ואחר כך שואלות את התלמיד/ה אם הם מתאימים. מתחילות ממה שנעשה בסיפור. אין חובה לבחור.`)),
+      h('div', { class: 'row between' }, h('div', { style: 'flex:1 1 220px;max-width:340px' }, search), counter),
+      h('div', { class: 'scards' }, els.map((x) => x.b)), empty,
+      h('div', { class: 'row' }, next, h('button', { class: 'btn ghost', type: 'button', onclick: () => go2(2) }, 'חזרה לסיפור')));
+  };
+
+  // 4. תגובת התלמיד/ה וסיכום
+  const stepSummary = () => {
+    const sumBox = h('div', { class: 'grid', 'aria-live': 'polite' });
+    const sumUpdate = () => {
+      const chosen = [...sc.offered.filter((id) => sc.resp[id] === 'yes' || sc.resp[id] === 'close').map((id) => ({ t: strength(id).name, n: sc.resp[id] === 'close' ? 'קרוב, לא בדיוק' : '' })),
+        ...sc.own.map((id) => ({ t: strength(id).name, n: 'בחירה של התלמיד/ה' })), ...(sc.ownText.trim() ? [{ t: sc.ownText.trim(), n: 'במילים של התלמיד/ה' }] : [])];
+      const label = { yes: 'מתאים', close: 'קרוב, לא בדיוק', no: 'התלמיד/ה לא הסכימ/ה' };
+      clear(sumBox);
+      add(sumBox, [
+        h('div', { class: 'well stack', style: 'gap:8px' }, h('h4', null, 'מה התלמיד/ה בחר/ה?'),
+          chosen.length ? h('ul', { class: 'sumlist' }, chosen.map((c) => h('li', null, h('b', null, c.t), c.n ? h('small', null, c.n) : null))) : h('p', { class: 'muted small' }, 'עדיין לא נבחרה חוזקה. וזה בסדר גמור.')),
+        h('div', { class: 'well stack', style: 'gap:8px' }, h('h4', null, 'מה המחנכת הציעה?'),
+          sc.offered.length ? h('ul', { class: 'sumlist' }, sc.offered.map((id) => h('li', null, h('b', null, strength(id).name), h('small', null, label[sc.resp[id]] || 'עדיין בלי תגובה')))) : h('p', { class: 'muted small' }, 'לא הוצעו חוזקות.'))]);
+    };
+    const offeredBlock = sc.offered.length
+      ? h('div', { class: 'stack' }, sc.offered.map((id) => {
+        const s = strength(id);
+        return h('div', { class: 'respcard' }, h('div', { class: 'stack', style: 'gap:2px' }, h('b', { style: 'font-size:20px' }, s.name), h('span', { class: 'muted' }, s.desc)),
+          h('div', { class: 'stack', style: 'gap:6px' }, h('span', { class: 'small muted' }, 'מה התלמיד/ה אומר/ת?'),
+            chipGroup({ options: SC_RESP, value: sc.resp[id], cls: 'sm', label: `תגובה לחוזקה ${s.name}`, onChange: (v) => { sc.resp[id] = v; sumUpdate(); } })));
+      }))
+      : h('p', { class: 'muted' }, 'לא הוצעו חוזקות, ואפשר גם להסתפק בסיפור. אם התלמיד/ה רוצה לומר מה הוא/היא רואה בעצמו/ה, אפשר לבחור למטה.');
+    const pills = D.strengths.filter((s) => !sc.offered.includes(s.id)).map((s) => {
+      const b = h('button', { class: 'pillbtn', type: 'button', 'aria-pressed': String(sc.own.includes(s.id)), title: s.desc, onclick: () => {
+        const i = sc.own.indexOf(s.id);
+        if (i >= 0) sc.own.splice(i, 1); else if (sc.own.length < SC_MAX) sc.own.push(s.id); else return;
+        b.setAttribute('aria-pressed', String(sc.own.includes(s.id))); sumUpdate();
+      } }, s.name);
+      return b;
+    });
+    const ownText = h('input', { class: 'input', type: 'text', maxlength: '60', placeholder: 'חוזקה במילים של התלמיד/ה', 'aria-label': 'חוזקה במילים של התלמיד/ה', value: sc.ownText });
+    ownText.addEventListener('input', () => { sc.ownText = ownText.value; sumUpdate(); });
+    sumUpdate();
+    return h('section', { class: 'frame' },
+      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'מה מתאים לתלמיד/ה?'), h('p', { class: 'muted', style: 'max-width:62ch' }, 'התלמיד/ה מחליט/ה. אפשר להסכים, לדייק, לדחות, או להציע חוזקה אחרת.')),
+      offeredBlock,
+      h('details', { class: 'idlens', open: sc.own.length > 0 || !sc.offered.length }, h('summary', null, 'התלמיד/ה מציע/ה חוזקה אחרת'),
+        h('div', { class: 'stack', style: 'margin-top:12px' }, h('p', { class: 'small muted' }, `אפשר לבחור עד ${SC_MAX} קלפים.`), h('div', { class: 'row', style: 'gap:8px' }, pills), ownText)),
+      h('div', { class: 'stack', style: 'gap:10px' }, h('h3', null, 'סיכום אופציונלי'), sumBox,
+        h('p', { class: 'privnote small' }, ic('lock', { size: 18 }), ' הסיכום מוצג רק על המסך הזה. הוא לא נשמר: לא בשרת, לא בדפדפן ולא בפרופיל, ונעלם כשיוצאים מהכלי. אם התלמיד/ה מסכימ/ה, אפשר לרשום אותו במחברת.')),
+      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: restart }, 'שיחה חדשה, קלף אחר'), h('button', { class: 'btn soft', type: 'button', onclick: () => go2(sc.offered.length ? 3 : 2) }, 'חזרה'), link('/tools/identity', 'לסיום', 'btn ghost')));
+  };
+
+  function paint() {
+    clear(host);
+    add(host, [idHead('יש בי יותר ממה שרואים', 'שיחה אישית משותפת: סיפור קצר, ואחריו שם לכוחות שנראים בו, בלי תיוג מלמעלה. כל התהליך נשאר על המסך, בלי תיעוד.'),
+      progress(), [stepPick, stepStory, stepOffer, stepSummary][sc.step - 1]()]);
+  }
+  paint();
+  return host;
 }
 
 /* =====================================================================
