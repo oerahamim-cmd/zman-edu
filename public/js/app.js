@@ -478,87 +478,103 @@ const IDENTITY_TOOLS = [
 function identityTile(x) {
   return h('a', { class: 'folder tile idtool', href: '#' + x.to, onclick: (e) => { e.preventDefault(); go(x.to); } },
     h('span', { class: 'ic-big' }, ic(x.icon, { size: 38, tone: 'blue' })),
-    h('div', { class: 'row', style: 'gap:8px' }, h('span', { class: 'tag lead' }, x.who), h('span', { class: 'tag' }, 'בלי תיעוד')),
+    h('div', { class: 'row', style: 'gap:8px' }, h('span', { class: 'tag lead' }, x.who)),
     h('h3', null, x.t), h('p', { class: 'muted' }, x.d), h('span', { class: 'btn sm', style: 'align-self:flex-start' }, 'לפתיחה'));
 }
 function idHead(title, sub) {
   return h('section', { class: 'frame' }, h('div', null, link('/tools/identity', 'זהות וחוזקות', 'btn ghost sm')), h('h2', null, title), sub ? h('p', { class: 'muted', style: 'max-width:62ch' }, sub) : null);
 }
 
-/* ---------- כלי 1: להקשיב לכוחות ---------- */
-let listenTab = 'lenses', listenLens = null, listenEx = 0, listenStep = 1;
-const LISTEN_NEXT = ['', 'מה אפשר לשמוע כאן?', 'איזו שאלת בירור היית שואלת?', 'מה התלמיד/ה עשוי/ה לענות?', 'איך היית משקפת?', 'ואיך מרחיבים, אם מתאים?'];
+/* ---------- כלי 1: להקשיב לכוחות (גרסה 1.2) ---------- */
+let listenTab = 'lenses', listenLens = 'L01', listenStep = 'T01', listenEx = 'E01', listenDraft = '', listenMine = null;
 function viewListen() {
-  const D = IDT().listen;
+  const D = window.ZMAN_LISTEN;
   const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  const TABS = [['lenses', 'ארבע עדשות'], ['flow', 'מהקשבה לשיקוף'], ['examples', 'דוגמאות חיות']];
+  const TABS = [['lenses', 'עדשות'], ['reflect', 'שיקוף'], ['examples', 'דוגמאות']];
   const lenses = () => h('section', { class: 'frame' },
-    h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'ארבע עדשות להקשבה'), h('p', { class: 'muted' }, 'בכל שיחה אפשר להקשיב דרך עדשה אחת או יותר. מקישים על עדשה כדי לראות למה להקשיב ואילו שאלות אפשר לשאול.')),
+    h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'ארבע עדשות להקשבה'), h('p', { class: 'muted', style: 'max-width:60ch' }, D.lensesIntro)),
     h('div', { class: 'lensgrid' }, D.lenses.map((l, i) => {
       const open = listenLens === l.id;
       return h('div', { class: 'lens', 'data-open': String(open) },
         h('button', { class: 'lenshead', type: 'button', 'aria-expanded': String(open), onclick: () => { listenLens = open ? null : l.id; paint(); } },
-          h('span', { class: 'lensnum', 'aria-hidden': 'true' }, String(i + 1)), h('span', { class: 'stack', style: 'gap:4px' }, h('b', { class: 'lenstitle' }, l.title), h('span', { class: 'muted' }, l.prompt))),
+          h('span', { class: 'lensnum', 'aria-hidden': 'true' }, String(i + 1)), h('span', { class: 'stack', style: 'gap:4px' }, h('b', { class: 'lenstitle' }, l.title), open ? null : h('span', { class: 'muted' }, l.prompt))),
         open ? h('div', { class: 'lensbody' },
-          h('div', { class: 'stack', style: 'gap:8px' }, h('h4', null, 'רמזים להקשבה'), h('div', { class: 'row', style: 'gap:8px' }, l.signals.map((s) => h('span', { class: 'tag' }, s)))),
-          h('div', { class: 'stack', style: 'gap:8px' }, h('h4', null, 'שאלות שאפשר לשאול'), l.examples.map((q) => h('p', { class: 'qquote' }, q)))) : null);
+          h('p', null, l.prompt),
+          h('div', { class: 'row', style: 'gap:8px' }, l.signals.map((g) => h('span', { class: 'tag' }, g))),
+          h('div', { class: 'stack', style: 'gap:8px' }, h('h4', null, 'אפשר לשאול'), l.examples.map((q) => h('p', { class: 'qquote' }, q)))) : null);
     })),
     h('p', { class: 'small muted' }, 'לא כל שיחה צריכה להסתיים בחוזקה. לפעמים הקשבה בלבד היא הדבר הנכון.'));
-  const flow = () => h('section', { class: 'frame' },
-    h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'מהקשבה לשיקוף'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'זה רצף אפשרי, לא טופס חובה. אפשר להישאר בשלב ההקשבה אם זה מה שהתלמיד/ה צריך/ה, ואין חובה להגיע להרחבה.')),
-    h('ol', { class: 'flow' }, D.flow.map((s, i) => h('li', { class: 'flowstep' },
-      h('span', { class: 'flowdot', 'aria-hidden': 'true' }, String(i + 1)),
-      h('div', { class: 'stack', style: 'gap:8px' },
-        h('div', { class: 'row', style: 'gap:10px' }, h('h3', null, s.micro), h('span', { class: 'tag lead' }, s.title)),
-        h('p', null, s.instruction),
-        h('p', { class: 'qquote' }, h('small', { class: 'qlab' }, 'דוגמה'), s.example))))));
+  const reflect = () => h('section', { class: 'frame' },
+    h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'מהקשבה לשיקוף'), h('p', { class: 'muted', style: 'max-width:60ch' }, D.reflectIntro)),
+    h('div', { class: 'lensgrid' }, D.reflect.map((st, i) => {
+      const open = listenStep === st.id;
+      return h('div', { class: 'lens', 'data-open': String(open) },
+        h('button', { class: 'lenshead', type: 'button', 'aria-expanded': String(open), onclick: () => { listenStep = open ? null : st.id; paint(); } },
+          h('span', { class: 'lensnum', 'aria-hidden': 'true' }, String(i + 1)),
+          h('span', { class: 'stack', style: 'gap:4px' }, h('b', { class: 'lenstitle' }, st.title), h('span', { class: 'muted' }, st.micro))),
+        open ? h('div', { class: 'lensbody' },
+          h('p', null, st.instruction),
+          h('div', { class: 'stack', style: 'gap:4px' }, h('small', { class: 'qlab' }, 'במקום'), h('p', { class: 'instead' }, h('s', null, st.insteadOf))),
+          h('div', { class: 'stack', style: 'gap:4px' }, h('small', { class: 'qlab' }, 'אפשר'), h('p', { class: 'qquote' }, st.tryThis))) : null);
+    })));
+  const bubbles = (e) => h('div', { class: 'idchat', 'aria-live': 'polite' },
+    h('div', { class: 'hintbox' }, h('b', null, e.hintLabel || 'רמזים אפשריים:'), h('div', { class: 'row', style: 'gap:8px' }, e.hints.map((x) => h('span', { class: 'tag' }, x)))),
+    e.lines.map((l) => h('div', { class: 'msg ' + (l.who === 'student' ? 'st' : 'ed') }, h('small', null, l.who === 'student' ? 'תלמיד/ה' : 'מחנך/ת'), h('div', { class: 'mb' }, l.text))),
+    e.note ? h('p', { class: 'note-tl' }, e.note) : null);
   const examples = () => {
-    const e = D.examples[listenEx];
-    const msgs = [
-      { k: 'st', label: 'התלמיד/ה מספר/ת', text: e.story },
-      { k: 'hint' },
-      { k: 'ed', label: 'שאלת בירור', text: e.ask },
-      { k: 'st', label: 'התלמיד/ה עונה', text: e.reply },
-      { k: 'ed', label: 'שיקוף', text: e.reflect },
-      { k: 'ed', label: 'הרחבה, אם מתאים', text: e.extend },
-    ];
-    const shown = msgs.slice(0, listenStep);
-    const done = listenStep >= msgs.length;
-    const bubbles = shown.map((m, i) => {
-      const fresh = i === shown.length - 1 && i > 0 ? ' msg-in' : '';
-      if (m.k === 'hint') return h('div', { class: 'hintbox' + fresh }, h('b', null, 'מה אפשר לשמוע כאן? השערות, לא קביעות'), h('div', { class: 'row', style: 'gap:8px' }, e.hints.map((x) => h('span', { class: 'tag' }, x))));
-      return h('div', { class: 'msg ' + m.k + fresh }, h('small', null, m.label), h('div', { class: 'mb' }, m.text));
-    });
-    const controls = h('div', { class: 'row' });
-    if (done) add(controls, [h('span', { class: 'tag' }, 'זה סוף הדוגמה')]);
-    else add(controls, [h('span', { class: 'muted small' }, LISTEN_NEXT[listenStep]),
-      h('button', { class: 'btn', type: 'button', onclick: () => { listenStep++; paint(); } }, 'הצעד הבא'),
-      h('button', { class: 'btn soft sm', type: 'button', onclick: () => { listenStep = msgs.length; paint(); } }, 'הצגת הכול')]);
-    if (listenStep > 1) add(controls, [h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { listenStep = 1; paint(); } }, 'מההתחלה')]);
+    const mine = listenEx === 'mine';
+    const cur = D.examples.find((x) => x.id === listenEx) || D.examples[0];
+    let body;
+    if (mine && !listenMine) {
+      const ta = h('textarea', { class: 'input', id: 'ls-case', rows: '4', maxlength: '300', placeholder: 'למשל: תלמיד שעונה ״לא יודע״ על כל שאלה', 'aria-label': 'מה ההתמודדות שלך?' }, listenDraft);
+      const btn = h('button', { class: 'btn', type: 'button', disabled: listenDraft.trim().length < 3, onclick: () => { listenMine = D.templateForCase(listenDraft); paint(); } }, 'בנו לי דוגמה');
+      ta.addEventListener('input', () => { listenDraft = ta.value; btn.disabled = listenDraft.trim().length < 3; });
+      body = h('div', { class: 'stack' },
+        h('label', { for: 'ls-case' }, h('h3', null, 'מה ההתמודדות שלך?')),
+        h('p', { class: 'muted', style: 'max-width:60ch' }, 'כתבו בכמה מילים מצב משיחה אישית שלא ברור לכם איך להגיב אליו. נבחר ממנו דוגמה קרובה לשיחה.'),
+        ta,
+        h('p', { class: 'small muted' }, 'בלי שמות ובלי פרטים מזהים. הטקסט נשאר על המסך הזה ולא נשמר ולא נשלח.'),
+        h('span', { class: 'qlab' }, 'או לבחור מצב נפוץ'),
+        h('div', { class: 'row', style: 'gap:8px' }, D.caseSuggestions.map((sg) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => { listenDraft = sg; paint(); } }, sg))),
+        h('div', null, btn));
+    } else if (mine) {
+      body = h('div', { class: 'stack' },
+        h('div', { class: 'well stack', style: 'gap:6px' }, h('small', { class: 'qlab' }, 'המקרה שלך'), h('p', null, listenDraft),
+          h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { listenMine = null; listenDraft = ''; paint(); } }, 'מקרה אחר'))),
+        h('p', { class: 'small muted' }, 'זו דוגמה מוכנה מהמאגר שנבחרה לפי מילים בטקסט, לא שיחה שנכתבה במיוחד עבורך.'),
+        bubbles(listenMine));
+    } else body = bubbles(cur);
     return h('section', { class: 'frame' },
-      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'דוגמאות חיות'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'בוחרות נושא ועוברות על השיחה צעד אחר צעד. לפני שמקישים "הצעד הבא", כדאי לחשוב מה היית עושה. הדוגמאות אינן תסריט.')),
-      chipGroup({ options: D.examples.map((x, i) => ({ v: i, t: x.category })), value: listenEx, label: 'נושא הדוגמה', onChange: (v) => { listenEx = v; listenStep = 1; paint(); } }),
-      h('div', { class: 'idchat', 'aria-live': 'polite' }, bubbles),
-      controls,
+      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'דוגמאות לשיחה'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'בוחרים נושא וקוראים איך שיחה כזו יכולה להישמע. הדוגמאות אינן תסריט.')),
+      chipGroup({ options: [{ v: 'mine', t: '+ המקרה שלי' }, ...D.examples.map((x) => ({ v: x.id, t: x.category }))], value: listenEx, label: 'נושא הדוגמה', onChange: (v) => { listenEx = v; paint(); } }),
+      body,
       h('p', { class: 'small muted' }, 'חוזקות מוצגות כהשערות ולא כאבחנות: התלמיד/ה יכול/ה לדייק או לדחות.'));
   };
   const principles = h('section', { class: 'frame quiet' }, h('details', null, h('summary', null, ic('insight', { size: 20 }), 'עקרונות להקשבה'),
-    h('ul', { class: 'plain' },
-      h('li', null, 'לא מחפשות חוזקה בכוח בכל סיפור. לפעמים הקשבה בלבד היא הדבר הנכון.'),
-      h('li', null, 'לא הופכות קושי לחוזקה באופן אוטומטי.'),
-      h('li', null, 'לא מייחסות לתלמיד/ה תכונה על סמך אירוע אחד.'),
-      h('li', null, 'שיקוף טוב מתחיל בהתנהגות שנצפתה ולא בתווית אישיות.'),
-      h('li', null, 'התלמיד/ה שותפ/ה לפרשנות, ויכול/ה לדחות או לשנות אותה.'))));
+    h('ul', { class: 'plain' }, D.principles.map((p) => h('li', null, p)))));
   function paint() {
+    const y = window.scrollY;
     clear(host);
-    const body = { lenses, flow, examples }[listenTab]();
+    const body = { lenses, reflect, examples }[listenTab]();
     add(host, [
-      idHead('להקשיב לכוחות', 'תזכורת קצרה למחנכת, בכל שיחה אישית, גם כשהנושא אינו חוזקות. אין מה למלא ואין תיעוד: זה כלי להקשבה.'),
+      idHead(D.name, D.tagline + ' תזכורת קצרה למחנכת, בכל שיחה אישית, גם כשהנושא אינו חוזקות.'),
       h('div', { class: 'idtabs', role: 'tablist', 'aria-label': 'חלקי הכלי' }, TABS.map(([id, t]) => h('button', { class: 'idtab', type: 'button', role: 'tab', 'aria-selected': String(listenTab === id), onclick: () => { listenTab = id; paint(); } }, t))),
       body, principles]);
+    window.scrollTo(0, y);
   }
   paint();
   return host;
+}
+
+/* דף הסבר על קלפי השיח להדפסה: מופיע בפתיחת הכלי, ומוביל להורדת הקובץ */
+function printBanner() {
+  return h('section', { class: 'frame printbanner' },
+    h('img', { src: 'assets/preview/cards-guide-1.jpg', alt: 'עמוד ההסבר של קובץ קלפי השיח להדפסה', loading: 'lazy' }),
+    h('div', { class: 'stack' },
+      h('h3', null, 'רוצים לנסות בשיחה הבאה?'),
+      h('p', null, h('a', { href: 'assets/pdf/kalfei-sicha.pdf', download: 'kalfei-sicha-hotam.pdf' }, 'לחצו כאן'), ' להורדה והדפסת הקלפים.'),
+      h('p', { class: 'small muted' }, 'קובץ PDF להדפסה בגודל A4, 7 עמודים: קלפי שאלה, קלפי חוזקה ודף ״מה גילינו״.'),
+      h('div', null, h('a', { class: 'btn', href: 'assets/pdf/kalfei-sicha.pdf', download: 'kalfei-sicha-hotam.pdf' }, 'הורדת הקלפים להדפסה'))));
 }
 
 /* ---------- כלי 2: יש בי יותר ממה שרואים ---------- */
@@ -569,7 +585,7 @@ const SC_STEPS = ['קלף שאלה', 'הסיפור', 'חוזקות', 'סיכום
 const SC_RESP = [{ v: 'yes', t: 'מתאים' }, { v: 'close', t: 'קרוב, לא בדיוק' }, { v: 'no', t: 'לא מתאים' }];
 function viewStrengthCards() {
   const D = IDT().cards;
-  const L = IDT().listen.lenses;
+  const L = window.ZMAN_LISTEN.lenses;
   if (!sc) sc = scFresh();
   const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
   const strength = (id) => D.strengths.find((s) => s.id === id);
@@ -684,7 +700,8 @@ function viewStrengthCards() {
 
   function paint() {
     clear(host);
-    add(host, [idHead('יש בי יותר ממה שרואים', 'שיחה אישית משותפת: סיפור קצר, ואחריו שם לכוחות שנראים בו, בלי תיוג מלמעלה. כל התהליך נשאר על המסך, בלי תיעוד.'),
+    add(host, [idHead('יש בי יותר ממה שרואים', 'שיחה אישית משותפת: סיפור קצר, ואחריו שם לכוחות שנראים בו, בלי תיוג מלמעלה. כל התהליך נשאר על המסך.'),
+      sc.step === 1 ? printBanner() : null,
       progress(), [stepPick, stepStory, stepOffer, stepSummary][sc.step - 1]()]);
   }
   paint();
