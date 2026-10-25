@@ -551,7 +551,7 @@ function idHead(title, sub) {
 }
 
 /* ---------- כלי 1: להקשיב לכוחות (גרסה 1.2) ---------- */
-let listenTab = 'lenses', listenLens = null, listenStep = null, listenEx = 'E01', listenWord = '', listenTopic = null;
+let listenTab = 'lenses', listenLens = null, listenStep = null, listenEx = 'E01', listenWord = '', listenTopic = null, listenAsk = false;
 function viewListen() {
   const D = window.ZMAN_LISTEN;
   const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
@@ -586,18 +586,29 @@ function viewListen() {
     h('div', { class: 'hintbox' }, h('b', null, e.hintLabel || 'רמזים אפשריים:'), h('div', { class: 'row', style: 'gap:8px' }, e.hints.map((x) => h('span', { class: 'tag' }, x)))),
     e.lines.map((l) => h('div', { class: 'msg ' + (l.who === 'student' ? 'st' : 'ed') }, h('small', null, l.who === 'student' ? 'תלמיד/ה' : 'מחנך/ת'), h('div', { class: 'mb' }, l.text))),
     e.note ? h('p', { class: 'note-tl' }, e.note) : null);
-  // "המקרה שלי": כותבים מילה אחת, ונבנית דוגמה לשיחה. הכול בדפדפן ולא נשמר
-  const buildTopic = (w) => { const word = w.replace(/["״׳']/g, '').trim(); if (word.length < 2) return; listenWord = word; listenTopic = D.exampleForTopic(word); paint(); };
+  // "המקרה שלי": כותבים מילה אחת, עונים איך התלמיד/ה מדברים עליה, ונבנית דוגמה לשיחה. הכול בדפדפן ולא נשמר
+  const buildTopic = (w) => { const word = w.replace(/["״׳']/g, '').trim(); if (word.length < 2) return; listenWord = word; listenAsk = true; paint(); };
+  const setMood = (m) => { listenTopic = D.exampleForTopic(listenWord, m); listenAsk = false; paint(); };
+  const topicReset = () => { listenTopic = null; listenWord = ''; listenAsk = false; paint(); };
   const topic = () => {
     if (listenTopic) {
       return h('div', { class: 'stack' },
         h('div', { class: 'well stack', style: 'gap:6px' }, h('small', { class: 'qlab' }, 'המילה שלך'), h('p', null, listenWord),
-          h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { listenTopic = null; listenWord = ''; paint(); } }, 'מילה אחרת'))),
+          h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: topicReset }, 'מילה אחרת'))),
         bubbles(listenTopic),
         h('p', { class: 'small muted' }, 'הדוגמה נבנית אוטומטית סביב המילה ואינה שיחה אמיתית. אפשר לשנות כל משפט.'));
     }
-    const inp = h('input', { class: 'input', id: 'ls-word', type: 'text', maxlength: '30', 'aria-label': 'מילה על הנושא', placeholder: 'למשל: כדורגל', value: listenWord });
-    const btn = h('button', { class: 'btn', type: 'button', disabled: listenWord.trim().length < 2, onclick: () => buildTopic(inp.value) }, 'בנו לי שיחה');
+    if (listenAsk) {
+      return h('div', { class: 'stack' },
+        h('div', { class: 'well stack', style: 'gap:6px' }, h('small', { class: 'qlab' }, 'המילה שלך'), h('p', null, listenWord),
+          h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: topicReset }, 'מילה אחרת'))),
+        h('h3', null, 'איך התלמיד/ה מדברים על זה?'),
+        h('p', { class: 'muted', style: 'max-width:60ch' }, 'אותה מילה יכולה להיות סיפור הצלחה או סיפור כאב. הבחירה קובעת איך תיראה השיחה.'),
+        h('div', { class: 'stack', style: 'gap:8px' },
+          [['good', 'בהתלהבות או בגאווה'], ['hard', 'בקושי: מתקשים, נכשלו או רוצים להתרחק'], ['unsure', 'עוד לא ברור']].map(([m, t2]) => h('button', { class: 'btn soft guidedopt', type: 'button', onclick: () => setMood(m) }, t2))));
+    }
+    const inp = h('input', { class: 'input', id: 'ls-word', type: 'text', maxlength: '30', 'aria-label': 'מילה על הנושא', placeholder: 'למשל: גיימינג', value: listenWord });
+    const btn = h('button', { class: 'btn', type: 'button', disabled: listenWord.trim().length < 2, onclick: () => buildTopic(inp.value) }, 'להמשך');
     inp.addEventListener('input', () => { listenWord = inp.value; btn.disabled = inp.value.trim().length < 2; });
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') buildTopic(inp.value); });
     return h('div', { class: 'stack' },
