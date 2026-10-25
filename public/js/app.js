@@ -422,6 +422,7 @@ function resolve(p) {
   if (p === '/tools/cards' || p.startsWith('/tools/cards/')) return viewCards(p);
   if (p === '/tools/identity/listen') return viewListen();
   if (p === '/tools/identity/cards') return viewStrengthCards();
+  if (p === '/tools/goals/journal') return viewJournal();
   if ((m = /^\/tools\/(identity|goals|agency)$/.exec(p))) return viewFolder(m[1]);
   const gate = (path, view) => (me() ? view() : isAdmin() || leadUser() ? viewEducatorsOnly() : viewEnter('new', path));
   const gateMap = (path, view) => gate(path, () => { ensureMap(); pingMapping(); return view(); });
@@ -502,7 +503,7 @@ function viewHome() {
    ארגז כלים (פתוח לכולם)
    ===================================================================== */
 function viewTools() {
-  const count = (id) => pub.tools.filter((t) => t.folder === id && !t.example).length + (id === 'identity' ? IDENTITY_TOOLS.length : 0);
+  const count = (id) => pub.tools.filter((t) => t.folder === id && !t.example).length + (id === 'identity' ? IDENTITY_TOOLS.length : id === 'goals' ? GOALS_TOOLS.length : 0);
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
     h('section', { class: 'frame' }, h('h2', null, 'ארגז כלים'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'כלים ופרקטיקות לשיחות אישיות. פתוח לכולם, בלי כניסה. התכנים יתווספו כאן לאורך השנה.')),
     h('a', { class: 'frame cardsfeature', href: '#/tools/cards', onclick: (e) => { e.preventDefault(); go('/tools/cards'); } },
@@ -517,7 +518,7 @@ function viewFolder(id) {
   const f = FOLDERS.find((x) => x.id === id);
   const back = link('/tools', 'ארגז כלים', 'btn ghost');
   const items = pub.tools.filter((t) => t.folder === id);
-  const builtin = id === 'identity' ? IDENTITY_TOOLS.map(identityTile) : [];
+  const builtin = id === 'identity' ? IDENTITY_TOOLS.map(identityTile) : id === 'goals' ? GOALS_TOOLS.map(identityTile) : [];
   const list = builtin.length || items.length ? [...builtin, ...items.filter((t) => !builtin.length || !t.example).map(toolCard)] : [h('div', { class: 'frame' }, h('p', { class: 'muted' }, 'הכלים והפרקטיקות בציר הזה יתווספו כאן.'))];
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
     h('section', { class: 'frame' }, h('div', null, back), h('div', { class: 'row' }, ic(f.icon, { size: 44, tone: 'blue' }), h('h2', null, f.t)), h('p', { class: 'muted' }, f.d)),
@@ -656,6 +657,71 @@ function printBanner() {
       h('p', null, h('a', { href: 'assets/pdf/kalfei-sicha.pdf', download: 'kalfei-sicha-hotam.pdf' }, 'לחצו כאן'), ' להורדה והדפסת הקלפים.'),
       h('p', { class: 'small muted' }, 'קובץ PDF להדפסה בגודל A4, 7 עמודים: קלפי שאלה, קלפי חוזקה ודף ״מה גילינו״.'),
       h('div', null, h('a', { class: 'btn', href: 'assets/pdf/kalfei-sicha.pdf', download: 'kalfei-sicha-hotam.pdf' }, 'הורדת הקלפים להדפסה'))));
+}
+
+/* =====================================================================
+   יעדים ומטרות: "יומן המסע שלי". חוברת אישית לתלמיד/ה לכל השנה.
+   שתי לשוניות: "למחנכת" (המדריך: איך עובדים עם החוברת בשלוש השיחות) ו"להורדה" (קובצי ההדפסה).
+   התוכן ב-js/goals-data.js, והוא זהה למדריך ב-PDF. שום דבר לא נשלח לשרת ולא נשמר.
+   ===================================================================== */
+const GOALS_TOOLS = [
+  { to: '/tools/goals/journal', icon: 'target', t: 'יומן המסע שלי', who: 'למחנכת ולתלמיד/ה', d: 'חוברת אישית למטרות: SWOT, SMART, תכנית, עצירות ביניים ותעודה אישית. שאלות לשיחה, ודפים להדפסה: אפשר לקחת דף אחד או את כולה.' },
+];
+let journalTab = 'guide';
+function viewJournal() {
+  const G = window.ZMAN_GOALS;
+  const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
+  const TABS = [['guide', 'למחנכת'], ['print', 'להדפסה']];
+  const list = (xs) => h('ul', { class: 'jlist' }, xs.map((x) => h('li', null, ic('chev', { size: 16, tone: 'blue' }), h('span', null, x))));
+  const head = (icon, title) => h('div', { class: 'row', style: 'gap:10px' }, ic(icon, { size: 32, tone: 'blue' }), h('h3', null, title));
+  const toTab = (t) => () => { journalTab = t; paint(); window.scrollTo(0, 0); };
+  const guide = () => [
+    h('section', { class: 'frame' }, head('checklist', 'איך מנהלים שיחה על מטרות'), list(G.how),
+      h('div', { class: 'grid' },
+        h('div', { class: 'well stack', style: 'gap:6px' }, h('span', { class: 'jlab' }, 'לפתוח'), h('p', null, G.open)),
+        h('div', { class: 'well stack', style: 'gap:6px' }, h('span', { class: 'jlab' }, 'לסיים'), h('p', null, G.close)))),
+    h('section', { class: 'frame' }, head('calendar', 'מתי מתאים'), h('p', { class: 'muted', style: 'max-width:70ch' }, G.momentsIntro),
+      h('div', { class: 'grid' }, G.moments.map((m) => h('div', { class: 'well stack', style: 'gap:6px' },
+        h('div', { class: 'row', style: 'gap:12px;flex-wrap:nowrap;align-items:flex-start' }, h('span', { class: 'lensnum' }, String(m.n)),
+          h('div', { class: 'stack', style: 'gap:2px' }, h('h4', null, m.t), h('p', { class: 'small muted' }, m.when))),
+        h('p', null, m.do), h('p', { class: 'small jlab' }, m.pages))))),
+    h('section', { class: 'frame' }, head('question', 'שאלות שעוזרות בשיחה'), h('p', { class: 'muted', style: 'max-width:70ch' }, G.questionsIntro),
+      h('div', { class: 'grid' }, G.questions.map((q) => h('div', { class: 'well stack', style: 'gap:8px' },
+        h('div', null, h('h4', null, q.t), h('p', { class: 'small muted' }, q.sub)), list(q.q))))),
+    h('section', { class: 'frame' }, head('insight', 'דגשים'), list(G.tips),
+      h('div', null, h('button', { class: 'btn', type: 'button', onclick: toTab('print') }, 'לדפים להדפסה'))),
+  ];
+  const file = (name, text, cls = 'btn') => h('a', { class: cls, href: G.files.dir + name, download: name }, text);
+  const pageCard = (p) => h('div', { class: 'well stack', style: 'gap:8px' },
+    h('div', { class: 'row', style: 'gap:8px' }, h('h4', null, p.t), p.tag ? h('span', { class: 'tag' }, p.tag) : null),
+    h('p', null, p.d),
+    h('p', { class: 'small muted' }, 'זמן משוער: ' + p.time),
+    h('div', { class: 'row', style: 'gap:8px' }, p.f.map(([n, l], i) => file(n, p.f.length > 1 || l !== 'הדף' ? 'להדפסה · ' + l : 'להדפסה', i ? 'btn soft sm' : 'btn sm'))));
+  const printTab = () => [
+    h('section', { class: 'frame' }, head('form', 'דף אחד, שיחה אחת'), h('p', { class: 'muted', style: 'max-width:70ch' }, G.printIntro),
+      G.pageGroups.map((g) => h('div', { class: 'stack', style: 'gap:10px' }, h('h4', { class: 'jlab' }, g.t), h('div', { class: 'grid' }, g.items.map(pageCard))))),
+    h('section', { class: 'frame printbanner' },
+      h('img', { src: 'assets/preview/yoman-hamasa.jpg', alt: 'השער של החוברת יומן המסע שלי', loading: 'lazy' }),
+      h('div', { class: 'stack' },
+        h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'לתלמיד/ה'),
+        h('h3', null, G.fullTitle),
+        h('p', null, G.fullText),
+        h('div', { class: 'row' },
+          h('a', { class: 'btn', href: G.files.print, download: 'yoman-hamasa-a4.pdf' }, 'הורדה להדפסה, A4 לרוחב'),
+          h('a', { class: 'btn soft', href: G.files.a5, download: 'yoman-hamasa-a5.pdf' }, 'גרסת A5, עמוד בכל דף')))),
+    h('section', { class: 'frame' }, head('checklist', 'הדפסה והכנה'), list(G.print)),
+  ];
+  function paint() {
+    const y = window.scrollY;
+    clear(host);
+    add(host, [
+      h('section', { class: 'frame' }, h('div', null, link('/tools/goals', 'יעדים ומטרות', 'btn ghost sm')), h('h2', null, G.name), h('p', { class: 'muted', style: 'max-width:62ch' }, G.tagline)),
+      h('div', { class: 'idtabs', role: 'tablist', 'aria-label': 'חלקי הכלי' }, TABS.map(([id, t]) => h('button', { class: 'idtab', type: 'button', role: 'tab', 'aria-selected': String(journalTab === id), onclick: () => { journalTab = id; paint(); } }, t))),
+      (journalTab === 'print' ? printTab : guide)()]);
+    window.scrollTo(0, y);
+  }
+  paint();
+  return host;
 }
 
 /* ---------- כלי 2: יש בי יותר ממה שרואים ---------- */
