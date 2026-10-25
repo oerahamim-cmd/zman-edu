@@ -67,9 +67,9 @@ async function seedDemo() {
           const roundW = wi < 3 ? [[1, 0.85], [2, 0.12], [3, 0.03]] : wi < 6 ? [[1, 0.5], [2, 0.4], [3, 0.1]] : [[1, 0.3], [2, 0.45], [3, 0.25]];
           const axis = weighted(r, [['identity', 0.4], ['goals', 0.3], ['agency', 0.25], ['other', 0.05]]);
           const kind = weighted(r, [['intro', 0.15], ['notebook', 0.3], ['complex', 0.2], ['grades', 0.1], ['parents', 0.1], ['other', 0.15]]);
-          await t.run('INSERT INTO conversations (report_id, seq, round, axis, axis_other, kind, kind_other, depth, talk, feeling, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [rid, k + 1, weighted(r, roundW), axis, axis === 'other' ? 'שיחה על איזון בין לימודים לפעילות אחר הצהריים' : null, kind, kind === 'other' ? 'שיחה מיוזמת התלמיד/ה' : null,
-              weighted(r, [[1, 0.1], [2, 0.2], [3, 0.3], [4, 0.25], [5, 0.15]]), weighted(r, [[1, 0.1], [2, 0.3], [3, 0.3], [4, 0.2], [5, 0.1]]),
+          await t.run('INSERT INTO conversations (report_id, seq, round, axis, axis_other, kind, kind_other, depth, talk_pct, feeling, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [rid, k + 1, weighted(r, roundW), axis === 'identity' && k % 3 === 0 ? 'identity,agency' : axis, axis === 'other' ? 'שיחה על איזון בין לימודים לפעילות אחר הצהריים' : null, kind, kind === 'other' ? 'שיחה בהפסקה' : null,
+              weighted(r, [[1, 0.1], [2, 0.2], [3, 0.3], [4, 0.25], [5, 0.15]]), Math.max(0, Math.min(100, Math.round((weighted(r, [[1, 0.1], [2, 0.3], [3, 0.3], [4, 0.2], [5, 0.1]]) - 1) * 20 + 10 + (r() - 0.5) * 16))),
               weighted(r, [['inspired', 0.2], ['good', 0.35], ['neutral', 0.15], ['thoughtful', 0.15], ['frustrated', 0.1], ['heavy', 0.05]]), r() < 0.4 ? NOTE_POOL[Math.floor(r() * NOTE_POOL.length)] : null]);
         }
       }

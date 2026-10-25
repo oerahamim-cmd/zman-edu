@@ -12,7 +12,7 @@ const ROUNDS = [{ v: 1, t: `סבב ראשון` }, { v: 2, t: `סבב שני` }, 
 const AXES = [
   { v: 'identity', t: `זהות וחוזקות` },
   { v: 'goals', t: `יעדים ומטרות` },
-  { v: 'agency', t: `אג'נסי` },
+  { v: 'agency', t: `אייג'נסי` },
   { v: 'other', t: `אחר` },
 ];
 const KINDS = [
@@ -23,10 +23,19 @@ const KINDS = [
   { v: 'parents', t: `לקראת יום הורים` },
   { v: 'other', t: `אחר` },
 ];
-// שתי שאלות ציר, בסולם של 1 עד 5. הצד הימני (1) הוא הראשון שקוראים.
-const DEPTH_SCALE = { q: 'מה היה אופי השיחה?', from: 'אינפורמטיבית', to: 'מעמיקה', labels: [`אינפורמטיבית מאוד`, `יותר אינפורמטיבית`, `באמצע`, `יותר מעמיקה`, `מעמיקה מאוד`] };
-const TALK_SCALE = { q: 'מי דיבר יותר בשיחה?', from: 'אני דיברתי יותר', to: 'התלמיד/ה דיברו יותר', labels: [`אני דיברתי הרבה יותר`, `אני דיברתי קצת יותר`, `חלוקה שווה בערך`, `התלמיד/ה דיברו קצת יותר`, `התלמיד/ה דיברו הרבה יותר`] };
+// עומק השיחה: חמישה שלבים, ממידע מעשי ועד עולם פנימי (נשמרים כ-1 עד 5). חלוקת הדיבור: פס שגוררים, ונשמר כאחוז הדיבור של התלמיד/ה.
+const DEPTH_LEVELS = [
+  { n: 1, t: `מידע ומעשיות`, d: `עדכון, תיאום, הסבר: מה צריך לעשות ואיך.` },
+  { n: 2, t: `בעיקר עניינית`, d: `בעיקר עניינים מעשיים, עם נגיעה קטנה באישי.` },
+  { n: 3, t: `גם וגם`, d: `שילוב של עניינים מעשיים ושיתוף אישי.` },
+  { n: 4, t: `בעיקר אישית`, d: `בעיקר מה שהתלמיד/ה חושבים ומרגישים.` },
+  { n: 5, t: `עולם פנימי`, d: `ערכים, רגשות, חלומות, מה שבאמת מעסיק אותם.` },
+];
+const DEPTH_SCALE = { q: 'מה היה אופי השיחה? ממידע ועד עולם פנימי', labels: DEPTH_LEVELS.map((l) => l.t) };
+const TALK_SCALE = { q: 'כמה מקום היה לקול של התלמיד/ה בשיחה?', labels: [`בעיקר אני דיברתי`, `אני דיברתי יותר`, `חלוקה שווה בערך`, `התלמיד/ה דיברו יותר`, `בעיקר התלמיד/ה דיברו`] };
 const scaleOpts = (s) => s.labels.map((t, i) => ({ v: i + 1, t: `${i + 1} · ${t}` }));
+// חמישה טווחים שווים של דיבור התלמיד/ה (תואם לשרת): 1 הכי הרבה דיבור שלי ... 5 הכי הרבה דיבור שלהם
+const talkBucket = (pct) => Math.min(5, Math.floor(Math.max(0, pct - 1) / 20) + 1);
 const FEELINGS = [
   { v: 'inspired', e: '🤩', t: `מעורר השראה` },
   { v: 'good', e: '😊', t: `טוב ומספק` },
@@ -39,18 +48,18 @@ const NONE_REASONS = [{ v: 'holiday', t: `חג או חופשה` }, { v: 'sick', 
 const FOLDERS = [
   { id: 'identity', t: `זהות וחוזקות`, icon: 'reflect', d: `שיחות שמזהות חוזקות ובונות תחושת זהות.` },
   { id: 'goals', t: `יעדים ומטרות`, icon: 'target', d: `שיחות על מומחיות, יעדים ומטרות אישיות.` },
-  { id: 'agency', t: `אג'נסי`, icon: 'empower', d: `יצירתיות, שותפות ויכולת לפעול ולהשפיע.` },
+  { id: 'agency', t: `אייג'נסי`, icon: 'empower', d: `יצירתיות, שותפות ויכולת לפעול ולהשפיע.` },
 ];
 const ICON = { check: 0, chev: 1, calendar: 2, checklist: 3, write: 4, reflect: 5, question: 6, insight: 7, idea: 8, community: 9, school: 10, data: 11, send: 12, secure: 13, person: 14, hourglass: 15, form: 17, team: 18, circle: 19, plan: 20, plant: 21, steps: 22, target: 23, empower: 24, compass: 25, book: 26, note: 27, practice: 28, id: 29, eye: 30, care: 31, alert: 32, gear: 33, trend: 34, pencil: 35, brain: 36, lock: 38, timer: 39, ballot: 40 };
 const GROUPS = [
   { n: 1, t: `ראשונים`, d: `יש נקודה (דחוף), בכל קשר. קשר 1–2: שיחה קצרה לבניית קשר. קשר 3: שיחה ממוקדת במה שראיתי.` },
   { n: 2, t: `אחריהם`, d: `בלי נקודה · קשר 1. אלה התלמידים השקטים, ובלי תזמון מכוון הם נשארים אחרונים.` },
   { n: 3, t: `אחר כך`, d: `בלי נקודה · קשר 2. לפי תחושה.` },
-  { n: 4, t: `לבסוף`, d: `בלי נקודה · קשר 3. שיחות קצרות לחיזוק יעדים ואג'נסי.` },
+  { n: 4, t: `לבסוף`, d: `בלי נקודה · קשר 3. שיחות קצרות לחיזוק יעדים ואייג'נסי.` },
 ];
 const URGENT_WORDS = [`נוכחות`, `חברים`, `מצב רוח`, `לימודים`, `התנהגות`];
 const LINKS = [{ v: 1, t: `כמעט לא מכיר/ה` }, { v: 2, t: `מכיר/ה את הבסיס` }, { v: 3, t: `קשר ושיח פתוח` }];
-const MAP_AXES = [{ v: 'z', t: `ז`, full: `זהות וחוזקות` }, { v: 'y', t: `י`, full: `יעדים ומטרות` }, { v: 'a', t: `א`, full: `אג'נסי` }];
+const MAP_AXES = [{ v: 'z', t: `ז`, full: `זהות וחוזקות` }, { v: 'y', t: `י`, full: `יעדים ומטרות` }, { v: 'a', t: `א`, full: `אייג'נסי` }];
 
 const lab = (list, v) => (list.find((x) => x.v === v) || {}).t || '';
 const nConv = (n) => (n === 0 ? 'אין שיחות' : n === 1 ? 'שיחה אחת' : `${n} שיחות`);
@@ -107,16 +116,72 @@ function chipGroup({ options, value, onChange, cls = '', multi = false, label })
   });
   return box;
 }
-// סולם של חמש נקודות בין שני קצוות (למשל אינפורמטיבית ... מעמיקה). מתחת מופיע מה שנבחר, במילים.
-function scaleGroup({ value, onChange, scale }) {
-  const name = nid('sc');
-  const readout = h('p', { class: 'scaleread', 'aria-live': 'polite' }, value ? scale.labels[value - 1] : '');
-  const box = h('div', { class: 'scale' }, h('div', { class: 'scalebtns', role: 'radiogroup', 'aria-label': scale.q }, scale.labels.map((t, i) => {
-    const inp = h('input', { type: 'radio', name, value: String(i + 1), checked: value === i + 1 });
-    inp.addEventListener('change', () => { readout.textContent = t; onChange(i + 1); });
-    return h('label', { class: 'scalepick', title: t }, inp, h('span', null, String(i + 1)));
-  })), h('div', { class: 'scaleends', 'aria-hidden': 'true' }, h('span', null, scale.from), h('span', null, scale.to)), readout);
-  return box;
+// עומק השיחה כפס שגוררים, באותו סגנון של חלוקת הדיבור: חמישה שלבים. זה אופי ולא ציון: שיחת מידע יכולה להיות חשובה מאוד, ולכן מסומן שלב אחד ולא פס שמתמלא.
+function depthSlider({ value, onChange }) {
+  let lvl = value || null, dragging = false;
+  const cells = DEPTH_LEVELS.map((l) => h('div', { class: 'divecell', style: `--lvl:${l.n}` }));
+  const names = DEPTH_LEVELS.map((l) => h('span', null, l.t));
+  const bar = h('div', { class: 'divebar', role: 'slider', tabindex: '0', 'aria-label': DEPTH_SCALE.q, 'aria-valuemin': '1', 'aria-valuemax': '5' }, cells);
+  const readout = h('p', { class: 'scaleread', 'aria-live': 'polite' });
+  const paint = () => {
+    bar.classList.toggle('unset', lvl === null);
+    cells.forEach((c, i) => c.classList.toggle('on', lvl === i + 1));
+    names.forEach((n, i) => n.classList.toggle('cur', lvl === i + 1));
+    if (lvl !== null) {
+      const l = DEPTH_LEVELS[lvl - 1], text = `${l.t}: ${l.d}`;
+      bar.setAttribute('aria-valuenow', String(lvl)); bar.setAttribute('aria-valuetext', text); readout.textContent = text;
+    } else { bar.removeAttribute('aria-valuenow'); readout.textContent = 'הקישו על שלב, או גררו, כדי לסמן.'; }
+  };
+  const setLvl = (v) => { v = Math.max(1, Math.min(5, v)); if (v === lvl) return; lvl = v; paint(); onChange(v); };
+  const fromEvent = (ev) => { const r = bar.getBoundingClientRect(); return Math.ceil(((r.right - ev.clientX) / r.width) * 5); };
+  bar.addEventListener('pointerdown', (ev) => { dragging = true; try { bar.setPointerCapture(ev.pointerId); } catch { /* ignore */ } setLvl(fromEvent(ev)); bar.focus(); });
+  bar.addEventListener('pointermove', (ev) => { if (dragging) setLvl(fromEvent(ev)); });
+  const stop = () => { dragging = false; };
+  bar.addEventListener('pointerup', stop); bar.addEventListener('pointercancel', stop);
+  bar.addEventListener('keydown', (ev) => {
+    const d = { ArrowLeft: 1, ArrowUp: 1, ArrowRight: -1, ArrowDown: -1 }[ev.key];
+    if (d === undefined) return;
+    ev.preventDefault();
+    setLvl((lvl || 0) + d);
+  });
+  paint();
+  return h('div', { class: 'talk' }, h('p', { class: 'hint' }, 'אין כאן טוב או פחות טוב: שיחת מידע יכולה להיות חשובה מאוד.'), bar, h('div', { class: 'divenames', 'aria-hidden': 'true' }, names), readout);
+}
+// חלוקת הדיבור כפס שגוררים: הצד הימני הוא המחנכת והשמאלי התלמיד/ה. נשמר אחוז הדיבור של התלמיד/ה (0 עד 100).
+function talkSlider({ value, onChange }) {
+  let me = value === null || value === undefined ? null : 100 - value; // אחוז הדיבור של המחנכת
+  let dragging = false;
+  const meSeg = h('div', { class: 'talkseg me' }), stSeg = h('div', { class: 'talkseg st' });
+  const knob = h('span', { class: 'talkknob', 'aria-hidden': 'true' });
+  const bar = h('div', { class: 'talkbar', role: 'slider', tabindex: '0', 'aria-label': TALK_SCALE.q, 'aria-valuemin': '0', 'aria-valuemax': '100' }, meSeg, stSeg, h('span', { class: 'talkmid', 'aria-hidden': 'true' }), knob);
+  const readout = h('p', { class: 'scaleread', 'aria-live': 'polite' });
+  const paint = () => {
+    const set = me !== null, m = set ? me : 50;
+    bar.classList.toggle('unset', !set);
+    meSeg.style.flexBasis = m + '%'; stSeg.style.flexBasis = (100 - m) + '%';
+    meSeg.textContent = m >= 22 ? 'אני' : ''; stSeg.textContent = 100 - m >= 22 ? 'התלמיד/ה' : '';
+    knob.style.right = m + '%';
+    if (set) {
+      const text = `אני ${m}% · התלמיד/ה ${100 - m}% (${TALK_SCALE.labels[talkBucket(100 - m) - 1]})`;
+      bar.setAttribute('aria-valuenow', String(m)); bar.setAttribute('aria-valuetext', text); readout.textContent = text;
+    } else { bar.removeAttribute('aria-valuenow'); readout.textContent = 'גררו את הקו, או הקישו על הפס, כדי לסמן.'; }
+  };
+  const setMe = (v) => { v = Math.max(0, Math.min(100, v)); if (v === me) return; me = v; paint(); onChange(100 - v); };
+  // הפס הפוך (ימין הוא 0): הצד הימני גדל ככל שמזיזים את הקו שמאלה
+  const fromEvent = (ev) => { const r = bar.getBoundingClientRect(); return Math.round(((r.right - ev.clientX) / r.width) * 20) * 5; };
+  bar.addEventListener('pointerdown', (ev) => { dragging = true; try { bar.setPointerCapture(ev.pointerId); } catch { /* ignore */ } if (me === null) { me = -1; } setMe(fromEvent(ev)); bar.focus(); });
+  bar.addEventListener('pointermove', (ev) => { if (dragging) setMe(fromEvent(ev)); });
+  const stop = () => { dragging = false; };
+  bar.addEventListener('pointerup', stop); bar.addEventListener('pointercancel', stop);
+  bar.addEventListener('keydown', (ev) => {
+    const d = { ArrowLeft: 5, ArrowUp: 5, ArrowRight: -5, ArrowDown: -5 }[ev.key];
+    if (d === undefined) return;
+    ev.preventDefault();
+    if (me === null) me = 50 - d;
+    setMe(me + d);
+  });
+  paint();
+  return h('div', { class: 'talk' }, bar, readout);
 }
 function moodGroup({ value, onChange }) {
   const name = nid('m');
@@ -486,7 +551,7 @@ function idHead(title, sub) {
 }
 
 /* ---------- כלי 1: להקשיב לכוחות (גרסה 1.2) ---------- */
-let listenTab = 'lenses', listenLens = null, listenStep = null, listenEx = 'E01', listenDraft = '', listenChat = [], listenBusy = false, listenErr = null, listenFallback = null;
+let listenTab = 'lenses', listenLens = null, listenStep = null, listenEx = 'E01', listenWord = '', listenTopic = null;
 function viewListen() {
   const D = window.ZMAN_LISTEN;
   const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
@@ -521,61 +586,33 @@ function viewListen() {
     h('div', { class: 'hintbox' }, h('b', null, e.hintLabel || 'רמזים אפשריים:'), h('div', { class: 'row', style: 'gap:8px' }, e.hints.map((x) => h('span', { class: 'tag' }, x)))),
     e.lines.map((l) => h('div', { class: 'msg ' + (l.who === 'student' ? 'st' : 'ed') }, h('small', null, l.who === 'student' ? 'תלמיד/ה' : 'מחנך/ת'), h('div', { class: 'mb' }, l.text))),
     e.note ? h('p', { class: 'note-tl' }, e.note) : null);
-  // "המקרה שלי": שיחה עם בוט. השיחה חיה רק בדפדפן, ולא נשמרת בשום מקום
-  const BOT_HELLO = 'ספרו לי על ההתמודדות: מצב משיחה אישית (או לפניה) שלא ברור לכם איך להגיב אליו. אפשר לכתוב בכמה מילים. בלי שמות ובלי פרטים מזהים.';
-  async function sendChat(raw) {
-    const text = raw.trim();
-    if (!text || listenBusy) return;
-    listenChat.push({ role: 'user', text });
-    listenDraft = ''; listenBusy = true; listenErr = null;
-    paint();
-    try {
-      const r = await api('POST', '/api/listen/chat', { messages: listenChat });
-      listenChat.push({ role: 'assistant', text: r.reply });
-    } catch (e) {
-      if (e.code === 'bot_off') listenFallback = D.templateForCase(listenChat.filter((m) => m.role === 'user').map((m) => m.text).join(' '));
-      else { listenChat.pop(); listenDraft = text; listenErr = e.message; }
+  // "המקרה שלי": כותבים מילה אחת, ונבנית דוגמה לשיחה. הכול בדפדפן ולא נשמר
+  const buildTopic = (w) => { const word = w.replace(/["״׳']/g, '').trim(); if (word.length < 2) return; listenWord = word; listenTopic = D.exampleForTopic(word); paint(); };
+  const topic = () => {
+    if (listenTopic) {
+      return h('div', { class: 'stack' },
+        h('div', { class: 'well stack', style: 'gap:6px' }, h('small', { class: 'qlab' }, 'המילה שלך'), h('p', null, listenWord),
+          h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { listenTopic = null; listenWord = ''; paint(); } }, 'מילה אחרת'))),
+        bubbles(listenTopic),
+        h('p', { class: 'small muted' }, 'הדוגמה נבנית אוטומטית סביב המילה ואינה שיחה אמיתית. אפשר לשנות כל משפט.'));
     }
-    listenBusy = false;
-    paint();
-    const box = document.getElementById('ls-draft');
-    if (box && !listenFallback) box.focus();
-  }
-  const chatReset = () => { listenChat = []; listenDraft = ''; listenErr = null; listenFallback = null; paint(); };
-  const chat = () => {
-    if (!session) {
-      return h('div', { class: 'well stack' }, h('h3', null, 'בוט להתייעצות על המקרה שלך'),
-        h('p', { class: 'muted' }, 'הבוט זמין למחנכות ולמובילות אחרי כניסה.'), h('div', null, link('/me', 'כניסה', 'btn')));
-    }
-    const full = listenChat.length >= 16;
-    const log = h('div', { class: 'idchat', 'aria-live': 'polite' },
-      h('div', { class: 'msg st' }, h('small', null, 'הבוט'), h('div', { class: 'mb' }, BOT_HELLO)),
-      listenChat.map((m) => h('div', { class: 'msg ' + (m.role === 'user' ? 'ed' : 'st') }, h('small', null, m.role === 'user' ? 'את/ה' : 'הבוט'), h('div', { class: 'mb' }, m.text))),
-      listenBusy ? h('div', { class: 'msg st' }, h('small', null, 'הבוט'), h('div', { class: 'mb muted' }, 'חושב…')) : null);
-    if (listenFallback) {
-      return h('div', { class: 'stack' }, log,
-        h('p', { class: 'note-tl' }, 'הבוט עדיין לא מחובר, אז הנה דוגמה קרובה מתוך המאגר.'),
-        bubbles(listenFallback),
-        h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: chatReset }, 'מקרה אחר')));
-    }
-    const ta = h('textarea', { class: 'input', id: 'ls-draft', rows: '3', maxlength: '1200', disabled: listenBusy || full, placeholder: listenChat.length ? 'כתבו תשובה' : 'למשל: תלמיד שעונה ״לא יודע״ על כל שאלה', 'aria-label': 'הודעה לבוט' }, listenDraft);
-    const btn = h('button', { class: 'btn', type: 'button', disabled: listenBusy || full || listenDraft.trim().length < 2, onclick: () => sendChat(ta.value) }, 'שליחה');
-    ta.addEventListener('input', () => { listenDraft = ta.value; btn.disabled = listenBusy || full || listenDraft.trim().length < 2; });
-    ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendChat(ta.value); });
-    return h('div', { class: 'stack' }, log,
-      listenErr ? h('p', { class: 'note-tl', role: 'alert' }, listenErr) : null,
-      full ? h('p', { class: 'small muted' }, 'השיחה ארוכה. אפשר להתחיל שיחה חדשה.') : null,
-      ta,
-      !listenChat.length ? h('div', { class: 'stack', style: 'gap:8px' }, h('span', { class: 'qlab' }, 'או לבחור מצב נפוץ'),
-        h('div', { class: 'row', style: 'gap:8px' }, D.caseSuggestions.map((sg) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => sendChat(sg) }, sg)))) : null,
-      h('div', { class: 'row' }, btn, listenChat.length ? h('button', { class: 'btn ghost sm', type: 'button', onclick: chatReset }, 'שיחה חדשה') : null),
-      h('p', { class: 'small muted' }, 'הבוט הוא בן שיח לחשיבה, לא מקור סמכות. המשפטים נשלחים לשירות הבינה המלאכותית של Anthropic כדי לקבל תשובה, ואינם נשמרים באפליקציה. בלי שמות ובלי פרטים מזהים של תלמידים.'));
+    const inp = h('input', { class: 'input', id: 'ls-word', type: 'text', maxlength: '30', 'aria-label': 'מילה על הנושא', placeholder: 'למשל: כדורגל', value: listenWord });
+    const btn = h('button', { class: 'btn', type: 'button', disabled: listenWord.trim().length < 2, onclick: () => buildTopic(inp.value) }, 'בנו לי שיחה');
+    inp.addEventListener('input', () => { listenWord = inp.value; btn.disabled = inp.value.trim().length < 2; });
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') buildTopic(inp.value); });
+    return h('div', { class: 'stack' },
+      h('label', { for: 'ls-word' }, h('h3', null, 'על מה התלמיד/ה מספר/ת?')),
+      h('p', { class: 'muted', style: 'max-width:60ch' }, 'כותבים מילה אחת, והמערכת בונה דוגמה לשיחה סביבה.'),
+      inp,
+      h('div', { class: 'row', style: 'gap:8px' }, D.topicSuggestions.map((sg) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => buildTopic(sg) }, sg))),
+      h('div', null, btn),
+      h('p', { class: 'small muted' }, 'בלי שמות של תלמידים. הטקסט נשאר על המסך ולא נשמר ולא נשלח.'));
   };
   const examples = () => {
     const mine = listenEx === 'mine';
     const cur = D.examples.find((x) => x.id === listenEx) || D.examples[0];
     let body;
-    if (mine) body = chat();
+    if (mine) body = topic();
     else body = bubbles(cur);
     return h('section', { class: 'frame' },
       h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'דוגמאות לשיחה'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'בוחרים נושא וקוראים איך שיחה כזו יכולה להישמע. הדוגמאות אינן תסריט.')),
@@ -917,7 +954,7 @@ function cardsHome() {
       mode('/tools/cards/topics', 'checklist', 'לפי נושא', 'התלמיד/ה בוחר/ת נושא, ומשם מקבלים שאלות שקשורות אליו.'),
       mode('/tools/cards/pictures', 'eye', 'דרך תמונה', 'ארבע תמונות על המסך. התלמיד/ה בוחר/ת תמונה אחת, והקלף מסתובב לשאלה.'),
       mode('/tools/cards/random', 'idea', 'קלף מעורבב', 'כל השאלות מעורבבות, ומושכים קלף אחד. אפשר להפוך אותו לתמונה.'),
-      mode('/tools/cards/depth', 'steps', 'לפי עומק וסוג השיחה', 'עומק: קליל, להעמיק או מעמיק, בהתאם לרמת הקשר. סוג: זהות וחוזקות, יעדים ומטרות, אג\'נסי ושותפות. אפשר לשלב.', 'חדש')),
+      mode('/tools/cards/depth', 'steps', 'לפי עומק וסוג השיחה', 'עומק: קליל, להעמיק או מעמיק, בהתאם לרמת הקשר. סוג: זהות וחוזקות, יעדים ומטרות, אייג\'נסי ושותפות. אפשר לשלב.', 'חדש')),
     h('section', { class: 'frame' }, h('div', { class: 'row' },
       h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsFull, onchange: (e) => { cardsFull = e.target.checked; } }), 'לפתוח את הקלפים במסך מלא (מומלץ בשיחה)'),
       h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsMutual, onchange: (e) => { cardsMutual = e.target.checked; } }), 'שיחה הדדית: גם המחנך/ת עונה'),
@@ -1010,7 +1047,7 @@ function cardsRandom() {
 const CARD_TYPES = [
   { id: 'identity', t: 'זהות וחוזקות', d: 'שאלות על מי שאני: חוזקות, רגשות, מה מרגש ומה חשוב לי.' },
   { id: 'goals', t: 'יעדים ומטרות', d: 'שאלות על חלומות, על מה שרוצים להשיג ועל ההחלטות הבאות.' },
-  { id: 'agency', t: "אג'נסי ושותפות", d: 'שאלות על היכולת לפעול ולהשפיע, ועל מי ואיך אפשר להיעזר.' },
+  { id: 'agency', t: "אייג'נסי ושותפות", d: 'שאלות על היכולת לפעול ולהשפיע, ועל מי ואיך אפשר להיעזר.' },
 ];
 function cardsDepthHome() {
   const D = cardsData();
@@ -1411,7 +1448,7 @@ function guide() {
       h('div', { class: 'grid' },
         h('div', { class: 'well' }, h('h4', null, 'קשר'), h('p', null, '1 כמעט לא מכיר/ה · 2 מכיר/ה את הבסיס · 3 קשר ושיח פתוח.')),
         h('div', { class: 'well' }, h('h4', null, 'דחוף'), h('p', null, 'נקודה ליד מי שיש לו או לה משהו שלא יכול לחכות, גם אם אתם מכירים אותו או אותה מצוין, ועוד מילה אחת. מומלץ עד חמש נקודות בכל פעם.')),
-        h('div', { class: 'well' }, h('h4', null, 'ציר שיחה'), h('p', null, 'ז זהות וחוזקות · י יעדים ומטרות · א אג׳נסי. מה אני רוצה שיתחיל לזוז.')),
+        h('div', { class: 'well' }, h('h4', null, 'ציר שיחה'), h('p', null, 'ז זהות וחוזקות · י יעדים ומטרות · א אייג׳נסי. מה אני רוצה שיתחיל לזוז.')),
         h('div', { class: 'well' }, h('h4', null, 'סבבי שיחות'), h('p', null, 'מסמנים עיגול על כל סבב שהתקיים, עד שלושה.')),
         h('div', { class: 'well' }, h('h4', null, 'שיחה אחרונה'), h('p', null, 'התאריך של השיחה האחרונה, מכל סוג. כך אף תלמיד/ה לא נשכחים.')))));
 }
@@ -1751,9 +1788,9 @@ function viewMe() {
   });
 }
 
-function newConv() { return { round: null, axis: null, axisOther: '', kind: null, kindOther: '', depth: null, talk: null, feeling: null, note: '' }; }
+function newConv() { return { round: null, axes: [], axisOther: '', kinds: [], kindOther: '', depth: null, talkPct: null, feeling: null, note: '' }; }
 // שיחה ממבט ישן (לפני שתי שאלות הציר) נחשבת שלמה גם בלעדיהן. אפשר להשלים אותן, אבל לא חייבים.
-const convDone = (c) => !!(c.round && c.axis && (c.axis !== 'other' || c.axisOther.trim()) && c.kind && (c.kind !== 'other' || c.kindOther.trim()) && (c.legacy || (c.depth && c.talk)) && c.feeling);
+const convDone = (c) => !!(c.round && c.axes.length && (!c.axes.includes('other') || c.axisOther.trim()) && c.kinds.length && (!c.kinds.includes('other') || c.kindOther.trim()) && (c.legacy || (c.depth && c.talkPct !== null && c.talkPct !== undefined)) && c.feeling);
 
 function viewReport(week) {
   const e = session;
@@ -1762,9 +1799,15 @@ function viewReport(week) {
   // טיוטה של מבט שעוד לא נשלח נשמרת רק במכשיר הזה, ונמחקת כשהמבט נשלח
   const dkey = `${DRAFT_KEY}.${e.id}.${week}`;
   const saved = (() => { try { return JSON.parse(lsGet(dkey) || 'null'); } catch { return null; } })();
-  const draft = JSON.parse(JSON.stringify(saved && Array.isArray(saved.convs) ? saved : existing ? { convs: existing.convs.map((c) => ({ ...c, legacy: c.depth == null && c.talk == null })), noneReason: existing.noneReason || '' } : { convs: [], noneReason: '' }));
+  const draft = JSON.parse(JSON.stringify(saved && Array.isArray(saved.convs) ? saved : existing ? { convs: existing.convs.map((c) => ({ ...c, legacy: c.depth == null && c.talkPct == null })), noneReason: existing.noneReason || '' } : { convs: [], noneReason: '' }));
   // טיוטה ישנה מהמכשיר: "שיחת עומק" כבר לא ברשימה, ולכן עוברת ל"אחר" עם אותו טקסט
-  draft.convs.forEach((c) => { if (c.kind === 'deep') { c.kind = 'other'; c.kindOther = c.kindOther || 'שיחת עומק'; } });
+  draft.convs.forEach((c) => {
+    // טיוטה מהמכשיר שנשמרה כשהציר והסוג היו בחירה אחת
+    if (!Array.isArray(c.axes)) c.axes = c.axis ? [c.axis] : [];
+    if (!Array.isArray(c.kinds)) c.kinds = c.kind ? [c.kind] : [];
+    delete c.axis; delete c.kind;
+    if (c.kinds.includes('deep')) { c.kinds = [...new Set(c.kinds.map((k) => (k === 'deep' ? 'other' : k)))]; c.kindOther = c.kindOther || 'שיחת עומק'; }
+  });
   const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
   const cardsHost = h('div', { class: 'stack', style: 'gap:var(--gap)' });
   const noneHost = h('div');
@@ -1799,17 +1842,17 @@ function viewReport(week) {
       const warn = h('p', { class: 'warn-note', hidden: true });
       const checkNames = () => { const names = findNames([c.note, c.axisOther, c.kindOther].join(' ')); warn.hidden = !names.length; warn.textContent = names.length ? `נראה שמופיע שם (${names.join(', ')}). המבט לא צריך שמות תלמידים: אפשר לכתוב "התלמיד/ה".` : ''; };
       const badge = h('span'); badges[i] = badge;
-      const axisOther = h('input', { class: 'input', placeholder: 'על מה דיברתם?', value: c.axisOther, hidden: c.axis !== 'other', maxlength: '120', 'aria-label': 'ציר אחר', oninput: (ev) => { c.axisOther = ev.target.value; checkNames(); touch(); } });
-      const kindOther = h('input', { class: 'input', placeholder: 'איזו שיחה זו הייתה?', value: c.kindOther, hidden: c.kind !== 'other', maxlength: '120', 'aria-label': 'אופי אחר', oninput: (ev) => { c.kindOther = ev.target.value; checkNames(); touch(); } });
+      const axisOther = h('input', { class: 'input', placeholder: 'על מה דיברתם?', value: c.axisOther, hidden: !c.axes.includes('other'), maxlength: '120', 'aria-label': 'ציר אחר', oninput: (ev) => { c.axisOther = ev.target.value; checkNames(); touch(); } });
+      const kindOther = h('input', { class: 'input', placeholder: 'איזו שיחה זו הייתה?', value: c.kindOther, hidden: !c.kinds.includes('other'), maxlength: '120', 'aria-label': 'אופי אחר', oninput: (ev) => { c.kindOther = ev.target.value; checkNames(); touch(); } });
       const note = h('textarea', { class: 'textarea', placeholder: 'תובנה, שאלה שיצאתם איתה, רעיון…', value: c.note, maxlength: '1000', 'aria-label': 'עוד משהו חשוב להוסיף', oninput: (ev) => { c.note = ev.target.value; checkNames(); touch(); } });
       note.value = c.note;
       const q = (n, label, ...body) => h('div', { class: 'q' }, h('div', { class: 'qlabel' }, h('span', { class: 'qn' }, String(n)), label), ...body);
       cardsHost.append(h('section', { class: 'frame conv' }, h('div', { class: 'conv-head' }, h('h3', null, `שיחה ${i + 1}`), badge),
         q(1, 'איזה סבב זה עם התלמיד/ה?', chipGroup({ options: ROUNDS, value: c.round, label: 'סבב', onChange: (v) => { c.round = v; touch(); } })),
-        q(2, 'על איזה ציר דיברתם?', chipGroup({ options: AXES, value: c.axis, label: 'ציר השיחה', onChange: (v) => { c.axis = v; axisOther.hidden = v !== 'other'; touch(); } }), axisOther),
-        q(3, 'איזה סוג שיחה זו הייתה?', chipGroup({ options: KINDS, value: c.kind, label: 'סוג השיחה', onChange: (v) => { c.kind = v; kindOther.hidden = v !== 'other'; touch(); } }), kindOther),
-        q(4, DEPTH_SCALE.q, scaleGroup({ scale: DEPTH_SCALE, value: c.depth, onChange: (v) => { c.depth = v; touch(); } })),
-        q(5, TALK_SCALE.q, scaleGroup({ scale: TALK_SCALE, value: c.talk, onChange: (v) => { c.talk = v; touch(); } })),
+        q(2, 'מה היה הציר המרכזי של השיחה?', chipGroup({ options: AXES, value: c.axes, multi: true, label: 'ציר השיחה', onChange: (v) => { c.axes = v; axisOther.hidden = !v.includes('other'); touch(); } }), axisOther),
+        q(3, ['איזה סוג שיחה זו הייתה?', h('span', { class: 'hint' }, ' (אפשר לבחור כמה)')], chipGroup({ options: KINDS, value: c.kinds, multi: true, label: 'סוג השיחה', onChange: (v) => { c.kinds = v; kindOther.hidden = !v.includes('other'); touch(); } }), kindOther),
+        q(4, DEPTH_SCALE.q, depthSlider({ value: c.depth, onChange: (v) => { c.depth = v; touch(); } })),
+        q(5, TALK_SCALE.q, talkSlider({ value: c.talkPct, onChange: (v) => { c.talkPct = v; touch(); } })),
         q(6, 'איך יצאתם מהשיחה?', moodGroup({ value: c.feeling, onChange: (v) => { c.feeling = v; touch(); } }), h('div', { class: 'field' }, h('label', { class: 'hint', for: (note.id = nid('n')) }, 'עוד משהו חשוב להוסיף? (לא חובה)'), note), warn)));
       checkNames();
     });
@@ -1818,7 +1861,7 @@ function viewReport(week) {
   function setCount(n) {
     if (n > draft.convs.length) { while (draft.convs.length < n) draft.convs.push(newConv()); buildCards(); touch(); return; }
     const last = draft.convs[draft.convs.length - 1];
-    const hasData = last && (last.round || last.axis || last.kind || last.depth || last.talk || last.feeling || last.note.trim());
+    const hasData = last && (last.round || last.axes.length || last.kinds.length || last.depth || (last.talkPct !== null && last.talkPct !== undefined) || last.feeling || last.note.trim());
     const doRemove = () => { draft.convs.pop(); buildCards(); touch(); };
     if (hasData) confirmInline(countHost, `למחוק את שיחה ${draft.convs.length} ואת מה שנכתב בה?`, 'מחיקה', doRemove); else doRemove();
   }
@@ -1972,19 +2015,19 @@ function paintOverview(d, sc) {
     h('section', { class: 'frame' }, h('h3', null, 'שיחות לפי שבוע'), columns(convsPerWeek, curIdx))));
   out.push(h('div', { class: 'grid' },
     h('section', { class: 'frame' }, h('h3', null, 'לפי סבב'), barRows(distRows(d.dist.round, ROUNDS))),
-    h('section', { class: 'frame' }, h('h3', null, 'לפי ציר'), barRows(distRows(d.dist.axis, AXES))),
-    h('section', { class: 'frame' }, h('h3', null, 'לפי סוג שיחה'), barRows(distRows(d.dist.kind, KINDS))),
-    h('section', { class: 'frame' }, h('h3', null, 'אופי השיחה'), h('p', { class: 'small muted' }, 'מאינפורמטיבית (1) עד מעמיקה (5)'), barRows(distRows(d.dist.depth, scaleOpts(DEPTH_SCALE)))),
-    h('section', { class: 'frame' }, h('h3', null, 'מי דיבר יותר'), h('p', { class: 'small muted' }, 'מאני דיברתי (1) עד התלמיד/ה דיברו (5)'), barRows(distRows(d.dist.talk, scaleOpts(TALK_SCALE)))),
+    h('section', { class: 'frame' }, h('h3', null, 'לפי ציר'), h('p', { class: 'small muted' }, 'אפשר לסמן כמה צירים לשיחה, ולכן הסכום גדול ממספר השיחות'), barRows(distRows(d.dist.axis, AXES))),
+    h('section', { class: 'frame' }, h('h3', null, 'לפי סוג שיחה'), h('p', { class: 'small muted' }, 'גם כאן אפשר לסמן כמה'), barRows(distRows(d.dist.kind, KINDS))),
+    h('section', { class: 'frame' }, h('h3', null, 'אופי השיחה'), h('p', { class: 'small muted' }, 'ממידע ומעשיות (1) עד עולם פנימי (5)'), barRows(distRows(d.dist.depth, scaleOpts(DEPTH_SCALE)))),
+    h('section', { class: 'frame' }, h('h3', null, 'מקום לקול של התלמיד/ה'), h('p', { class: 'small muted' }, d.talkAvg === null || d.talkAvg === undefined ? 'מהמחנכת (1) עד התלמיד/ה (5)' : `בממוצע התלמיד/ה דיברו כ-${d.talkAvg}% מהשיחה. מהמחנכת (1) עד התלמיד/ה (5)`), barRows(distRows(d.dist.talk, scaleOpts(TALK_SCALE)))),
     h('section', { class: 'frame' }, h('h3', null, 'איך יצאו מהשיחה'), barRows(distRows(d.dist.feeling, FEELINGS)))));
   out.push(h('p', { class: 'muted small' }, d.masked ? 'ההתפלגויות מתחילת התכנית, לבית הספר שלך. ערכים קטנים מ-5 מוסתרים. אין כאן שום מידע על תלמידים.' : 'ההתפלגויות מתחילת התכנית, לפי בית הספר שנבחר. אין כאן שום מידע על תלמידים.'));
   return out;
 }
 
 function convLine(c) {
-  const ax = c.axis === 'other' ? `אחר: ${c.axisOther}` : lab(AXES, c.axis), kd = c.kind === 'other' ? `אחר: ${c.kindOther}` : lab(KINDS, c.kind);
+  const ax = c.axes.map((a) => (a === 'other' ? `אחר: ${c.axisOther}` : lab(AXES, a))).join(' · '), kd = c.kinds.map((k) => (k === 'other' ? `אחר: ${c.kindOther}` : lab(KINDS, k))).join(' · ');
   const f = FEELINGS.find((x) => x.v === c.feeling);
-  return h('div', { class: 'well stack' }, h('div', { class: 'chips' }, h('span', { class: 'tag lead' }, lab(ROUNDS, c.round)), h('span', { class: 'tag' }, ax), h('span', { class: 'tag' }, kd), c.depth ? h('span', { class: 'tag', title: DEPTH_SCALE.q }, `אופי: ${DEPTH_SCALE.labels[c.depth - 1]}`) : null, c.talk ? h('span', { class: 'tag', title: TALK_SCALE.q }, `דיבור: ${TALK_SCALE.labels[c.talk - 1]}`) : null, f ? h('span', { class: 'tag emo', title: f.t }, f.e, h('span', { class: 'micro', style: 'margin-inline-start:6px' }, f.t)) : null), c.note ? h('p', null, c.note) : null);
+  return h('div', { class: 'well stack' }, h('div', { class: 'chips' }, h('span', { class: 'tag lead' }, lab(ROUNDS, c.round)), h('span', { class: 'tag' }, ax), h('span', { class: 'tag' }, kd), c.depth ? h('span', { class: 'tag', title: DEPTH_SCALE.q }, `אופי: ${DEPTH_SCALE.labels[c.depth - 1]}`) : null, c.talkPct !== null && c.talkPct !== undefined ? h('span', { class: 'tag', title: TALK_SCALE.q }, `דיבור התלמיד/ה: ${c.talkPct}%`) : null, f ? h('span', { class: 'tag emo', title: f.t }, f.e, h('span', { class: 'micro', style: 'margin-inline-start:6px' }, f.t)) : null), c.note ? h('p', null, c.note) : null);
 }
 async function openReportSheet(sc, eid, week) {
   try {
@@ -2030,7 +2073,7 @@ function adminNotes(sc) {
       sc.admin ? schoolPills(() => adm.notesSchool, (v) => { adm.notesSchool = v; }) : null,
       h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'תחושה'), chipGroup({ options: [{ v: 'all', t: 'הכול' }, ...FEELINGS.map((x) => ({ v: x.v, t: `${x.e} ${x.t}` }))], value: adm.notesFeeling, cls: 'sm', label: 'תחושה', onChange: (v) => { adm.notesFeeling = v; render(); } })),
       h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'ציר'), chipGroup({ options: [{ v: 'all', t: 'הכול' }, ...AXES], value: adm.notesAxis, cls: 'sm', label: 'ציר', onChange: (v) => { adm.notesAxis = v; render(); } })),
-      h('div', { class: 'grid' }, d.items.length ? d.items.map((it) => h('article', { class: 'well note' }, h('div', { class: 'chips' }, h('span', { class: 'tag lead' }, it.educator), h('span', { class: 'tag' }, `שבוע ${weekNo(it.week)}`), h('span', { class: 'tag' }, it.axis === 'other' ? 'אחר' : lab(AXES, it.axis)), (() => { const fe = FEELINGS.find((x) => x.v === it.feeling); return fe ? h('span', { class: 'tag emo', title: fe.t }, fe.e) : null; })()), h('blockquote', null, it.note))) : h('p', { class: 'muted' }, 'אין הערות שמתאימות לסינון.'))),
+      h('div', { class: 'grid' }, d.items.length ? d.items.map((it) => h('article', { class: 'well note' }, h('div', { class: 'chips' }, h('span', { class: 'tag lead' }, it.educator), h('span', { class: 'tag' }, `שבוע ${weekNo(it.week)}`), h('span', { class: 'tag' }, it.axes.map((a) => lab(AXES, a)).join(' · ')), (() => { const fe = FEELINGS.find((x) => x.v === it.feeling); return fe ? h('span', { class: 'tag emo', title: fe.t }, fe.e) : null; })()), h('blockquote', null, it.note))) : h('p', { class: 'muted' }, 'אין הערות שמתאימות לסינון.'))),
     backToLead(sc));
 }
 

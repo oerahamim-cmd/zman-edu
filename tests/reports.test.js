@@ -71,7 +71,7 @@ test('אין בשום מקום שדה לתלמיד: שדות מיותרים נז
   const c = await newEducator('בדיקה חמש');
   const r = await c.put('/api/me/reports/2026-10-11', { studentName: 'דני כהן', convs: [{ ...conv(), student: 'דני', studentId: 123, name: 'דני' }] });
   assert.equal(r.status, 200);
-  assert.deepEqual(Object.keys(r.json.report.convs[0]).sort(), ['axis', 'axisOther', 'depth', 'feeling', 'kind', 'kindOther', 'note', 'round', 'talk']);
+  assert.deepEqual(Object.keys(r.json.report.convs[0]).sort(), ['axisOther', 'axes', 'depth', 'feeling', 'kinds', 'kindOther', 'note', 'round', 'talkPct'].sort());
   assert.ok(!r.text.includes('דני'));
   // גם בסכמה: אין עמודה שמחזיקה מידע על תלמיד
   const cols = await db.all(`SELECT column_name FROM information_schema.columns WHERE table_name IN ('conversations', 'reports')`);
@@ -105,18 +105,29 @@ test('ההגדרות הציבוריות: שבוע נוכחי ותחילת התכ
   assert.equal(r.json.programStart, '2026-09-06');
 });
 
-test('שתי שאלות הציר: אופי השיחה וחלוקת הדיבור, בסולם 1 עד 5, נשמרות ומוחזרות', async () => {
-  const c = await newEducator('בדיקה שמונה');
-  const ok = await c.put('/api/me/reports/2026-10-11', { convs: [conv({ kind: 'intro', depth: 5, talk: 2 }), conv({ depth: 1, talk: 5 })] });
+test('ציר וסוג שיחה: אפשר לסמן כמה, בלי כפילויות, ו"אחר" מחייב טקסט', async () => {
+  const c = await newEducator('בדיקה עשר');
+  const ok = await c.put('/api/me/reports/2026-10-11', { convs: [conv({ axes: ['agency', 'identity', 'identity'], axis: undefined, kinds: ['complex', 'intro'], kind: undefined })] });
   assert.equal(ok.status, 200);
-  assert.deepEqual(ok.json.report.convs.map((x) => [x.kind, x.depth, x.talk]), [['intro', 5, 2], ['notebook', 1, 5]]);
-  for (const bad of [{ depth: 0 }, { depth: 6 }, { talk: '3' }, { talk: 2.5 }, { depth: 'x' }]) {
+  assert.deepEqual([ok.json.report.convs[0].axes, ok.json.report.convs[0].kinds], [['identity', 'agency'], ['intro', 'complex']]);
+  for (const bad of [{ axes: [] }, { axes: ['identity', 'x'] }, { axes: 'identity' }, { kinds: [] }, { axes: ['goals', 'other'], axisOther: '' }, { kinds: ['intro', 'other'], kindOther: ' ' }]) {
+    assert.equal((await c.put('/api/me/reports/2026-10-11', { convs: [conv({ axis: undefined, kind: undefined, axes: ['identity'], kinds: ['intro'], ...bad })] })).status, 400, JSON.stringify(bad));
+  }
+  assert.equal((await c.put('/api/me/reports/2026-10-11', { convs: [conv({ axes: ['goals', 'other'], axisOther: 'שינה', axis: undefined })] })).status, 200);
+});
+
+test('שתי שאלות הציר: עומק השיחה (שלב 1 עד 5) וחלוקת הדיבור (אחוז דיבור התלמיד/ה), נשמרות ומוחזרות', async () => {
+  const c = await newEducator('בדיקה שמונה');
+  const ok = await c.put('/api/me/reports/2026-10-11', { convs: [conv({ kind: 'intro', depth: 5, talkPct: 35 }), conv({ depth: 1, talkPct: 100 }), conv({ talkPct: 0 })] });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(ok.json.report.convs.map((x) => [x.kinds, x.depth, x.talkPct]), [[['intro'], 5, 35], [['notebook'], 1, 100], [['notebook'], null, 0]]);
+  for (const bad of [{ depth: 0 }, { depth: 6 }, { talkPct: '30' }, { talkPct: 2.5 }, { talkPct: -5 }, { talkPct: 101 }, { depth: 'x' }]) {
     assert.equal((await c.put('/api/me/reports/2026-10-11', { convs: [conv(bad)] })).status, 400, JSON.stringify(bad));
   }
   assert.equal((await c.put('/api/me/reports/2026-10-11', { convs: [conv({ kind: 'deep' })] })).status, 400, 'שיחת עומק כבר לא סוג שיחה');
   // מבט ישן בלי שתי השאלות עדיין תקין
   assert.equal((await c.put('/api/me/reports/2026-10-11', { convs: [conv()] })).status, 200);
-  assert.deepEqual((await c.get('/api/me')).json.reports[0].convs.map((x) => [x.depth, x.talk]), [[null, null]]);
+  assert.deepEqual((await c.get('/api/me')).json.reports[0].convs.map((x) => [x.depth, x.talkPct]), [[null, null]]);
 });
 
 test('שימוש במיפוי הכיתה: נרשם רק מי ומתי, בלי תוכן, ורק למחנכת', async () => {

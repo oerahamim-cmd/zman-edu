@@ -14,6 +14,13 @@ function checkWeekAllowed(user, week, programStart) {
   if (week < first || week > weeks.curWeek()) throw new HttpError(400, 'השבוע הזה לא פתוח למבט.');
 }
 
+// בחירה מרובה: מערך של ערכים מותרים (בלי כפילויות, בסדר הרשימה), או ערך בודד ישן. null אם ריק או שיש ערך לא מוכר
+function pickMany(list, single, allowed) {
+  const raw = Array.isArray(list) ? list : single !== undefined && single !== null ? [single] : [];
+  if (!raw.length || !raw.every((v) => allowed.includes(v))) return null;
+  return allowed.filter((v) => raw.includes(v));
+}
+
 // בדיקת תקינות של מבט: כל שיחה חייבת תשובות מלאות. אין שדה לתלמיד: רק הערכים המותרים וטקסט קצר.
 function validateReport(body) {
   if (!Array.isArray(body.convs)) throw new HttpError(400, 'חסרות השיחות.');
@@ -21,16 +28,20 @@ function validateReport(body) {
   const convs = body.convs.map((c, i) => {
     if (!c || typeof c !== 'object') throw new HttpError(400, `שיחה ${i + 1} לא תקינה.`);
     if (!ROUNDS.includes(c.round)) throw new HttpError(400, `בשיחה ${i + 1} חסר סבב.`);
-    if (!AXES.includes(c.axis)) throw new HttpError(400, `בשיחה ${i + 1} חסר סוג שיחה.`);
-    if (!KINDS.includes(c.kind)) throw new HttpError(400, `בשיחה ${i + 1} חסר אופי שיחה.`);
+    // אפשר לסמן כמה צירים וכמה סוגי שיחה. ערך בודד (axis / kind) מהמבטים הישנים מתקבל גם הוא
+    const axes = pickMany(c.axes, c.axis, AXES), kinds = pickMany(c.kinds, c.kind, KINDS);
+    if (!axes) throw new HttpError(400, `בשיחה ${i + 1} חסר ציר שיחה.`);
+    if (!kinds) throw new HttpError(400, `בשיחה ${i + 1} חסר סוג שיחה.`);
     if (!FEELINGS.includes(c.feeling)) throw new HttpError(400, `בשיחה ${i + 1} חסר איך יצאו מהשיחה.`);
-    // שתי שאלות הציר אופציונליות בשרת (מבטים ישנים נשמרו בלעדיהן), אבל אם נשלחו הן חייבות להיות בסולם
-    for (const f of ['depth', 'talk']) if (c[f] !== undefined && c[f] !== null && !SCALE.includes(c[f])) throw new HttpError(400, `בשיחה ${i + 1} ערך לא תקין בשאלת הציר.`);
-    const axisOther = c.axis === 'other' ? clip(c.axisOther, 120) : '';
-    const kindOther = c.kind === 'other' ? clip(c.kindOther, 120) : '';
-    if (c.axis === 'other' && !axisOther) throw new HttpError(400, `בשיחה ${i + 1} צריך לכתוב על מה דיברתם.`);
-    if (c.kind === 'other' && !kindOther) throw new HttpError(400, `בשיחה ${i + 1} צריך לכתוב איזו שיחה זו הייתה.`);
-    return { round: c.round, axis: c.axis, axisOther, kind: c.kind, kindOther, depth: c.depth ?? null, talk: c.talk ?? null, feeling: c.feeling, note: clip(c.note, 1000) };
+    // שתי שאלות הציר אופציונליות בשרת (מבטים ישנים נשמרו בלעדיהן), אבל אם נשלחו הן חייבות להיות בטווח:
+    // עומק השיחה הוא שלב 1 עד 5, וחלוקת הדיבור היא אחוז שלם (0 עד 100) של דיבור התלמיד/ה
+    if (c.depth !== undefined && c.depth !== null && !SCALE.includes(c.depth)) throw new HttpError(400, `בשיחה ${i + 1} ערך לא תקין בשאלת עומק השיחה.`);
+    if (c.talkPct !== undefined && c.talkPct !== null && !(Number.isInteger(c.talkPct) && c.talkPct >= 0 && c.talkPct <= 100)) throw new HttpError(400, `בשיחה ${i + 1} ערך לא תקין בשאלת חלוקת הדיבור.`);
+    const axisOther = axes.includes('other') ? clip(c.axisOther, 120) : '';
+    const kindOther = kinds.includes('other') ? clip(c.kindOther, 120) : '';
+    if (axes.includes('other') && !axisOther) throw new HttpError(400, `בשיחה ${i + 1} צריך לכתוב על מה דיברתם.`);
+    if (kinds.includes('other') && !kindOther) throw new HttpError(400, `בשיחה ${i + 1} צריך לכתוב איזו שיחה זו הייתה.`);
+    return { round: c.round, axes, axisOther, kinds, kindOther, depth: c.depth ?? null, talkPct: c.talkPct ?? null, feeling: c.feeling, note: clip(c.note, 1000) };
   });
   let noneReason = '';
   if (!convs.length && body.noneReason) {
@@ -50,14 +61,14 @@ async function upsertReport(educatorId, week, { convs, noneReason }) {
     await t.run('DELETE FROM conversations WHERE report_id = ?', [rep.id]);
     let seq = 0;
     for (const c of convs) {
-      await t.run('INSERT INTO conversations (report_id, seq, round, axis, axis_other, kind, kind_other, depth, talk, feeling, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [rep.id, ++seq, c.round, c.axis, c.axisOther || null, c.kind, c.kindOther || null, c.depth, c.talk, c.feeling, c.note || null]);
+      await t.run('INSERT INTO conversations (report_id, seq, round, axis, axis_other, kind, kind_other, depth, talk_pct, feeling, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [rep.id, ++seq, c.round, c.axes.join(','), c.axisOther || null, c.kinds.join(','), c.kindOther || null, c.depth, c.talkPct, c.feeling, c.note || null]);
     }
     return rep.id;
   });
 }
 
-const serializeConv = (c) => ({ round: c.round, axis: c.axis, axisOther: c.axis_other || '', kind: c.kind, kindOther: c.kind_other || '', depth: c.depth ?? null, talk: c.talk ?? null, feeling: c.feeling, note: c.note || '' });
+const serializeConv = (c) => ({ round: c.round, axes: c.axis.split(','), axisOther: c.axis_other || '', kinds: c.kind.split(','), kindOther: c.kind_other || '', depth: c.depth ?? null, talkPct: c.talk_pct ?? null, feeling: c.feeling, note: c.note || '' });
 
 // כל המבטים של קבוצת מחנכות (מזהים), עם השיחות. החזרה: Map(educatorId -> [report])
 async function loadReports(educatorIds) {
