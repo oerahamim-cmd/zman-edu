@@ -373,3 +373,6 @@ route('GET', '/api/admin/audit', ['manager'], async () => ({
   entries: await db.all(
     `SELECT a.id, a.timestamp, a.role, a.action, a.target, u.name FROM audit_log a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.id DESC LIMIT 200`),
 }));
+
+// בוט "המקרה שלי" בכלי "להקשיב לכוחות"
+require('./listen');

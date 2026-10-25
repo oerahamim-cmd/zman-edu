@@ -106,8 +106,8 @@ const destroyUserSessions = async (userId, exceptToken) => db.run('DELETE FROM s
 // בית ספר שלם יושב על אותה כתובת IP (מפגש מחנכות, כולן נכנסות יחד), ולכן המגבלה לפי IP גבוהה מהמגבלה לפי חשבון.
 // קוד אישי הוא ארבע ספרות, ולכן ניחוש של חשבון בודד נחסם אחרי 8 ניסיונות ל-15 דקות.
 const WINDOW_MS = 15 * 60e3;
-const LIMITS = { acct: 8, ip: 60, code: 20 };
-const limitFor = (key) => (key.startsWith('ip:') ? LIMITS.ip : key.startsWith('code:') || key.startsWith('setup:') ? LIMITS.code : LIMITS.acct);
+const LIMITS = { acct: 8, ip: 60, code: 20, bot: 40 };
+const limitFor = (key) => (key.startsWith('bot:') ? LIMITS.bot : key.startsWith('ip:') ? LIMITS.ip : key.startsWith('code:') || key.startsWith('setup:') ? LIMITS.code : LIMITS.acct);
 const minutesLeft = (firstAt) => Math.max(1, Math.ceil((Date.parse(firstAt) + WINDOW_MS - Date.now()) / 60e3));
 
 // מגדיל את המונה בפעולה אטומה אחת (גם אם כמה בקשות מגיעות במקביל)

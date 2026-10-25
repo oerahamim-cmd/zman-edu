@@ -486,7 +486,7 @@ function idHead(title, sub) {
 }
 
 /* ---------- כלי 1: להקשיב לכוחות (גרסה 1.2) ---------- */
-let listenTab = 'lenses', listenLens = 'L01', listenStep = 'T01', listenEx = 'E01', listenDraft = '', listenMine = null;
+let listenTab = 'lenses', listenLens = null, listenStep = null, listenEx = 'E01', listenDraft = '', listenChat = [], listenBusy = false, listenErr = null, listenFallback = null;
 function viewListen() {
   const D = window.ZMAN_LISTEN;
   const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
@@ -521,29 +521,62 @@ function viewListen() {
     h('div', { class: 'hintbox' }, h('b', null, e.hintLabel || 'רמזים אפשריים:'), h('div', { class: 'row', style: 'gap:8px' }, e.hints.map((x) => h('span', { class: 'tag' }, x)))),
     e.lines.map((l) => h('div', { class: 'msg ' + (l.who === 'student' ? 'st' : 'ed') }, h('small', null, l.who === 'student' ? 'תלמיד/ה' : 'מחנך/ת'), h('div', { class: 'mb' }, l.text))),
     e.note ? h('p', { class: 'note-tl' }, e.note) : null);
+  // "המקרה שלי": שיחה עם בוט. השיחה חיה רק בדפדפן, ולא נשמרת בשום מקום
+  const BOT_HELLO = 'ספרו לי על ההתמודדות: מצב משיחה אישית (או לפניה) שלא ברור לכם איך להגיב אליו. אפשר לכתוב בכמה מילים. בלי שמות ובלי פרטים מזהים.';
+  async function sendChat(raw) {
+    const text = raw.trim();
+    if (!text || listenBusy) return;
+    listenChat.push({ role: 'user', text });
+    listenDraft = ''; listenBusy = true; listenErr = null;
+    paint();
+    try {
+      const r = await api('POST', '/api/listen/chat', { messages: listenChat });
+      listenChat.push({ role: 'assistant', text: r.reply });
+    } catch (e) {
+      if (e.code === 'bot_off') listenFallback = D.templateForCase(listenChat.filter((m) => m.role === 'user').map((m) => m.text).join(' '));
+      else { listenChat.pop(); listenDraft = text; listenErr = e.message; }
+    }
+    listenBusy = false;
+    paint();
+    const box = document.getElementById('ls-draft');
+    if (box && !listenFallback) box.focus();
+  }
+  const chatReset = () => { listenChat = []; listenDraft = ''; listenErr = null; listenFallback = null; paint(); };
+  const chat = () => {
+    if (!session) {
+      return h('div', { class: 'well stack' }, h('h3', null, 'בוט להתייעצות על המקרה שלך'),
+        h('p', { class: 'muted' }, 'הבוט זמין למחנכות ולמובילות אחרי כניסה.'), h('div', null, link('/me', 'כניסה', 'btn')));
+    }
+    const full = listenChat.length >= 16;
+    const log = h('div', { class: 'idchat', 'aria-live': 'polite' },
+      h('div', { class: 'msg st' }, h('small', null, 'הבוט'), h('div', { class: 'mb' }, BOT_HELLO)),
+      listenChat.map((m) => h('div', { class: 'msg ' + (m.role === 'user' ? 'ed' : 'st') }, h('small', null, m.role === 'user' ? 'את/ה' : 'הבוט'), h('div', { class: 'mb' }, m.text))),
+      listenBusy ? h('div', { class: 'msg st' }, h('small', null, 'הבוט'), h('div', { class: 'mb muted' }, 'חושב…')) : null);
+    if (listenFallback) {
+      return h('div', { class: 'stack' }, log,
+        h('p', { class: 'note-tl' }, 'הבוט עדיין לא מחובר, אז הנה דוגמה קרובה מתוך המאגר.'),
+        bubbles(listenFallback),
+        h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: chatReset }, 'מקרה אחר')));
+    }
+    const ta = h('textarea', { class: 'input', id: 'ls-draft', rows: '3', maxlength: '1200', disabled: listenBusy || full, placeholder: listenChat.length ? 'כתבו תשובה' : 'למשל: תלמיד שעונה ״לא יודע״ על כל שאלה', 'aria-label': 'הודעה לבוט' }, listenDraft);
+    const btn = h('button', { class: 'btn', type: 'button', disabled: listenBusy || full || listenDraft.trim().length < 2, onclick: () => sendChat(ta.value) }, 'שליחה');
+    ta.addEventListener('input', () => { listenDraft = ta.value; btn.disabled = listenBusy || full || listenDraft.trim().length < 2; });
+    ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendChat(ta.value); });
+    return h('div', { class: 'stack' }, log,
+      listenErr ? h('p', { class: 'note-tl', role: 'alert' }, listenErr) : null,
+      full ? h('p', { class: 'small muted' }, 'השיחה ארוכה. אפשר להתחיל שיחה חדשה.') : null,
+      ta,
+      !listenChat.length ? h('div', { class: 'stack', style: 'gap:8px' }, h('span', { class: 'qlab' }, 'או לבחור מצב נפוץ'),
+        h('div', { class: 'row', style: 'gap:8px' }, D.caseSuggestions.map((sg) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => sendChat(sg) }, sg)))) : null,
+      h('div', { class: 'row' }, btn, listenChat.length ? h('button', { class: 'btn ghost sm', type: 'button', onclick: chatReset }, 'שיחה חדשה') : null),
+      h('p', { class: 'small muted' }, 'הבוט הוא בן שיח לחשיבה, לא מקור סמכות. המשפטים נשלחים לשירות הבינה המלאכותית של Anthropic כדי לקבל תשובה, ואינם נשמרים באפליקציה. בלי שמות ובלי פרטים מזהים של תלמידים.'));
+  };
   const examples = () => {
     const mine = listenEx === 'mine';
     const cur = D.examples.find((x) => x.id === listenEx) || D.examples[0];
     let body;
-    if (mine && !listenMine) {
-      const ta = h('textarea', { class: 'input', id: 'ls-case', rows: '4', maxlength: '300', placeholder: 'למשל: תלמיד שעונה ״לא יודע״ על כל שאלה', 'aria-label': 'מה ההתמודדות שלך?' }, listenDraft);
-      const btn = h('button', { class: 'btn', type: 'button', disabled: listenDraft.trim().length < 3, onclick: () => { listenMine = D.templateForCase(listenDraft); paint(); } }, 'בנו לי דוגמה');
-      ta.addEventListener('input', () => { listenDraft = ta.value; btn.disabled = listenDraft.trim().length < 3; });
-      body = h('div', { class: 'stack' },
-        h('label', { for: 'ls-case' }, h('h3', null, 'מה ההתמודדות שלך?')),
-        h('p', { class: 'muted', style: 'max-width:60ch' }, 'כתבו בכמה מילים מצב משיחה אישית שלא ברור לכם איך להגיב אליו. נבחר ממנו דוגמה קרובה לשיחה.'),
-        ta,
-        h('p', { class: 'small muted' }, 'בלי שמות ובלי פרטים מזהים. הטקסט נשאר על המסך הזה ולא נשמר ולא נשלח.'),
-        h('span', { class: 'qlab' }, 'או לבחור מצב נפוץ'),
-        h('div', { class: 'row', style: 'gap:8px' }, D.caseSuggestions.map((sg) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => { listenDraft = sg; paint(); } }, sg))),
-        h('div', null, btn));
-    } else if (mine) {
-      body = h('div', { class: 'stack' },
-        h('div', { class: 'well stack', style: 'gap:6px' }, h('small', { class: 'qlab' }, 'המקרה שלך'), h('p', null, listenDraft),
-          h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { listenMine = null; listenDraft = ''; paint(); } }, 'מקרה אחר'))),
-        h('p', { class: 'small muted' }, 'זו דוגמה מוכנה מהמאגר שנבחרה לפי מילים בטקסט, לא שיחה שנכתבה במיוחד עבורך.'),
-        bubbles(listenMine));
-    } else body = bubbles(cur);
+    if (mine) body = chat();
+    else body = bubbles(cur);
     return h('section', { class: 'frame' },
       h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'דוגמאות לשיחה'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'בוחרים נושא וקוראים איך שיחה כזו יכולה להישמע. הדוגמאות אינן תסריט.')),
       chipGroup({ options: [{ v: 'mine', t: '+ המקרה שלי' }, ...D.examples.map((x) => ({ v: x.id, t: x.category }))], value: listenEx, label: 'נושא הדוגמה', onChange: (v) => { listenEx = v; paint(); } }),
