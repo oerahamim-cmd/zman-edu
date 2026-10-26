@@ -382,7 +382,9 @@ const route = () => (current || '/').split('?')[0];
 
 function header() {
   const p = route();
-  const links = [{ to: '/', t: 'בית' }, { to: '/me', t: 'שיחות אישיות' }, { to: '/mapping', t: 'מיפוי הכיתה' }, { to: '/tools', t: 'ארגז כלים' }];
+  // מובילה ומנהלת התכנית לא נכנסות לשיחות האישיות ולמיפוי (הם של כל מחנכת), ולכן הקישורים האלה לא מוצגים להן
+  const staff = leadUser() || isAdmin();
+  const links = [{ to: '/', t: 'בית' }, ...(staff ? [] : [{ to: '/me', t: 'שיחות אישיות' }, { to: '/mapping', t: 'מיפוי הכיתה' }]), { to: '/tools', t: 'ארגז כלים' }];
   if (leadUser()) links.push({ to: '/lead', t: 'מובילות' });
   if (isAdmin()) links.push({ to: '/admin', t: 'מנהלת התכנית' });
   const active = (to) => (to === '/' ? p === '/' : p === to || p.startsWith(to + '/'));
@@ -503,7 +505,9 @@ function viewHome() {
    ארגז כלים (פתוח לכולם)
    ===================================================================== */
 function viewTools() {
-  const count = (id) => pub.tools.filter((t) => t.folder === id && !t.example).length + (id === 'identity' ? IDENTITY_TOOLS.length : id === 'goals' ? GOALS_TOOLS.length : 0);
+  // שמות הכלים בכל תיקייה מופיעים על הכרטיס, כדי שיהיה ברור מה יש בפנים לפני שנכנסים
+  const names = (id) => [...(id === 'identity' ? IDENTITY_TOOLS : id === 'goals' ? GOALS_TOOLS : []).map((x) => x.t), ...pub.tools.filter((t) => t.folder === id && !t.example).map((t) => t.title)];
+  const inside = (id) => { const n = names(id); return n.length ? h('ul', { class: 'foldertools' }, n.map((t) => h('li', null, t))) : h('span', { class: 'tag', style: 'align-self:flex-start' }, 'בקרוב'); };
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
     h('section', { class: 'frame' }, h('h2', null, 'ארגז כלים'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'כלים ופרקטיקות לשיחות אישיות. פתוח לכולם, בלי כניסה. התכנים יתווספו כאן לאורך השנה.')),
     h('a', { class: 'frame cardsfeature', href: '#/tools/cards', onclick: (e) => { e.preventDefault(); go('/tools/cards'); } },
@@ -511,7 +515,7 @@ function viewTools() {
       h('div', { class: 'stack' }, h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'חדש'), h('h3', null, 'קלפי שיח וקשר אישי'), h('p', { class: 'muted' }, `${((window.ZMAN_CARDS || {}).cards || []).length || 63} קלפים עם שאלה בצד אחד ותמונה בצד השני: לפי נושא, דרך תמונה, קלף מעורבב או לפי עומק וסוג השיחה. עובד גם בטלפון, בשיחה אישית.`), h('span', { class: 'btn', style: 'align-self:flex-start' }, 'לפתיחת הקלפים'))),
     h('div', { class: 'grid' }, FOLDERS.map((f) => h('a', { class: 'folder', href: '#/tools/' + f.id, onclick: (e) => { e.preventDefault(); go('/tools/' + f.id); } },
       h('span', { class: 'ic-big' }, ic(f.icon, { size: 38, tone: 'blue' })), h('h3', null, f.t), h('p', { class: 'muted' }, f.d),
-      h('span', { class: 'tag', style: 'align-self:flex-start' }, `${count(f.id)} כלים`)))));
+      inside(f.id)))));
 }
 
 function viewFolder(id) {
@@ -1285,18 +1289,20 @@ function applyNames(names, replace) {
 function viewMappingHome() {
   ensureMap();
   const n = map.students.length, placed = map.students.filter((s) => s.link).length;
-  const step = (num, title, desc, to, btn, status, optional) => h('article', { class: 'frame stepcard' },
-    h('div', { class: 'row' }, h('span', { class: 'group-badge' }, num), h('h3', null, title), optional ? h('span', { class: 'tag' }, 'לא חובה') : null),
-    h('p', null, desc), status ? h('p', { class: 'small muted' }, status) : null, h('div', null, link(to, btn)));
+  // השלב הבא שמומלץ מודגש. בלי רשימה: שלב 1. יש מי שעוד לא הוצבו: שלב 3. אחרת: מפת השיחות.
+  const next = !n ? '1' : placed < n ? '3' : '4';
+  const step = (num, title, desc, to, btn, status, optional) => h('article', { class: 'frame stepcard' + (num === next ? ' next' : '') },
+    h('div', { class: 'row' }, h('span', { class: 'group-badge' + (num === next ? '' : ' dim') }, num), h('h3', null, title), optional ? h('span', { class: 'tag' }, 'לא חובה') : num === next ? h('span', { class: 'tag lead' }, 'הצעד הבא') : null),
+    h('p', null, desc), status ? h('p', { class: 'small muted' }, status) : null, h('div', { style: 'margin-top:auto' }, link(to, btn, num === next ? 'btn' : 'btn soft')));
   const orig = (title, desc, pdf, imgs) => h('div', { class: 'well stack' }, h('b', null, title), h('p', { class: 'small' }, desc),
     h('div', { class: 'row' }, h('a', { class: 'btn soft sm', href: pdf, target: '_blank', rel: 'noopener' }, 'הקובץ המקורי (PDF)')),
     h('details', null, h('summary', { style: 'cursor:pointer;font-weight:500;color:var(--lead)' }, 'תצוגה מקדימה'), h('div', { class: 'previews', style: 'margin-top:14px' }, imgs.map((s) => h('img', { class: 'preview-img', src: s, alt: `תצוגה מקדימה של ${title}`, loading: 'lazy' })))));
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
     mapHead('מיפוי הכיתה', 'עוזר להחליט עם מי לשוחח ומתי: כל תלמיד/ה במעגל שמתאים לרמת הקשר איתם, ומהמיפוי יוצא סדר שיחות מוצע. עובדים בארבעה שלבים, על אותה רשימה.', '/mapping'),
     privacyNote(),
-    h('div', { class: 'grid' },
+    h('div', { class: 'grid steps4' },
       step('1', 'הכיתה שלי', 'מדביקים או מעלים את רשימת השמות של הכיתה, פעם אחת.', '/mapping/class', n ? 'לרשימה שלי' : 'להוספת הרשימה', n ? `${n} תלמידים ברשימה` : 'עוד אין רשימה'),
-      step('2', 'עוזר לקשר', 'לא בטוחים מה רמת הקשר עם תלמיד/ה? עד שלוש שאלות של כן או לא, והמלצה באיזה מעגל למקם אותם.', '/mapping/helper', 'להתחיל שיחה עם העוזר', '', true),
+      step('2', 'עוזר לקשר', 'לא בטוחים מה רמת הקשר עם תלמיד/ה? עד שלוש שאלות של כן או לא, והמלצה באיזה מעגל למקם אותם.', '/mapping/helper', 'לעוזר לקשר', '', true),
       step('3', 'מעגלי קשר', 'גוררים כל תלמיד/ה למעגל שמתאים: תמונה אחת של כל הכיתה.', '/mapping/circles', 'למעגלי קשר', n ? `${placed} מתוך ${n} כבר ממוקמים` : ''),
       step('4', 'מפת שיחות', 'אותם נתונים בטבלה: דחוף, ציר שיחה, סבבים ושיחה אחרונה, וסדר מוצע לשיחות.', '/mapping/map', 'למפת שיחות', '')),
     h('details', { class: 'frame' }, h('summary', { style: 'font-weight:700;font-size:19px;cursor:pointer' }, 'הקבצים המקוריים של המפה והמעגלים'),
@@ -1547,6 +1553,7 @@ function groupSummary() {
   return box;
 }
 
+let mapSort = 'list';
 function viewMap() {
   ensureMap();
   const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
@@ -1556,10 +1563,14 @@ function viewMap() {
     clear(root);
     const list = h('div', { class: 'stack', style: 'gap:8px' });
     list.append(h('div', { class: 'maphead', 'aria-hidden': 'true' }, h('span', null, '#'), h('span', null, 'שם או ראשי תיבות'), h('span', null, 'קשר'), h('span', null, 'דחוף'), h('span', null, 'ציר שיחה'), h('span', null, 'סבבי שיחות'), h('span', null, 'שיחה אחרונה'), h('span', null, 'קבוצה'), h('span', null, '')));
-    map.students.forEach((s, i) => list.append(studentRow(s, i, paint)));
+    // מיון לתצוגה בלבד: לפי סדר הרשימה, או לפי הקבוצה (סדר השיחות המוצע). הסדר השמור לא משתנה.
+    const rows = mapSort === 'group' ? map.students.slice().sort((a, b) => (groupOf(a) || 9) - (groupOf(b) || 9)) : map.students;
+    rows.forEach((s) => list.append(studentRow(s, map.students.indexOf(s), paint)));
+    const sortPick = chipGroup({ options: [{ v: 'list', t: 'לפי הרשימה' }, { v: 'group', t: 'לפי סדר השיחות' }], value: mapSort, cls: 'sm', label: 'מיון הטבלה', onChange: (v) => { mapSort = v; paint(); } });
     const addName = h('input', { class: 'input', placeholder: 'הוספת שם אחד, ואז Enter', 'aria-label': 'הוספת תלמיד/ה', onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) { applyNames(parseNames(e.target.value), false); paint(); setTimeout(() => root.querySelector('[aria-label="הוספת תלמיד/ה"]')?.focus(), 0); } } });
     add(root, [mapHead('מפת שיחות', `${map.cls ? 'כיתה ' + map.cls + '. ' : ''}טבלה אחת לכל הכיתה: קשר, דחוף, ציר שיחה, סבבים ושיחה אחרונה. הקבוצה בעמודה האחרונה מחושבת לבד ומסדרת את סדר השיחות.`, '/mapping/map'), privacyNote(), guide(),
       h('section', { class: 'frame' },
+        map.students.length ? h('div', { class: 'row' }, h('span', { class: 'small muted' }, 'מיון:'), sortPick) : null,
         map.students.length ? h('div', { class: 'tablewrap', style: 'overflow:visible' }, list) : emptyRoster(),
         h('div', { class: 'row' }, h('div', { style: 'flex:1 1 260px' }, addName), link('/mapping/class', 'הוספת רשימה שלמה', 'btn soft sm'), link('/mapping/helper', 'לא בטוחים בקשר? העוזר', 'btn soft sm'))),
       groupSummary(),
@@ -1673,12 +1684,13 @@ function viewCircles() {
     map.students.filter((s) => s.link).forEach((s) => board.append(chipEl(s, { x: s.x, y: s.y })));
     const unplaced = map.students.filter((s) => !s.link);
     const tray = h('div', { class: 'tray' }, unplaced.length ? unplaced.map((s) => chipEl(s, null)) : h('span', { class: 'micro muted' }, 'כל התלמידים הוצבו במעגלים'));
-    const legend = h('div', { class: 'row small muted', 'aria-label': 'מקרא המעגלים' }, LINKS.slice().reverse().map((l) => h('span', null, `טבעת ${l.v}: ${l.t}`)));
     const panel = sel ? selPanel(map.students.find((s) => s.id === sel)) : h('p', { class: 'muted small' }, 'גוררים תלמיד/ה לכל מקום במעגל שמתאים, או לוחצים עליו כדי לערוך. הנקודה הסגולה מסמנת דחוף.');
     const addOne = h('input', { class: 'input', placeholder: 'הוספת שם אחד, ואז Enter', 'aria-label': 'הוספת תלמיד/ה', onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) { applyNames(parseNames(e.target.value), false); paint(); } } });
+    // במסך רחב: הלוח בצד אחד, והרשימה של מי שעוד לא הוצבו לידו, כדי שהגרירה תהיה קצרה
+    const side = h('div', { class: 'stack circleside' }, h('h4', null, `עדיין לא הוצבו (${unplaced.length})`), tray, panel,
+      h('div', { class: 'stack', style: 'gap:10px' }, addOne, h('div', { class: 'row' }, link('/mapping/class', 'הוספת רשימה שלמה', 'btn soft sm'), link('/mapping/helper', 'לא בטוחים? העוזר לקשר', 'btn soft sm'))));
     add(root, [mapHead('מעגלי קשר', `${map.cls ? 'כיתה ' + map.cls + '. ' : ''}גוררים כל תלמיד/ה למעגל שמתאים לקשר שלכם איתם. ככל שהשם קרוב יותר למרכז, הקשר חזק יותר.`, '/mapping/circles'), privacyNote(),
-      map.students.length ? h('section', { class: 'frame' }, board, legend, h('div', { class: 'stack' }, h('h4', null, 'עדיין לא הוצבו'), tray), panel,
-        h('div', { class: 'row' }, h('div', { style: 'flex:1 1 220px' }, addOne), link('/mapping/class', 'הוספת רשימה שלמה', 'btn soft sm'), link('/mapping/helper', 'לא בטוחים? העוזר לקשר', 'btn soft sm')))
+      map.students.length ? h('section', { class: 'frame circlewrap' }, board, side)
         : h('section', { class: 'frame' }, emptyRoster()),
       groupSummary(),
       h('section', { class: 'frame' }, h('h3', null, 'שמירה וגיבוי'), mapActions(paint), h('p', { class: 'small' }, link('/mapping/map', 'לראות את אותה מפה כטבלה', 'btn ghost')))]);
@@ -2087,9 +2099,12 @@ function paintOverview(d, sc) {
       notUsed.length ? h('div', { class: 'stack' }, h('h4', null, `עוד לא פתחו (${notUsed.length})`), h('div', { class: 'chips' }, notUsed.map((r) => chip({ id: r.id, name: r.name, schoolName: r.schoolName }, 'tag todo')))) : null,
       h('p', { class: 'small muted' }, 'המיפוי עצמו (שמות התלמידים, המעגלים והסימונים) נשאר במכשיר של כל מחנכת, ואין לך גישה אליו. השרת מקבל רק את העובדה שנפתח, ומתי.')));
   }
+  const curNote = curIdx >= 0 && w === d.curWeek ? h('p', { class: 'micro muted' }, 'העמודה הכחולה: השבוע הנוכחי, שעוד פתוח.') : null;
   out.push(h('div', { class: 'grid' },
-    h('section', { class: 'frame' }, h('h3', null, 'אחוז השליחה לפי שבוע'), columns(rate, curIdx)),
-    h('section', { class: 'frame' }, h('h3', null, 'שיחות לפי שבוע'), columns(convsPerWeek, curIdx))));
+    h('section', { class: 'frame' }, h('h3', null, 'אחוז השליחה לפי שבוע'), columns(rate, curIdx), curNote),
+    h('section', { class: 'frame' }, h('h3', null, 'שיחות לפי שבוע'), columns(convsPerWeek, curIdx), curNote ? curNote.cloneNode(true) : null)));
+  // ההתפלגויות מצטברות מתחילת התכנית ולא תלויות בשבוע שנבחר למעלה, ולכן הכותרת אומרת את זה במפורש
+  out.push(h('section', { class: 'frame quiet' }, h('h3', null, 'כל השיחות מתחילת התכנית'), h('p', { class: 'small muted' }, 'הנתונים כאן מצטברים, ולא משתנים כשעוברים בין שבועות.')));
   out.push(h('div', { class: 'grid' },
     h('section', { class: 'frame' }, h('h3', null, 'לפי סבב'), barRows(distRows(d.dist.round, ROUNDS))),
     h('section', { class: 'frame' }, h('h3', null, 'לפי ציר'), h('p', { class: 'small muted' }, 'אפשר לסמן כמה צירים לשיחה, ולכן הסכום גדול ממספר השיחות'), barRows(distRows(d.dist.axis, AXES))),

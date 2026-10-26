@@ -141,6 +141,7 @@ a { color: var(--lead); }
 .tag.emo { font-size: 18px; padding: 2px 10px; }
 .bar-track { height: 12px; background: var(--soft); border-radius: 999px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--lead); border-radius: 999px; }
+.well .bar-track { background: #fff; }
 .accent-line { height: 6px; border-radius: 6px; background: var(--turq); width: 72px; }
 
 /* ---------- דיווח שבועי ---------- */
@@ -162,6 +163,8 @@ a { color: var(--lead); }
 .folder:hover { background: #fff; outline: 3px solid var(--lead); outline-offset: -3px; }
 .folder .ic-big { width: 64px; height: 64px; border-radius: 18px; background: var(--soft); display: grid; place-items: center; }
 .folder h3 { color: var(--lead); }
+.foldertools { margin: auto 0 0; padding: 12px 0 0; list-style: none; border-top: 1px solid var(--soft); display: flex; flex-direction: column; gap: 6px; font-weight: 500; }
+.foldertools li::before { content: "←"; color: var(--lead); margin-inline-end: 8px; }
 .tool { display: flex; flex-direction: column; gap: 10px; }
 .tool.example { background: var(--soft); }
 .preview-img { width: 100%; height: auto; border-radius: 14px; display: block; background: #fff; }
@@ -169,7 +172,7 @@ a { color: var(--lead); }
 
 /* ---------- מיפוי: טבלה ---------- */
 .maphead, .maprow { display: grid; gap: 10px 12px; align-items: center;
-  grid-template-columns: 34px minmax(130px, 1.4fr) auto minmax(140px, auto) auto auto minmax(172px, 0.9fr) 54px 40px; }
+  grid-template-columns: 34px minmax(130px, 1.4fr) 132px minmax(140px, 0.8fr) 132px 112px minmax(172px, 0.9fr) 54px 40px; }
 .maphead { font-size: 14px; font-weight: 700; color: var(--ink2); padding: 0 12px; }
 .maprow { background: var(--soft); border-radius: 14px; padding: 10px 12px; }
 .maprow .cell { min-width: 0; }
@@ -213,6 +216,10 @@ a { color: var(--lead); }
 .pchip.dragging { opacity: .25; }
 .pchip.ghost { position: fixed; z-index: 1000; pointer-events: none; cursor: grabbing; }
 .tray { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-height: 58px; }
+@media (min-width: 1000px) {
+  .circlewrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+  .circleside { position: sticky; top: 16px; }
+}
 .tray .pchip { position: relative; transform: none; left: auto; top: auto; }
 
 /* ---------- סקירה (מנהלת) ---------- */
@@ -263,6 +270,11 @@ table.mx { border-collapse: separate; border-spacing: 0 6px; width: 100%; min-wi
 .privnote summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; font-size: 15px; }
 .privnote summary::-webkit-details-marker { display: none; }
 .stepcard { gap: 10px; }
+.stepcard.next { outline: 3px solid var(--lead); outline-offset: -3px; }
+.group-badge.dim { background: var(--soft); color: var(--lead); }
+@media (min-width: 1100px) { .grid.steps4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 640px) and (max-width: 1099px) { .grid.steps4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+details.frame:not([open]) { gap: 0; }
 .steps { margin: 0; padding-inline-start: 22px; display: grid; gap: 6px; }
 .rosterrow { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; }
 .rosterrow .input { padding: 9px 12px; }
