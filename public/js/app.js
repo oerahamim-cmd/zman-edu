@@ -392,7 +392,7 @@ function header() {
     h('a', { class: 'brand', href: '#/', 'aria-label': 'זמן לחינוך, לדף הבית', onclick: (e) => { e.preventDefault(); go('/'); } },
       h('img', { class: 'l-hotam', src: 'assets/logo/hotam-logo.png', alt: 'חותם' }), h('span', { class: 'sep', 'aria-hidden': 'true' }),
       h('img', { class: 'l-ort', src: 'assets/logo/ort-logo.png', alt: 'רשת אורט' }), h('span', { class: 'sep', 'aria-hidden': 'true' }),
-      h('img', { class: 'l-zman', src: 'assets/logo/zman-logo.png', alt: 'זמן לחינוך' })),
+      h('img', { class: 'l-zman', src: 'assets/logo/zman-logo.svg', alt: 'זמן לחינוך' })),
     h('nav', { class: 'nav', 'aria-label': 'ניווט ראשי' }, links.map((l) => h('a', { href: '#' + l.to, 'aria-current': active(l.to) ? 'page' : null, onclick: (e) => { e.preventDefault(); go(l.to); } }, l.t))));
 }
 const ROLE_LABEL = { educator: 'מחנכת', lead: 'מובילה זמן לחינוך', manager: 'מנהלת התכנית' };
@@ -425,6 +425,7 @@ function resolve(p) {
   if (p === '/tools/identity/listen') return viewListen();
   if (p === '/tools/identity/cards') return viewStrengthCards();
   if (p === '/tools/goals/journal') return viewJournal();
+  if (p === '/tools/agency/partnership') return viewPartnership();
   if ((m = /^\/tools\/(identity|goals|agency)$/.exec(p))) return viewFolder(m[1]);
   const gate = (path, view) => (me() ? view() : isAdmin() || leadUser() ? viewEducatorsOnly() : viewEnter('new', path));
   const gateMap = (path, view) => gate(path, () => { ensureMap(); pingMapping(); return view(); });
@@ -506,7 +507,7 @@ function viewHome() {
    ===================================================================== */
 function viewTools() {
   // שמות הכלים בכל תיקייה מופיעים על הכרטיס, כדי שיהיה ברור מה יש בפנים לפני שנכנסים
-  const names = (id) => [...(id === 'identity' ? IDENTITY_TOOLS : id === 'goals' ? GOALS_TOOLS : []).map((x) => x.t), ...pub.tools.filter((t) => t.folder === id && !t.example).map((t) => t.title)];
+  const names = (id) => [...builtinTools(id).map((x) => x.t), ...pub.tools.filter((t) => t.folder === id && !t.example).map((t) => t.title)];
   const inside = (id) => { const n = names(id); return n.length ? h('ul', { class: 'foldertools' }, n.map((t) => h('li', null, t))) : h('span', { class: 'tag', style: 'align-self:flex-start' }, 'בקרוב'); };
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
     h('section', { class: 'frame' }, h('h2', null, 'ארגז כלים'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'כלים ופרקטיקות לשיחות אישיות. פתוח לכולם, בלי כניסה. התכנים יתווספו כאן לאורך השנה.')),
@@ -518,14 +519,16 @@ function viewTools() {
       inside(f.id)))));
 }
 
+const builtinTools = (id) => (id === 'identity' ? IDENTITY_TOOLS : id === 'goals' ? GOALS_TOOLS : id === 'agency' ? AGENCY_TOOLS : []);
 function viewFolder(id) {
   const f = FOLDERS.find((x) => x.id === id);
   const back = link('/tools', 'ארגז כלים', 'btn ghost');
   const items = pub.tools.filter((t) => t.folder === id);
-  const builtin = id === 'identity' ? IDENTITY_TOOLS.map(identityTile) : id === 'goals' ? GOALS_TOOLS.map(identityTile) : [];
+  const builtin = builtinTools(id).map(identityTile);
   const list = builtin.length || items.length ? [...builtin, ...items.filter((t) => !builtin.length || !t.example).map(toolCard)] : [h('div', { class: 'frame' }, h('p', { class: 'muted' }, 'הכלים והפרקטיקות בציר הזה יתווספו כאן.'))];
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
     h('section', { class: 'frame' }, h('div', null, back), h('div', { class: 'row' }, ic(f.icon, { size: 44, tone: 'blue' }), h('h2', null, f.t)), h('p', { class: 'muted' }, f.d)),
+    id === 'agency' ? agencyIntro() : null,
     h('div', { class: 'grid' }, list),
     isAdmin() ? h('div', null, link('/admin/tools', 'הוספה ועריכה של כלים', 'btn soft')) : null);
 }
@@ -726,6 +729,120 @@ function viewJournal() {
   }
   paint();
   return host;
+}
+
+/* =====================================================================
+   אייג'נסי: "שותפות תלמידים". הסבר, סולם השותפות, תפקידים, מהלך לכיתה י' וחוברת להדפסה.
+   התוכן ב-js/agency-data.js, והוא זהה לחוברת ב-PDF. הבחירות על המסך (סולם, תפקידים) לא נשמרות ולא נשלחות.
+   ===================================================================== */
+const AG = () => window.ZMAN_AGENCY;
+const AGENCY_TOOLS = [
+  { to: '/tools/agency/partnership', icon: 'team', t: 'שותפות תלמידים', who: 'למחנכת ולכיתה', d: 'סולם של שש צורות שותפות, בניית מסגרת, בנק תפקידים לכיתה, ומהלך מוצע לכיתה י\' שמסתיים בשיחה אישית על התפקיד.' },
+];
+// ההסבר בראש תיקיית אייג'נסי: מה זה, ואיך זה מתחבר לשותפות
+function agencyIntro() {
+  const F = AG().folderIntro;
+  return h('section', { class: 'frame agintro' }, h('h3', null, F.title), h('p', { style: 'max-width:70ch' }, F.text),
+    h('div', { class: 'agparts' }, AG().what.parts.map((p) => h('div', { class: 'well stack', style: 'gap:4px' }, h('b', null, p.t), h('p', { class: 'small' }, p.d)))),
+    h('p', { class: 'agbridge' }, F.link));
+}
+let agTab = 'what', agStep = null, agCheck = {}, agRoles = new Set();
+function viewPartnership() {
+  const D = AG();
+  const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
+  const TABS = [['what', 'מה זה'], ['ladder', 'סולם השותפות'], ['roles', 'תפקידים'], ['class', 'בכיתה י\''], ['print', 'להדפסה']];
+  const list = (xs) => h('ul', { class: 'jlist' }, xs.map((x) => h('li', null, ic('chev', { size: 16, tone: 'blue' }), h('span', null, x))));
+  const head = (icon, title) => h('div', { class: 'row', style: 'gap:10px' }, ic(icon, { size: 32, tone: 'blue' }), h('h3', null, title));
+  const toTab = (t) => () => { agTab = t; paint(); window.scrollTo(0, 0); };
+  const what = () => [
+    h('section', { class: 'frame' }, head('empower', 'מה זה אייג\'נסי'), h('p', { style: 'max-width:70ch' }, D.folderIntro.text),
+      h('div', { class: 'agparts' }, D.what.parts.map((p) => h('div', { class: 'well stack', style: 'gap:4px' }, h('b', null, p.t), h('p', { class: 'small' }, p.d))))),
+    h('section', { class: 'frame' }, head('team', 'ומה הקשר לשותפות תלמידים'), h('p', { class: 'agbridge' }, D.what.definition), h('p', { style: 'max-width:70ch' }, D.what.how), h('p', { style: 'max-width:70ch' }, D.what.bridge)),
+    h('div', { class: 'grid' },
+      h('section', { class: 'frame' }, head('school', 'למה דווקא בכיתה י\''), h('p', null, D.what.grade)),
+      h('section', { class: 'frame' }, head('care', 'ומה זה נותן לשיחה האישית'), h('p', null, D.what.personal))),
+    h('section', { class: 'frame' }, head('insight', 'איך הכלי עוזר לכם'), h('div', { class: 'grid' }, D.forYou.map((x) => h('div', { class: 'well stack', style: 'gap:4px' }, h('h4', null, x.t), h('p', { class: 'small' }, x.d)))),
+      h('div', null, h('button', { class: 'btn', type: 'button', onclick: toTab('ladder') }, 'לסולם השותפות'))),
+  ];
+  // סולם: לוחצים על שלב לפרטים. מתחת, בדיקה קצרה "איפה זה אצלנו" לכמה נושאים, על המסך בלבד
+  const ladder = () => {
+    const steps = h('ol', { class: 'agladder' }, D.ladder.map((s) => {
+      const open = agStep === s.n;
+      return h('li', { 'data-open': String(open) }, h('button', { class: 'agstep', type: 'button', 'aria-expanded': String(open), onclick: () => { agStep = open ? null : s.n; paint(); } },
+        h('span', { class: 'lensnum', 'aria-hidden': 'true' }, String(s.n)), h('span', { class: 'stack', style: 'gap:2px' }, h('b', null, s.t, s.sub ? ' ' + s.sub : ''), open ? null : h('span', { class: 'small muted' }, s.d))),
+        open ? h('div', { class: 'lensbody' }, h('p', null, s.d), h('div', { class: 'stack', style: 'gap:4px' }, h('small', { class: 'qlab' }, 'למשל בכיתה'), h('p', { class: 'qquote' }, s.ex))) : null);
+    }));
+    const levels = Object.values(agCheck);
+    const low = D.checkTopics.filter((t) => agCheck[t] && agCheck[t] <= 2);
+    return [
+      h('section', { class: 'frame' }, head('steps', 'שש צורות של שותפות'), h('p', { class: 'muted', style: 'max-width:70ch' }, D.ladderIntro), steps, h('p', { class: 'micro muted' }, D.ladderSource)),
+      h('section', { class: 'frame' }, head('question', 'איפה זה נמצא אצלנו?'), h('p', { class: 'muted', style: 'max-width:70ch' }, 'בוחרים לכל נושא את השלב שבו הוא נמצא היום בכיתה. זה רק על המסך, לא נשמר. אפשר לעשות את זה גם עם התלמידים.'),
+        h('div', { class: 'stack' }, D.checkTopics.map((t) => h('div', { class: 'agcheck' }, h('b', null, t),
+          chipGroup({ options: D.ladder.map((s) => ({ v: s.n, t: s.t })), value: agCheck[t] || null, cls: 'sm', label: t, onChange: (v) => { agCheck[t] = v; paint(); } })))),
+        levels.length ? h('div', { class: 'well stack', style: 'gap:6px' }, h('b', null, 'מה עולה מכאן'),
+          h('p', null, low.length ? `${low.join(', ')}: ${low.length > 1 ? 'נמצאים' : 'נמצא'} בשלבים הראשונים. בחרו נושא אחד ונסו להעלות אותו שלב אחד החודש, למשל מיידוע להיוועצות.` : 'יפה. בחרו נושא אחד שבו השותפות כבר חזקה, ושאלו את התלמידים מה עוד הם רוצים להחליט בעצמם.')) : null),
+      h('section', { class: 'frame' }, head('idea', 'למה זה טוב'), h('div', { class: 'agwhy' }, D.why.map((w) => h('span', null, w)))),
+    ];
+  };
+  const toggleRole = (r) => { agRoles.has(r) ? agRoles.delete(r) : agRoles.add(r); paint(); };
+  const roles = () => [
+    h('section', { class: 'frame' }, head('checklist', 'בנק תפקידים לכיתה'), h('p', { class: 'muted', style: 'max-width:70ch' }, 'מסמנים את התפקידים שמתאימים לכיתה, ומדפיסים טבלה עם התפקידים שבחרתם. את השמות ואת היעדים ממלאים ביד, יחד עם התלמידים.'),
+      D.roleGroups.map((g) => h('div', { class: 'stack', style: 'gap:10px' }, h('h4', { class: 'jlab' }, g.t),
+        h('div', { class: 'chips' }, g.items.map((r) => h('button', { class: 'tag pick agrole', type: 'button', 'aria-pressed': String(agRoles.has(r)), onclick: () => toggleRole(r) }, r))))),
+      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: printRoles }, agRoles.size ? `הדפסת הטבלה (${agRoles.size} תפקידים)` : 'הדפסת טבלה ריקה'),
+        agRoles.size ? h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { agRoles.clear(); paint(); } }, 'ניקוי הבחירה') : null),
+      h('p', { class: 'small muted' }, 'הבחירה נשארת על המסך בלבד, ולא נשמרת ולא נשלחת.')),
+    h('section', { class: 'frame' }, head('gear', D.authority.title),
+      h('div', { class: 'grid' }, [D.authority.resp, D.authority.auth].map((x) => h('div', { class: 'well stack', style: 'gap:4px' }, h('h4', null, x.t), h('p', null, x.d)))),
+      h('p', { style: 'max-width:70ch' }, D.authority.note)),
+    h('section', { class: 'frame' }, head('secure', 'בונים את המסגרת'), h('p', { class: 'muted', style: 'max-width:70ch' }, D.frameIntro),
+      h('div', { class: 'grid agframe' }, D.frame.map((f) => h('div', { class: 'well stack', style: 'gap:4px' }, h('h4', null, f.t), h('p', { class: 'small' }, f.q))))),
+  ];
+  const cls = () => [
+    h('section', { class: 'frame' }, head('plan', 'מהלך מוצע לכיתה י\''), h('p', { class: 'muted', style: 'max-width:70ch' }, 'ארבעה צעדים לאורך מחצית. אפשר לקחת צעד אחד ולהתחיל ממנו.'),
+      h('div', { class: 'stack' }, D.steps.map((s) => h('div', { class: 'well stack', style: 'gap:8px' },
+        h('div', { class: 'row', style: 'gap:12px;flex-wrap:nowrap;align-items:flex-start' }, h('span', { class: 'lensnum' }, String(s.n)),
+          h('div', { class: 'stack', style: 'gap:2px' }, h('h4', null, s.t), h('p', { class: 'small muted' }, s.time))),
+        s.parts ? h('div', { class: 'agparts4' }, s.parts.map((p) => h('div', { class: 'stack', style: 'gap:2px' }, h('small', { class: 'qlab' }, `${p.t} · ${p.time}`), h('p', { class: 'small' }, p.d)))) : h('p', null, s.d))))),
+    h('section', { class: 'frame' }, head('question', 'שאלות לשיחה האישית על התפקיד'), h('p', { class: 'muted', style: 'max-width:70ch' }, 'מספיקות שאלה או שתיים. אחרי השיחה, במבט השבועי, מסמנים את הציר אייג\'נסי.'), list(D.questions),
+      h('div', { class: 'row' }, link('/tools/cards/type/agency', 'קלפי שיח: אייג\'נסי ושותפות', 'btn soft'), link('/me', 'למבט השבועי', 'btn soft'))),
+    h('section', { class: 'frame' }, head('insight', 'דגשים'), list(D.tips)),
+  ];
+  const print = () => [
+    h('section', { class: 'frame printbanner' },
+      h('img', { src: D.files.preview, alt: 'השער של החוברת שותפות תלמידים', loading: 'lazy' }),
+      h('div', { class: 'stack' },
+        h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'למחנכת'),
+        h('h3', null, 'החוברת המלאה: שותפות תלמידים'),
+        h('p', null, D.pdfText),
+        h('div', { class: 'row' }, h('a', { class: 'btn', href: D.files.pdf, download: 'shutfut-talmidim.pdf' }, 'הורדה להדפסה')))),
+  ];
+  function paint() {
+    const y = window.scrollY;
+    clear(host);
+    add(host, [
+      h('section', { class: 'frame' }, h('div', null, link('/tools/agency', 'אייג\'נסי', 'btn ghost sm')), h('h2', null, D.name), h('p', { class: 'muted', style: 'max-width:62ch' }, D.tagline)),
+      h('div', { class: 'idtabs', role: 'tablist', 'aria-label': 'חלקי הכלי' }, TABS.map(([id, t]) => h('button', { class: 'idtab', type: 'button', role: 'tab', 'aria-selected': String(agTab === id), onclick: () => { agTab = id; paint(); } }, t))),
+      ({ what, ladder, roles, class: cls, print })[agTab]()]);
+    window.scrollTo(0, y);
+  }
+  paint();
+  return host;
+}
+// הדפסת טבלת התפקידים: דף נפרד שמופיע רק בהדפסה, ונעלם אחריה
+function printRoles() {
+  const chosen = [...agRoles];
+  const rows = Math.max(12, chosen.length);
+  const sheet = h('div', { id: 'printsheet', dir: 'rtl' },
+    h('div', { class: 'ps-head' }, h('img', { src: 'assets/logo/hotam-logo.png', alt: 'חותם' }), h('img', { src: 'assets/logo/ort-logo.png', alt: 'רשת אורט' }), h('img', { src: 'assets/logo/zman-logo.svg', alt: 'זמן לחינוך' })),
+    h('h1', null, 'תפקידים כיתתיים'),
+    h('table', null, h('thead', null, h('tr', null, h('th', null, 'תפקיד'), h('th', null, 'שם התלמיד/ה'), h('th', null, 'עד מתי'), h('th', null, 'מה היעד'))),
+      h('tbody', null, Array.from({ length: rows }, (_, i) => h('tr', null, h('td', null, chosen[i] || ''), h('td'), h('td'), h('td'))))),
+    h('p', { class: 'ps-foot' }, 'זמן לחינוך · שותפות תלמידים'));
+  document.body.append(sheet);
+  const done = () => { sheet.remove(); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(() => window.print(), 50);
 }
 
 /* ---------- כלי 2: יש בי יותר ממה שרואים ---------- */

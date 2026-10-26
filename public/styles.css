@@ -66,7 +66,7 @@ a { color: var(--lead); }
 .top { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; }
 .brand { display: flex; align-items: center; gap: 16px; text-decoration: none; min-width: 0; }
 .brand img { display: block; width: auto; }
-.brand .l-hotam { height: 40px; } .brand .l-ort { height: 36px; } .brand .l-zman { height: 46px; }
+.brand .l-hotam { height: 40px; } .brand .l-ort { height: 36px; } .brand .l-zman { height: 56px; }
 .sep { width: 2px; height: 28px; background: var(--soft); border-radius: 2px; flex: none; }
 .nav { display: flex; flex-wrap: wrap; gap: 6px; }
 .nav a { padding: 9px 16px; border-radius: 999px; text-decoration: none; color: var(--ink); font-weight: 500; }
@@ -76,7 +76,7 @@ a { color: var(--lead); }
 .sessionbar b { font-weight: 700; }
 .sessionbar .btn { background: #fff; color: var(--violet); padding: 8px 14px; font-size: 14px; }
 @media (max-width: 640px) {
-  .brand { gap: 10px; } .brand .l-hotam { height: 30px; } .brand .l-ort { height: 28px; } .brand .l-zman { height: 36px; }
+  .brand { gap: 10px; } .brand .l-hotam { height: 30px; } .brand .l-ort { height: 28px; } .brand .l-zman { height: 42px; }
   .nav a { padding: 8px 12px; font-size: 15px; }
 }
 
@@ -558,3 +558,43 @@ body.cards-full { overflow: hidden; }
 .jlist li { display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
 .jlist li .ic { margin-top: 4px; flex: none; }
 .jlab { font-weight: 700; font-size: 14px; color: var(--lead); }
+
+/* ---------- אייג'נסי: שותפות תלמידים ---------- */
+.agparts { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.agparts b { color: var(--lead); font-size: 18px; }
+.agbridge { background: #e8efff; border-radius: 14px; padding: 14px 18px; border-inline-start: 4px solid var(--lead); font-weight: 500; max-width: 76ch; }
+.agladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.agladder li { background: var(--soft); border-radius: 18px; overflow: hidden; }
+.agladder li:nth-child(1) { margin-inline-end: 25%; } .agladder li:nth-child(2) { margin-inline-end: 20%; } .agladder li:nth-child(3) { margin-inline-end: 15%; }
+.agladder li:nth-child(4) { margin-inline-end: 10%; } .agladder li:nth-child(5) { margin-inline-end: 5%; }
+.agladder li[data-open="true"] { background: #e8efff; outline: 3px solid var(--lead); outline-offset: -3px; }
+.agstep { width: 100%; text-align: start; border: 0; background: transparent; font: inherit; color: inherit; padding: 14px 18px; display: flex; gap: 14px; align-items: center; cursor: pointer; }
+.agstep b { font-size: 19px; font-weight: 900; }
+.agstep::after { content: '＋'; margin-inline-start: auto; color: var(--lead); font-weight: 700; flex: none; }
+.agladder li[data-open="true"] .agstep::after { content: '－'; }
+.agladder .lensbody .qquote { background: #fff; }
+.agcheck { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--soft); }
+.agwhy { display: flex; flex-wrap: wrap; gap: 10px; }
+.agwhy span { background: var(--soft); border-radius: 999px; padding: 10px 18px; font-weight: 500; display: inline-flex; align-items: center; gap: 10px; }
+.agwhy span::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--turq); flex: none; }
+.agrole[aria-pressed="true"] { background: var(--lead); color: #fff; }
+.agparts4 { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.agparts4 > div { background: #fff; border-radius: 12px; padding: 10px 12px; }
+@media (max-width: 640px) { .agladder li { margin-inline-end: 0 !important; } }
+
+/* טבלת תפקידים להדפסה: מופיעה רק בזמן הדפסה */
+#printsheet { display: none; }
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body > *:not(#printsheet) { display: none !important; }
+  body { background: #fff !important; }
+  #printsheet { display: block; font-family: Rubik, Arial, sans-serif; color: #10131f; }
+  #printsheet .ps-head { display: flex; gap: 18px; align-items: center; justify-content: flex-start; }
+  #printsheet .ps-head img { height: 14mm; width: auto; }
+  #printsheet h1 { color: #0046ff; font-size: 30px; font-weight: 900; margin: 8mm 0 6mm; }
+  #printsheet table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  #printsheet th { background: #e8efff; color: #0046ff; text-align: start; padding: 8px; border: 1px solid #0046ff; }
+  #printsheet td { border: 1px solid #0046ff; height: 15mm; padding: 6px 8px; vertical-align: middle; }
+  #printsheet td:first-child { width: 38%; font-weight: 500; }
+  #printsheet .ps-foot { margin-top: 6mm; font-size: 11px; color: #555; }
+}
