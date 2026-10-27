@@ -2359,10 +2359,10 @@ function eduHome() {
   const weeks = weeksBetween(joinWeek(), CUR_WEEK).slice(-8);
   const counts = weeks.map((w) => (myReport(w) ? myReport(w).convs.length : 0));
   const max = Math.max(4, ...counts);
-  const bars = h('div', { class: 'bars', role: 'img', 'aria-label': `מספר השיחות ב-${weeks.length} השבועות האחרונים: ${counts.join(', ')}` }, weeks.map((w, i) => {
+  const bars = h('div', { class: 'wbars', role: 'img', 'aria-label': `מספר השיחות ב-${weeks.length} השבועות האחרונים: ${counts.join(', ')}` }, weeks.map((w, i) => {
     const now = w === CUR_WEEK, v = counts[i];
-    if (now) return h('div', { class: 'bar now' + (cur ? ' filled' : '') }, h('i', { style: cur ? `height:${Math.max(22, (v / max) * 82)}px` : '' }, cur ? String(v) : '?'), h('b', null, 'השבוע'));
-    return h('div', { class: 'bar' }, h('i', { style: `height:${Math.max(4, (v / max) * 82)}px;animation-delay:${i * 60}ms` }), h('b', null, String(weekNo(w))));
+    if (now) return h('div', { class: 'wbar now' + (cur ? ' filled' : '') }, h('i', { style: cur ? `height:${Math.max(22, (v / max) * 82)}px` : '' }, cur ? String(v) : '?'), h('b', null, 'השבוע'));
+    return h('div', { class: 'wbar' }, h('i', { style: `height:${Math.max(4, (v / max) * 82)}px;animation-delay:${i * 60}ms` }), h('b', null, String(weekNo(w))));
   }));
   const streak = streakWeeks();
   const hero = h('section', { class: 'ehero rise' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
@@ -2486,7 +2486,7 @@ function eduWeek(week) {
   let t = null;
   const persist = () => lsSet(dkey, JSON.stringify(draft));
   const touch = () => { clearTimeout(t); t = setTimeout(persist, 400); };
-  const root = h('div', { class: 'flow' });
+  const root = h('div', { class: 'wflow' });
   const cur = () => draft.convs[F.ci];
   const nameWarn = (texts) => { const names = findNames(texts.join(' ')); return names.length ? `נראה שמופיע שם (${names.join(', ')}). המבט לא צריך שמות תלמידים: אפשר לכתוב "התלמיד/ה".` : ''; };
   const canNext = () => {
@@ -2520,14 +2520,14 @@ function eduWeek(week) {
   }
   function head() {
     return h('div', { class: 'wtop' },
-      F.step !== 'count' && F.step !== 'done' ? h('button', { class: 'xbtn', type: 'button', 'aria-label': 'חזרה לשאלה הקודמת', onclick: back }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>')) : null,
+      F.step !== 'count' && F.step !== 'done' ? h('button', { class: 'fbtn', type: 'button', 'aria-label': 'חזרה לשאלה הקודמת', onclick: back }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>')) : null,
       progress(),
-      F.step !== 'done' ? h('button', { class: 'xbtn', type: 'button', 'aria-label': 'סגירה. הטיוטה נשמרת במכשיר', onclick: close }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>')) : null);
+      F.step !== 'done' ? h('button', { class: 'fbtn', type: 'button', 'aria-label': 'סגירה. הטיוטה נשמרת במכשיר', onclick: close }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>')) : null);
   }
-  const q = (kicker, title, sub, ...body) => h('div', { class: 'qwrap' }, kicker ? h('span', { class: 'qk' }, kicker) : null, h('h2', { class: 'q' }, title), sub ? h('p', { class: 'qs' }, sub) : null, ...body);
+  const q = (kicker, title, sub, ...body) => h('div', { class: 'qwrap' }, kicker ? h('span', { class: 'qk' }, kicker) : null, h('h2', { class: 'qt' }, title), sub ? h('p', { class: 'qs' }, sub) : null, ...body);
   const nextButton = (label, onclick, cls = 'cta') => { nextBtn = h('button', { class: cls, type: 'button', onclick }, label); upd(); return nextBtn; };
   const convKick = () => `שיחה ${F.ci + 1} מתוך ${draft.convs.length}${week < CUR_WEEK ? ` · שבוע ${weekNo(week)}` : ''}`;
-  const tile = (on, art, label, onclick) => h('button', { class: 'tile' + (on ? ' on' : ''), type: 'button', 'aria-pressed': String(on), onclick }, art, h('span', null, label));
+  const tile = (on, art, label, onclick) => h('button', { class: 'qtile' + (on ? ' on' : ''), type: 'button', 'aria-pressed': String(on), onclick }, art, h('span', null, label));
   const otherInput = (val, ph, onInput) => {
     const warn = h('p', { class: 'warn-note', hidden: true });
     const inp = h('input', { class: 'input othin', value: val, placeholder: ph, maxlength: '120', 'aria-label': ph, oninput: (ev) => { onInput(ev.target.value); const w = nameWarn([ev.target.value]); warn.hidden = !w; warn.textContent = w; upd(); } });
@@ -2560,14 +2560,14 @@ function eduWeek(week) {
     }
     if (s === 'zero') {
       return q('שבוע בלי שיחות', 'מה היה השבוע?', 'זה קורה. זה עוזר לנו להבין את הקצב של השנה. לא חובה לבחור.',
-        h('div', { class: 'chips' }, NONE_REASONS.map((r) => h('button', { class: 'pick' + (draft.noneReason === r.v ? ' on' : ''), type: 'button', 'aria-pressed': String(draft.noneReason === r.v), onclick: () => { draft.noneReason = draft.noneReason === r.v ? '' : r.v; touch(); paint(); } }, r.t))),
+        h('div', { class: 'chips' }, NONE_REASONS.map((r) => h('button', { class: 'zpick' + (draft.noneReason === r.v ? ' on' : ''), type: 'button', 'aria-pressed': String(draft.noneReason === r.v), onclick: () => { draft.noneReason = draft.noneReason === r.v ? '' : r.v; touch(); paint(); } }, r.t))),
         nextButton(F.sending ? 'שולחים…' : 'שליחת המבט', submit), F.err ? h('p', { class: 'err', role: 'alert' }, F.err) : null);
     }
     const c = cur();
     if (s === 'axis') {
       const [inp, warn] = otherInput(c.axisOther, 'על מה עוד דיברתם? כמה מילים', (v) => { c.axisOther = v; touch(); });
       return q(convKick(), 'על מה דיברתם?', 'אפשר לבחור יותר מאחד',
-        h('div', { class: 'tiles' }, AXES.map((a) => tile(c.axes.includes(a.v), h('span', { class: 'tic', style: `background:${AXIS_LOOK[a.v].c}` }, ic(AXIS_LOOK[a.v].i, { size: 30, tone: 'white' })), a.v === 'other' ? 'משהו אחר' : a.t, () => {
+        h('div', { class: 'qtiles' }, AXES.map((a) => tile(c.axes.includes(a.v), h('span', { class: 'tic', style: `background:${AXIS_LOOK[a.v].c}` }, ic(AXIS_LOOK[a.v].i, { size: 30, tone: 'white' })), a.v === 'other' ? 'משהו אחר' : a.t, () => {
           c.axes = c.axes.includes(a.v) ? c.axes.filter((x) => x !== a.v) : [...c.axes, a.v]; touch(); paint(); if (a.v === 'other' && c.axes.includes('other')) root.querySelector('.othin')?.focus();
         }))),
         c.axes.includes('other') ? [inp, warn] : null, nextButton('המשך', () => go2('kind')));
@@ -2575,7 +2575,7 @@ function eduWeek(week) {
     if (s === 'kind') {
       const [inp, warn] = otherInput(c.kindOther, 'איזו שיחה? כמה מילים', (v) => { c.kindOther = v; touch(); });
       return q(convKick(), 'איזו שיחה זו הייתה?', 'אפשר לבחור יותר מאחת',
-        h('div', { class: 'tiles' }, KINDS.map((k) => {
+        h('div', { class: 'qtiles' }, KINDS.map((k) => {
           const b = tile(c.kinds.includes(k.v), svgSpan(KIND_ART[k.v], 'ill'), k.t, () => {
             const on = !c.kinds.includes(k.v); c.kinds = on ? [...c.kinds, k.v] : c.kinds.filter((x) => x !== k.v); touch(); if (on) burstFrom(b, 18); paint();
             if (k.v === 'other' && on) root.querySelector('.othin')?.focus();
@@ -2607,7 +2607,7 @@ function eduWeek(week) {
     }
     if (s === 'saved') {
       const left = draft.convs.length - F.ci;
-      return h('div', { class: 'qwrap saved' }, h('div', { class: 'badge' }, ic('check', { size: 54, tone: 'white' })), h('h2', { class: 'q' }, `שיחה ${F.ci} נשמרה`), h('p', { class: 'qs' }, left === 1 ? 'נשארה עוד שיחה אחת' : `נשארו עוד ${left}`),
+      return h('div', { class: 'qwrap saved' }, h('div', { class: 'badge' }, ic('check', { size: 54, tone: 'white' })), h('h2', { class: 'qt' }, `שיחה ${F.ci} נשמרה`), h('p', { class: 'qs' }, left === 1 ? 'נשארה עוד שיחה אחת' : `נשארו עוד ${left}`),
         h('button', { class: 'cta violet', type: 'button', onclick: () => { const src = draft.convs[F.ci - 1]; for (let k = F.ci; k < draft.convs.length; k++) draft.convs[k] = { ...JSON.parse(JSON.stringify(src)), note: '' }; touch(); submit(); } }, 'השיחות הבאות דומות לקודמת · שמירה ושליחה'),
         h('button', { class: 'cta', type: 'button', onclick: () => go2('axis') }, `לשאלות על שיחה ${F.ci + 1}`),
         F.err ? h('p', { class: 'err', role: 'alert' }, F.err) : null);
@@ -2620,7 +2620,7 @@ function eduWeek(week) {
     const sug = talk !== null && talk < 50 ? HOME_TOOLS[1] : HOME_TOOLS[3];
     const sugText = talk !== null && talk < 50 ? 'השבוע דיברת לא מעט. הכלי הזה עוזר להקשיב יותר.' : sug.d;
     return h('div', { class: 'qwrap saved' }, h('div', { class: 'badge v' }, ic('check', { size: 54, tone: 'white' })),
-      h('h2', { class: 'q' }, 'המבט נשלח'), streak > 1 ? h('p', { class: 'qs' }, `${streak} שבועות ברצף`) : null,
+      h('h2', { class: 'qt' }, 'המבט נשלח'), streak > 1 ? h('p', { class: 'qs' }, `${streak} שבועות ברצף`) : null,
       list.length ? h('div', { class: 'sumrow' }, h('div', null, h('b', { class: 'num' }, String(list.length)), h('span', null, 'שיחות')), h('div', null, h('b', { class: 'num' }, String(deep)), h('span', null, 'בעומק אישי')),
         h('div', null, h('b', { class: 'num' }, talk === null ? '–' : `${talk}%`), h('span', null, 'התלמידים דיברו'))) : null,
       togetherBox(h('div', { style: 'width:100%' })),
