@@ -108,7 +108,7 @@ const SCHEMA = [
     submitted_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE (educator_id, week))`,
   `CREATE TABLE IF NOT EXISTS conversations (
     id ${ID}, report_id INTEGER NOT NULL REFERENCES reports(id) ON DELETE CASCADE, seq INTEGER NOT NULL,
-    round INTEGER NOT NULL CHECK (round BETWEEN 1 AND 3), axis TEXT NOT NULL, axis_other TEXT,
+    round INTEGER CHECK (round BETWEEN 1 AND 3), axis TEXT NOT NULL, axis_other TEXT,
     kind TEXT NOT NULL, kind_other TEXT, feeling TEXT NOT NULL, note TEXT, depth INTEGER, talk INTEGER, talk_pct INTEGER)`,
   `CREATE INDEX IF NOT EXISTS idx_conv_report ON conversations(report_id)`,
   `CREATE TABLE IF NOT EXISTS tools (
@@ -144,6 +144,8 @@ async function init() {
     // חלוקת הדיבור: כמה אחוזים מהשיחה התלמיד/ה דיברו (0 עד 100). העמודה talk הישנה (סולם 1 עד 5) נשארת, ושורות ישנות מומרות לאמצע הטווח של כל שלב
     await run('ALTER TABLE conversations ADD COLUMN IF NOT EXISTS talk_pct INTEGER');
     await run('UPDATE conversations SET talk_pct = (talk - 1) * 20 + 10 WHERE talk IS NOT NULL AND talk_pct IS NULL');
+    // שאלת הסבב יצאה מהמבט השבועי (הסבב יוצג במיפוי הכיתה): שיחות חדשות נשמרות בלי סבב, והישנות שומרות את הסבב שלהן
+    await run('ALTER TABLE conversations ALTER COLUMN round DROP NOT NULL');
     // "שיחת עומק" יצאה מרשימת הסוגים: שיחות ישנות נשמרות כ"אחר" עם הטקסט המקורי
     await run("UPDATE conversations SET kind = 'other', kind_other = 'שיחת עומק' WHERE kind = 'deep'");
     // שימוש בכלים: רק מי פתחה ומתי. בלי שום תוכן, ובלי שום מידע על תלמידים.

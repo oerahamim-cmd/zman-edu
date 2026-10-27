@@ -84,7 +84,7 @@ function h(tag, props, ...kids) {
   return el;
 }
 function add(el, kids) {
-  for (const c of kids.flat(Infinity)) {
+  for (const c of [kids].flat(Infinity)) {
     if (c === null || c === undefined || c === false) continue;
     el.append(c instanceof Node ? c : document.createTextNode(String(c)));
   }
@@ -116,37 +116,6 @@ function chipGroup({ options, value, onChange, cls = '', multi = false, label })
   });
   return box;
 }
-// עומק השיחה כפס שגוררים, באותו סגנון של חלוקת הדיבור: חמישה שלבים. זה אופי ולא ציון: שיחת מידע יכולה להיות חשובה מאוד, ולכן מסומן שלב אחד ולא פס שמתמלא.
-function depthSlider({ value, onChange }) {
-  let lvl = value || null, dragging = false;
-  const cells = DEPTH_LEVELS.map((l) => h('div', { class: 'divecell', style: `--lvl:${l.n}` }));
-  const names = DEPTH_LEVELS.map((l) => h('span', null, l.t));
-  const bar = h('div', { class: 'divebar', role: 'slider', tabindex: '0', 'aria-label': DEPTH_SCALE.q, 'aria-valuemin': '1', 'aria-valuemax': '5' }, cells);
-  const readout = h('p', { class: 'scaleread', 'aria-live': 'polite' });
-  const paint = () => {
-    bar.classList.toggle('unset', lvl === null);
-    cells.forEach((c, i) => c.classList.toggle('on', lvl === i + 1));
-    names.forEach((n, i) => n.classList.toggle('cur', lvl === i + 1));
-    if (lvl !== null) {
-      const l = DEPTH_LEVELS[lvl - 1], text = `${l.t}: ${l.d}`;
-      bar.setAttribute('aria-valuenow', String(lvl)); bar.setAttribute('aria-valuetext', text); readout.textContent = text;
-    } else { bar.removeAttribute('aria-valuenow'); readout.textContent = 'הקישו על שלב, או גררו, כדי לסמן.'; }
-  };
-  const setLvl = (v) => { v = Math.max(1, Math.min(5, v)); if (v === lvl) return; lvl = v; paint(); onChange(v); };
-  const fromEvent = (ev) => { const r = bar.getBoundingClientRect(); return Math.ceil(((r.right - ev.clientX) / r.width) * 5); };
-  bar.addEventListener('pointerdown', (ev) => { dragging = true; try { bar.setPointerCapture(ev.pointerId); } catch { /* ignore */ } setLvl(fromEvent(ev)); bar.focus(); });
-  bar.addEventListener('pointermove', (ev) => { if (dragging) setLvl(fromEvent(ev)); });
-  const stop = () => { dragging = false; };
-  bar.addEventListener('pointerup', stop); bar.addEventListener('pointercancel', stop);
-  bar.addEventListener('keydown', (ev) => {
-    const d = { ArrowLeft: 1, ArrowUp: 1, ArrowRight: -1, ArrowDown: -1 }[ev.key];
-    if (d === undefined) return;
-    ev.preventDefault();
-    setLvl((lvl || 0) + d);
-  });
-  paint();
-  return h('div', { class: 'talk' }, h('p', { class: 'hint' }, 'אין כאן טוב או פחות טוב: שיחת מידע יכולה להיות חשובה מאוד.'), bar, h('div', { class: 'divenames', 'aria-hidden': 'true' }, names), readout);
-}
 // חלוקת הדיבור כפס שגוררים: הצד הימני הוא המחנכת והשמאלי התלמיד/ה. נשמר אחוז הדיבור של התלמיד/ה (0 עד 100).
 function talkSlider({ value, onChange }) {
   let me = value === null || value === undefined ? null : 100 - value; // אחוז הדיבור של המחנכת
@@ -164,7 +133,7 @@ function talkSlider({ value, onChange }) {
     if (set) {
       const text = `אני ${m}% · התלמיד/ה ${100 - m}% (${TALK_SCALE.labels[talkBucket(100 - m) - 1]})`;
       bar.setAttribute('aria-valuenow', String(m)); bar.setAttribute('aria-valuetext', text); readout.textContent = text;
-    } else { bar.removeAttribute('aria-valuenow'); readout.textContent = 'גררו את הקו, או הקישו על הפס, כדי לסמן.'; }
+    } else { bar.removeAttribute('aria-valuenow'); readout.textContent = 'אפשר לגרור את הקו, או להקיש על הפס.'; }
   };
   const setMe = (v) => { v = Math.max(0, Math.min(100, v)); if (v === me) return; me = v; paint(); onChange(100 - v); };
   // הפס הפוך (ימין הוא 0): הצד הימני גדל ככל שמזיזים את הקו שמאלה
@@ -182,16 +151,6 @@ function talkSlider({ value, onChange }) {
   });
   paint();
   return h('div', { class: 'talk' }, bar, readout);
-}
-function moodGroup({ value, onChange }) {
-  const name = nid('m');
-  const box = h('div', { class: 'moods', role: 'radiogroup', 'aria-label': 'איך יצאתם מהשיחה' });
-  FEELINGS.forEach((f) => {
-    const inp = h('input', { type: 'radio', name, value: f.v, checked: value === f.v });
-    inp.addEventListener('change', () => onChange(f.v));
-    box.append(h('label', { class: 'mood' }, inp, h('span', null, h('span', { class: 'em', 'aria-hidden': 'true' }, f.e), f.t)));
-  });
-  return box;
 }
 // שדה סיסמה או קוד: כפתור "הצגה" מחליף בין נקודות לטקסט גלוי
 function withReveal(input) {
@@ -236,10 +195,10 @@ async function api(method, path, body) {
   try {
     res = await fetch(path, { method, headers: body !== undefined ? { 'Content-Type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
   } catch {
-    throw Object.assign(new Error('אין חיבור לשרת. בדקו את החיבור ונסו שוב.'), { status: 0 });
+    throw Object.assign(new Error('אין חיבור לשרת. כדאי לבדוק את החיבור ולנסות שוב.'), { status: 0 });
   }
   const json = await res.json().catch(() => null);
-  if (!res.ok) throw Object.assign(new Error((json && json.error) || 'משהו השתבש. נסו שוב.'), { status: res.status, code: json && json.code });
+  if (!res.ok) throw Object.assign(new Error((json && json.error) || 'משהו השתבש. אפשר לנסות שוב.'), { status: res.status, code: json && json.code });
   return json;
 }
 function applyPublic(p) {
@@ -384,7 +343,7 @@ function header() {
   const p = route();
   // מובילה ומנהלת התכנית לא נכנסות לשיחות האישיות ולמיפוי (הם של כל מחנכת), ולכן הקישורים האלה לא מוצגים להן
   const staff = leadUser() || isAdmin();
-  const links = [{ to: '/', t: 'בית' }, ...(staff ? [] : [{ to: '/me', t: 'שיחות אישיות' }, { to: '/mapping', t: 'מיפוי הכיתה' }]), { to: '/tools', t: 'ארגז כלים' }];
+  const links = me() ? [] : [{ to: '/', t: 'בית' }, ...(staff ? [] : [{ to: '/me', t: 'שיחות אישיות' }, { to: '/mapping', t: 'מיפוי הכיתה' }]), { to: '/tools', t: 'ארגז כלים' }];
   if (leadUser()) links.push({ to: '/lead', t: 'מובילות' });
   if (isAdmin()) links.push({ to: '/admin', t: 'מנהלת התכנית' });
   const active = (to) => (to === '/' ? p === '/' : p === to || p.startsWith(to + '/'));
@@ -393,7 +352,7 @@ function header() {
       h('img', { class: 'l-hotam', src: 'assets/logo/hotam-logo.png', alt: 'חותם' }), h('span', { class: 'sep', 'aria-hidden': 'true' }),
       h('img', { class: 'l-ort', src: 'assets/logo/ort-logo.png', alt: 'רשת אורט' }), h('span', { class: 'sep', 'aria-hidden': 'true' }),
       h('img', { class: 'l-zman', src: 'assets/logo/zman-logo.svg', alt: 'זמן לחינוך' })),
-    h('nav', { class: 'nav', 'aria-label': 'ניווט ראשי' }, links.map((l) => h('a', { href: '#' + l.to, 'aria-current': active(l.to) ? 'page' : null, onclick: (e) => { e.preventDefault(); go(l.to); } }, l.t))));
+    links.length === 0 ? null : h('nav', { class: 'nav', 'aria-label': 'ניווט ראשי' }, links.map((l) => h('a', { href: '#' + l.to, 'aria-current': active(l.to) ? 'page' : null, onclick: (e) => { e.preventDefault(); go(l.to); } }, l.t))));
 }
 const ROLE_LABEL = { educator: 'מחנכת', lead: 'מובילה זמן לחינוך', manager: 'מנהלת התכנית' };
 function sessionBar() {
@@ -413,13 +372,16 @@ function render() {
   state.area = p.startsWith('/admin') || p.startsWith('/lead') ? 'admin' : 'public';
   const view = resolve(p);
   clear(app);
-  app.className = 'wrap' + (state.area === 'admin' ? ' admin' : '');
-  add(app, [header(), sessionBar(), view, h('p', { class: 'footer-note' }, 'זמן לחינוך · חותם ורשת אורט')]);
+  // מחנכת מחוברת: סרגל ניווט תחתון במקום התפריט העליון. במבט השבועי המסך כולו לשאלות, בלי סרגלים
+  const edu = !!me() && state.area !== 'admin', inflow = edu && p.startsWith('/me/report/');
+  app.className = 'wrap' + (state.area === 'admin' ? ' admin' : '') + (edu ? ' edu' : '') + (inflow ? ' inflow' : '');
+  document.body.classList.toggle('has-bn', edu && !inflow);
+  add(app, inflow ? [view] : [header(), edu ? null : sessionBar(), view, h('p', { class: 'footer-note' }, 'זמן לחינוך · חותם ורשת אורט'), edu ? eduNav() : null]);
   window.scrollTo(0, same ? y0 : 0);
 }
 function resolve(p) {
   let m;
-  if (p === '/') return viewHome();
+  if (p === '/') return me() ? eduHome() : viewHome();
   if (p === '/tools') return viewTools();
   if (p === '/tools/cards' || p.startsWith('/tools/cards/')) return viewCards(p);
   if (p === '/tools/identity/listen') return viewListen();
@@ -439,7 +401,7 @@ function resolve(p) {
   if (p === '/enter') return viewEnter('new', '/me');
   if (p === '/enter/manager') return viewEnter('manager', '/admin');
   if (p === '/me') return gate(p, viewMe);
-  if ((m = /^\/me\/report\/(\d{4}-\d{2}-\d{2})$/.exec(p))) { const wk = m[1]; return gate(p, () => viewReport(wk)); }
+  if ((m = /^\/me\/report\/(\d{4}-\d{2}-\d{2})$/.exec(p))) { const wk = m[1]; return gate(p, () => eduWeek(wk)); }
   if (p.startsWith('/lead')) return gateLead(p, () => viewLead(p));
   if (p.startsWith('/admin')) return isAdmin() ? viewAdmin(p) : redirect('/enter/manager');
   return h('section', { class: 'frame' }, h('h2', null, 'העמוד לא נמצא'), h('a', { class: 'btn', href: '#/', onclick: (e) => { e.preventDefault(); go('/'); } }, 'לדף הבית'));
@@ -489,7 +451,7 @@ function viewHome() {
       h('ul', { class: 'plain' },
         h('li', null, 'לא נשמרים שמות תלמידים ולא תיעוד על ילד או ילדה.'),
         h('li', null, 'בכל שבוע נשמר מספר השיחות, ולכל שיחה כמה בחירות קצרות והערה חופשית.'),
-        h('li', null, 'מיפוי הכיתה נשאר במכשיר שלכם. מנהלת התכנית יודעת רק אם פתחתם אותו.'),
+        h('li', null, 'מיפוי הכיתה נשאר במכשיר שלך. מנהלת התכנית יודעת רק אם נפתח.'),
         h('li', null, who))),
     session ? null : h('details', null, h('summary', null, ic('question', { size: 20 }), 'פעם ראשונה? איך נכנסים'),
       h('ol', { class: 'plain' },
@@ -1880,9 +1842,9 @@ function viewEnter(mode, next = '/me') {
       } },
       tab === 'lead' ? h('p', { class: 'muted' }, 'זו הכניסה הראשונה שלך כמובילה. מזינים את קוד ההצטרפות של המובילות, שמקבלים ממנהלת התכנית, ובוחרים קוד אישי בן ארבע ספרות.') : null,
       schoolPick(),
-      field('שם מלא', name, 'כך תיכנסו בפעמים הבאות, ולכן כדאי לכתוב אותו כמו שאתם כותבים אותו תמיד.'),
+      field('שם מלא', name, 'כך הכניסה בפעמים הבאות, ולכן כדאי לכתוב אותו כמו שהוא נכתב תמיד.'),
       field(role === 'lead' ? 'קוד הצטרפות של המובילות' : 'קוד הצטרפות של בית הספר', join, role === 'lead' ? 'את הקוד מקבלת המובילה ממנהלת התכנית.' : 'את הקוד מקבלים ממנהלת התכנית (למשל במפגש הליווי). הוא מוודא שרק מחנכות של התכנית נרשמות.'),
-      h('div', { class: 'grid' }, field('בחירת קוד אישי', pin, 'ארבע ספרות שקל לכם לזכור.'), field('אימות הקוד', pin2)),
+      h('div', { class: 'grid' }, field('בחירת קוד אישי', pin, 'ארבע ספרות שקל לך לזכור.'), field('אימות הקוד', pin2)),
       tab === 'lead' ? h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { leadFirst = false; paint(); } }, 'כבר יש לי קוד')) : null,
       keepRow, err, h('div', null, btn));
     } else if (tab === 'back' || tab === 'lead') {
@@ -1895,7 +1857,7 @@ function viewEnter(mode, next = '/me') {
         if (name.value.trim().length < 2) { e.preventDefault(); err.textContent = 'יש לכתוב שם.'; return; }
         submitter(err, btn, async () => done(await api('POST', `/api/auth/${role}/login`, { school, name: name.value, code: pin.value, remember: keep.checked }), role === 'lead' ? (next.startsWith('/lead') ? next : '/lead') : next, false))(e);
       } },
-      schoolPick(), field('שם', name, 'כמו שנרשמתם בפעם הראשונה.'), field('קוד אישי', pin, 'שכחתם את הקוד? מנהלת התכנית יכולה לאפס אותו.'),
+      schoolPick(), field('שם', name, 'כמו בהרשמה הראשונה.'), field('קוד אישי', pin, 'הקוד נשכח? מנהלת התכנית יכולה לאפס אותו.'),
       tab === 'lead' ? h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { leadFirst = true; paint(); } }, 'זו הכניסה הראשונה שלי כמובילה')) : null,
       keepRow, err, h('div', null, btn));
     } else if (pub.setupNeeded) {
@@ -1936,7 +1898,7 @@ function viewEnter(mode, next = '/me') {
     const ctxText = leadCtx ? 'נכנסים בשם ובקוד אישי. בפעם הראשונה נרשמים עם קוד ההצטרפות של המובילות.'
       : tab === 'manager' ? 'כניסה בדואל ובסיסמה.'
         : tab === 'back' ? 'נכנסים עם בית ספר, שם והקוד האישי.'
-          : 'בוחרים בית ספר, מזינים את קוד ההצטרפות שקיבלתם מהתכנית ובוחרים קוד אישי בן ארבע ספרות.';
+          : 'בוחרים בית ספר, מזינים את קוד ההצטרפות מהתכנית ובוחרים קוד אישי בן ארבע ספרות.';
     add(root, [h('section', { class: 'frame' }, h('h2', null, ctxTitle), h('p', { class: 'muted', style: 'max-width:56ch' }, ctxText), tabs), h('section', { class: 'frame' }, form)]);
   }
   paint();
@@ -1975,7 +1937,7 @@ function viewMe() {
     const convs = myReports.reduce((n, r) => n + r.convs.length, 0);
     const cur = myReport(CUR_WEEK);
     const root = [];
-    if (justRegistered) { justRegistered = false; root.push(h('div', { class: 'frame' }, h('div', { class: 'row' }, ic('check', { size: 30 }), h('h4', null, 'הקוד נשמר')), h('p', null, 'בפעם הבאה נכנסים עם בית ספר, שם והקוד שבחרתם.'))); }
+    if (justRegistered) { justRegistered = false; root.push(h('div', { class: 'frame' }, h('div', { class: 'row' }, ic('check', { size: 30 }), h('h4', null, 'הקוד נשמר')), h('p', null, 'בפעם הבאה נכנסים עם בית ספר, שם והקוד שנבחר.'))); }
     root.push(h('section', { class: 'frame lead' }, h('p', { class: 'small muted' }, e.schoolName),
       h('div', { class: 'week-hero' }, h('div', { class: 'stack' }, h('h1', null, `שלום ${firstName(e.name)}`), h('p', { style: 'font-size:19px' }, `שבוע ${weekNo(CUR_WEEK)} · ${weekLabel(CUR_WEEK)}`),
         h('p', null, cur ? (cur.convs.length ? `המבט לשבוע הזה נשמר: ${nConv(cur.convs.length)}. אפשר לערוך עד סוף השבוע.` : 'המבט לשבוע הזה נשמר: שבוע בלי שיחות. אפשר לערוך עד סוף השבוע.') : 'המבט לשבוע הזה עדיין לא נשלח. זה לוקח כדקה.')),
@@ -1995,113 +1957,6 @@ function viewMe() {
 }
 
 function newConv() { return { round: null, axes: [], axisOther: '', kinds: [], kindOther: '', depth: null, talkPct: null, feeling: null, note: '' }; }
-// שיחה ממבט ישן (לפני שתי שאלות הציר) נחשבת שלמה גם בלעדיהן. אפשר להשלים אותן, אבל לא חייבים.
-const convDone = (c) => !!(c.round && c.axes.length && (!c.axes.includes('other') || c.axisOther.trim()) && c.kinds.length && (!c.kinds.includes('other') || c.kindOther.trim()) && (c.legacy || (c.depth && c.talkPct !== null && c.talkPct !== undefined)) && c.feeling);
-
-function viewReport(week) {
-  const e = session;
-  if (week > CUR_WEEK || week < joinWeek()) return h('section', { class: 'frame' }, h('h2', null, 'השבוע הזה לא פתוח למבט'), link('/me', 'חזרה למבט שלי'));
-  const existing = myReport(week);
-  // טיוטה של מבט שעוד לא נשלח נשמרת רק במכשיר הזה, ונמחקת כשהמבט נשלח
-  const dkey = `${DRAFT_KEY}.${e.id}.${week}`;
-  const saved = (() => { try { return JSON.parse(lsGet(dkey) || 'null'); } catch { return null; } })();
-  const draft = JSON.parse(JSON.stringify(saved && Array.isArray(saved.convs) ? saved : existing ? { convs: existing.convs.map((c) => ({ ...c, legacy: c.depth == null && c.talkPct == null })), noneReason: existing.noneReason || '' } : { convs: [], noneReason: '' }));
-  // טיוטה ישנה מהמכשיר: "שיחת עומק" כבר לא ברשימה, ולכן עוברת ל"אחר" עם אותו טקסט
-  draft.convs.forEach((c) => {
-    // טיוטה מהמכשיר שנשמרה כשהציר והסוג היו בחירה אחת
-    if (!Array.isArray(c.axes)) c.axes = c.axis ? [c.axis] : [];
-    if (!Array.isArray(c.kinds)) c.kinds = c.kind ? [c.kind] : [];
-    delete c.axis; delete c.kind;
-    if (c.kinds.includes('deep')) { c.kinds = [...new Set(c.kinds.map((k) => (k === 'deep' ? 'other' : k)))]; c.kindOther = c.kindOther || 'שיחת עומק'; }
-  });
-  const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  const cardsHost = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  const noneHost = h('div');
-  const countOut = h('output', { 'aria-live': 'polite' });
-  const minus = h('button', { class: '', type: 'button', 'aria-label': 'פחות שיחה אחת' }, '−');
-  const plus = h('button', { type: 'button', 'aria-label': 'עוד שיחה' }, '+');
-  const submit = h('button', { class: 'btn', type: 'button' }, existing ? 'שמירת השינויים' : 'שליחת המבט השבועי');
-  const summary = h('p', { class: 'muted' });
-  const savedNote = h('span', { class: 'micro muted' });
-  const submitHost = h('div', { class: 'stack' });
-  const errBox = h('p', { class: 'err', role: 'alert' });
-  let t = null, sending = false;
-  const persist = () => { lsSet(dkey, JSON.stringify(draft)); savedNote.textContent = 'הטיוטה נשמרה במכשיר'; };
-  const touch = () => { clearTimeout(t); savedNote.textContent = ''; t = setTimeout(persist, 500); status(); };
-  const badges = [];
-  function status() {
-    const n = draft.convs.length, ok = draft.convs.filter(convDone).length;
-    countOut.textContent = String(n);
-    minus.disabled = n === 0; plus.disabled = n >= 15;
-    summary.textContent = n === 0 ? 'גם שבוע בלי שיחות אישיות נספר.' : `${ok} מתוך ${n} שיחות הושלמו.`;
-    submit.disabled = ok < n || sending;
-    badges.forEach((b, i) => { if (!b) return; clear(b); const d = draft.convs[i] && convDone(draft.convs[i]); b.className = d ? 'tag lead' : 'tag todo'; add(b, d ? [ic('check', { size: 14, tone: 'white' }), 'הושלמה'] : ['חסרות תשובות']); });
-    clear(noneHost);
-    if (n === 0) {
-      noneHost.append(h('div', { class: 'well stack' }, h('p', null, 'אפשר לדלג על שאלות נוספות. אם רוצים, אפשר לסמן מה הפריע (לא חובה).'),
-        chipGroup({ options: NONE_REASONS, value: draft.noneReason, label: 'מה הפריע', cls: 'sm', onChange: (v) => { draft.noneReason = v; touch(); } })));
-    }
-  }
-  function buildCards() {
-    clear(cardsHost); badges.length = 0;
-    draft.convs.forEach((c, i) => {
-      const warn = h('p', { class: 'warn-note', hidden: true });
-      const checkNames = () => { const names = findNames([c.note, c.axisOther, c.kindOther].join(' ')); warn.hidden = !names.length; warn.textContent = names.length ? `נראה שמופיע שם (${names.join(', ')}). המבט לא צריך שמות תלמידים: אפשר לכתוב "התלמיד/ה".` : ''; };
-      const badge = h('span'); badges[i] = badge;
-      const axisOther = h('input', { class: 'input', placeholder: 'על מה דיברתם?', value: c.axisOther, hidden: !c.axes.includes('other'), maxlength: '120', 'aria-label': 'ציר אחר', oninput: (ev) => { c.axisOther = ev.target.value; checkNames(); touch(); } });
-      const kindOther = h('input', { class: 'input', placeholder: 'איזו שיחה זו הייתה?', value: c.kindOther, hidden: !c.kinds.includes('other'), maxlength: '120', 'aria-label': 'אופי אחר', oninput: (ev) => { c.kindOther = ev.target.value; checkNames(); touch(); } });
-      const note = h('textarea', { class: 'textarea', placeholder: 'תובנה, שאלה שיצאתם איתה, רעיון…', value: c.note, maxlength: '1000', 'aria-label': 'עוד משהו חשוב להוסיף', oninput: (ev) => { c.note = ev.target.value; checkNames(); touch(); } });
-      note.value = c.note;
-      const q = (n, label, ...body) => h('div', { class: 'q' }, h('div', { class: 'qlabel' }, h('span', { class: 'qn' }, String(n)), label), ...body);
-      cardsHost.append(h('section', { class: 'frame conv' }, h('div', { class: 'conv-head' }, h('h3', null, `שיחה ${i + 1}`), badge),
-        q(1, 'איזה סבב זה עם התלמיד/ה?', chipGroup({ options: ROUNDS, value: c.round, label: 'סבב', onChange: (v) => { c.round = v; touch(); } })),
-        q(2, 'מה היה הציר המרכזי של השיחה?', chipGroup({ options: AXES, value: c.axes, multi: true, label: 'ציר השיחה', onChange: (v) => { c.axes = v; axisOther.hidden = !v.includes('other'); touch(); } }), axisOther),
-        q(3, ['איזה סוג שיחה זו הייתה?', h('span', { class: 'hint' }, ' (אפשר לבחור כמה)')], chipGroup({ options: KINDS, value: c.kinds, multi: true, label: 'סוג השיחה', onChange: (v) => { c.kinds = v; kindOther.hidden = !v.includes('other'); touch(); } }), kindOther),
-        q(4, DEPTH_SCALE.q, depthSlider({ value: c.depth, onChange: (v) => { c.depth = v; touch(); } })),
-        q(5, TALK_SCALE.q, talkSlider({ value: c.talkPct, onChange: (v) => { c.talkPct = v; touch(); } })),
-        q(6, 'איך יצאתם מהשיחה?', moodGroup({ value: c.feeling, onChange: (v) => { c.feeling = v; touch(); } }), h('div', { class: 'field' }, h('label', { class: 'hint', for: (note.id = nid('n')) }, 'עוד משהו חשוב להוסיף? (לא חובה)'), note), warn)));
-      checkNames();
-    });
-    status();
-  }
-  function setCount(n) {
-    if (n > draft.convs.length) { while (draft.convs.length < n) draft.convs.push(newConv()); buildCards(); touch(); return; }
-    const last = draft.convs[draft.convs.length - 1];
-    const hasData = last && (last.round || last.axes.length || last.kinds.length || last.depth || (last.talkPct !== null && last.talkPct !== undefined) || last.feeling || last.note.trim());
-    const doRemove = () => { draft.convs.pop(); buildCards(); touch(); };
-    if (hasData) confirmInline(countHost, `למחוק את שיחה ${draft.convs.length} ואת מה שנכתב בה?`, 'מחיקה', doRemove); else doRemove();
-  }
-  minus.addEventListener('click', () => setCount(draft.convs.length - 1));
-  plus.addEventListener('click', () => setCount(draft.convs.length + 1));
-  const countHost = h('div', { class: 'stack' });
-  submit.addEventListener('click', () => {
-    const doSubmit = async () => {
-      sending = true; errBox.textContent = ''; status();
-      try {
-        const res = await api('PUT', `/api/me/reports/${week}`, { convs: draft.convs, noneReason: draft.convs.length ? '' : draft.noneReason });
-        const i = myReports.findIndex((r) => r.week === week);
-        if (i >= 0) myReports[i] = res.report; else myReports.push(res.report);
-        lsDel(dkey);
-        clear(root);
-        root.append(h('section', { class: 'frame lead' }, ic('check', { size: 44, tone: 'white' }), h('h2', null, 'תודה'), h('p', { style: 'font-size:19px' }, `המבט לשבוע ${weekNo(week)} (${weekLabel(week)}) נשמר: ${nConv(res.report.convs.length)}.`),
-          h('div', { class: 'row' }, link('/me', 'למבט שלי', 'btn white'), link('/tools', 'לארגז הכלים', 'btn soft'))));
-        window.scrollTo(0, 0);
-      } catch (ex) { sending = false; errBox.textContent = ex.message; status(); }
-    };
-    const named = draft.convs.some((c) => findNames([c.note, c.axisOther, c.kindOther].join(' ')).length);
-    if (named) confirmInline(submitHost, 'נראה שמופיעים שמות בהערות. הכלל: אין שמות תלמידים. לשלוח בכל זאת?', 'שליחה בכל זאת', doSubmit); else doSubmit();
-  });
-  add(root, [
-    h('section', { class: 'frame' }, h('div', null, link('/me', 'המבט שלי', 'btn ghost')), h('p', { class: 'small muted' }, `שבוע ${weekNo(week)}`), h('h2', null, weekLabel(week)),
-      h('p', { class: 'muted', style: 'max-width:56ch' }, 'מבט קצר על השיחות האישיות של השבוע. בלי שמות תלמידים, ובלי פרטים מזהים.'),
-      week < CUR_WEEK ? h('div', { class: 'tag', style: 'align-self:flex-start' }, 'מבט לשבוע שעבר') : null),
-    h('section', { class: 'frame' }, h('h3', null, 'כמה שיחות אישיות קיימתם השבוע?'), h('div', { class: 'row' }, h('div', { class: 'stepper' }, minus, countOut, plus), summary), countHost, noneHost),
-    cardsHost,
-    h('section', { class: 'frame' }, h('div', { class: 'row between' }, h('div', { class: 'row' }, submit, savedNote)), errBox, submitHost)]);
-  buildCards();
-  return root;
-}
-
 
 /* =====================================================================
    מנהלת התכנית והמובילות
@@ -2396,6 +2251,406 @@ function adminAccount() {
 }
 
 /* ---------- פתיחה ---------- */
+/* =====================================================================
+   חוויית המחנכת (עיצוב אוקטובר 2026): דף בית, מבט שבועי בשאלה אחת למסך, סרגל ניווט תחתון וקונפטי.
+   השרת והנתונים לא השתנו, חוץ מהסבב שכבר לא נשאל. הנוסחים בפנייה אישית שנקראת לשני הכיוונים:
+   עבר בגוף שני ("דיברת"), "שלך" ו"לך", ושם פועל ("לבחור"). בלי ציווי ובלי הווה.
+   ===================================================================== */
+const BRAND = { blue: '#0046ff', purple: '#6437eb', deep: '#3c5af0', sky: '#0fb4f5', turq: '#23d7cd', light: '#f0f0f0', ink: '#10131f' };
+const reduceMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
+const svgSpan = (markup, cls = '') => { const s = h('span', { class: cls, 'aria-hidden': 'true' }); s.innerHTML = markup; return s; };
+
+/* ---------- קונפטי, בצבעי המותג בלבד ---------- */
+let fxCanvas = null, fxParts = [], fxRaf = 0;
+function confetti(n, spread = 1, origin) {
+  if (reduceMotion()) n = Math.min(n, 18);
+  if (!fxCanvas) { fxCanvas = h('canvas', { class: 'fx', 'aria-hidden': 'true' }); document.body.append(fxCanvas); }
+  const dpr = window.devicePixelRatio || 1;
+  fxCanvas.width = innerWidth * dpr; fxCanvas.height = innerHeight * dpr;
+  const W = fxCanvas.width, H = fxCanvas.height, cols = [BRAND.blue, BRAND.purple, BRAND.sky, BRAND.turq, BRAND.deep];
+  const ox = origin ? origin.x * dpr : null, oy = origin ? origin.y * dpr : H * 0.42;
+  for (let k = 0; k < n; k++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.6 * spread, v = (6 + Math.random() * 9) * dpr * (0.8 + spread * 0.3);
+    fxParts.push({ x: ox !== null ? ox : W / 2 + (Math.random() - 0.5) * W * 0.3 * spread, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: (3 + Math.random() * 4) * dpr, c: cols[k % 5], rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3, shape: k % 3, life: 0, g: 0.25 * dpr });
+  }
+  if (!fxRaf) fxTick();
+}
+function confettiRain(n) {
+  if (reduceMotion()) return;
+  if (!fxCanvas) confetti(0);
+  const dpr = window.devicePixelRatio || 1, W = fxCanvas.width, cols = [BRAND.blue, BRAND.purple, BRAND.sky, BRAND.turq];
+  for (let k = 0; k < n; k++) fxParts.push({ x: Math.random() * W, y: -Math.random() * fxCanvas.height * 0.6, vx: (Math.random() - 0.5) * 2, vy: (2 + Math.random() * 3) * dpr, r: (3 + Math.random() * 4) * dpr, c: cols[k % 4], rot: 0, vr: 0.1, shape: k % 3, life: 0, g: 0.25 * dpr });
+  if (!fxRaf) fxTick();
+}
+function fxTick() {
+  const cx = fxCanvas.getContext('2d');
+  cx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+  for (const p of fxParts) {
+    p.vy += p.g; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life++;
+    cx.save(); cx.translate(p.x, p.y); cx.rotate(p.rot); cx.fillStyle = p.c;
+    if (p.shape === 0) cx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r);
+    else if (p.shape === 1) { cx.beginPath(); cx.arc(0, 0, p.r * 0.7, 0, 7); cx.fill(); }
+    else { cx.beginPath(); cx.moveTo(0, -p.r); cx.lineTo(p.r, p.r); cx.lineTo(-p.r, p.r); cx.fill(); }
+    cx.restore();
+  }
+  fxParts = fxParts.filter((p) => p.y < fxCanvas.height + 40 && p.life < 400);
+  fxRaf = fxParts.length ? requestAnimationFrame(fxTick) : 0;
+  if (!fxRaf) cx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+}
+function burstFrom(el, n) { const r = el.getBoundingClientRect(); confetti(n, 0.7, { x: r.left + r.width / 2, y: r.top + r.height / 2 }); }
+function heartPop() {
+  const el = svgSpan('<svg viewBox="0 0 24 24" width="90" height="90"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="#6437eb"/></svg>', 'heartpop');
+  document.body.append(el);
+  requestAnimationFrame(() => el.classList.add('go'));
+  setTimeout(() => el.remove(), 1400);
+}
+// חגיגה במדרג: שיחה אחת לב, שתיים קונפטי קטן, שלוש קונפטי, ארבע גדול, חמש ומעלה גם גשם
+function celebrate(n) { if (n === 1) heartPop(); else if (n === 2) confetti(40, 0.6); else if (n === 3) confetti(90, 1); else if (n === 4) confetti(150, 1.4); else if (n >= 5) { confetti(160, 1.5); confettiRain(120); } }
+const COUNT_MSG = ['גם שבוע בלי שיחות הוא חלק מהדרך', 'שיחה אחת. זו כבר התחלה', 'שתי שיחות. יפה מאוד', 'שלוש שיחות. שבוע עשיר', 'ארבע שיחות. מרשים', 'שבוע יוצא דופן'];
+
+/* ---------- סרגל ניווט תחתון למחנכת ---------- */
+function eduNav() {
+  const p = route();
+  const isOn = (to) => (to === '/' ? p === '/' : to === '/tools' ? p.startsWith('/tools') && !p.startsWith('/tools/cards') : to.startsWith('/me/report') ? p.startsWith('/me') : p === to || p.startsWith(to + '/'));
+  const item = (to, icon, t, mid) => {
+    const on = isOn(to);
+    return h('a', { class: 'bn' + (mid ? ' mid' : '') + (on ? ' on' : ''), href: '#' + to, 'aria-current': on ? 'page' : null, onclick: (e) => { e.preventDefault(); go(to); } },
+      mid ? h('span', { class: 'ring' }, ic(icon, { size: 28, tone: 'white' })) : ic(icon, { size: 26, tone: 'blue' }), h('span', { class: 'bnl' }, t));
+  };
+  return h('nav', { class: 'bottomnav', 'aria-label': 'ניווט' },
+    item('/', 'school', 'בית'), item('/mapping', 'community', 'הכיתה'), item(`/me/report/${CUR_WEEK}`, 'calendar', 'מבט שבועי', true),
+    item('/tools', 'book', 'כלים'), item('/tools/cards', 'idea', 'קלפי שיח'));
+}
+
+/* ---------- נתונים קטנים שמשותפים לבית ולמסך הסיום ---------- */
+const HOME_TOOLS = [
+  { to: '/tools/cards', t: 'קלפי שיח', d: 'שאלות ותמונות לשיחה אישית', i: 'idea', c: BRAND.blue },
+  { to: '/tools/identity/listen', t: 'להקשיב לכוחות', d: 'ארבע שאלות לראש, לפני השיחה', i: 'eye', c: BRAND.deep },
+  { to: '/tools/identity/cards', t: 'יש בי יותר ממה שרואים', d: 'קלפים לשיחה על חוזקות', i: 'id', c: BRAND.purple },
+  { to: '/tools/goals/journal', t: 'המסע שלי', d: 'שיחה על מטרות, ודפים להדפסה', i: 'target', c: BRAND.blue },
+  { to: '/tools/agency/partnership', t: 'שותפות תלמידים', d: 'תפקידים לכיתה ושאלות לשיחה', i: 'empower', c: BRAND.purple },
+];
+const allConvs = () => myReports.flatMap((r) => r.convs);
+const avgTalk = (list) => { const v = list.map((c) => c.talkPct).filter((x) => x !== null && x !== undefined); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
+function streakWeeks() {
+  let w = myReport(CUR_WEEK) ? CUR_WEEK : addDays(CUR_WEEK, -7), n = 0;
+  while (w >= joinWeek() && myReport(w)) { n++; w = addDays(w, -7); }
+  return n;
+}
+let together = null, togetherAt = 0;
+function togetherBox(host) {
+  const paint = () => {
+    clear(host);
+    if (!together) return;
+    const dots = Math.min(together.convs, 160);
+    add(host, [h('section', { class: 'together rise' }, h('span', { class: 'tg-k' }, `יחד · ${together.educators} מחנכות בתכנית`), h('span', { class: 'tg-v num' }, nConv(together.convs)),
+      h('span', { class: 'tg-s' }, 'בארבעת השבועות האחרונים, בכל בתי הספר. כל נקודה היא שיחה.'),
+      h('div', { class: 'tg-dots', 'aria-hidden': 'true' }, Array.from({ length: dots }, (_, i) => h('i', { class: i % 7 === 0 ? 'l' : i % 2 ? 't' : 's' }))))]);
+  };
+  if (together && Date.now() - togetherAt < 300000) paint();
+  else api('GET', '/api/me/together').then((r) => { together = r; togetherAt = Date.now(); if (document.body.contains(host)) paint(); }, () => {});
+  return host;
+}
+
+/* ---------- דף הבית של המחנכת ---------- */
+function eduHome() {
+  const e = session, cur = myReport(CUR_WEEK), n = cur ? cur.convs.length : 0;
+  ensureMap();
+  const weeks = weeksBetween(joinWeek(), CUR_WEEK).slice(-8);
+  const counts = weeks.map((w) => (myReport(w) ? myReport(w).convs.length : 0));
+  const max = Math.max(4, ...counts);
+  const bars = h('div', { class: 'bars', role: 'img', 'aria-label': `מספר השיחות ב-${weeks.length} השבועות האחרונים: ${counts.join(', ')}` }, weeks.map((w, i) => {
+    const now = w === CUR_WEEK, v = counts[i];
+    if (now) return h('div', { class: 'bar now' + (cur ? ' filled' : '') }, h('i', { style: cur ? `height:${Math.max(22, (v / max) * 82)}px` : '' }, cur ? String(v) : '?'), h('b', null, 'השבוע'));
+    return h('div', { class: 'bar' }, h('i', { style: `height:${Math.max(4, (v / max) * 82)}px;animation-delay:${i * 60}ms` }), h('b', null, String(weekNo(w))));
+  }));
+  const streak = streakWeeks();
+  const hero = h('section', { class: 'ehero rise' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
+    h('span', { class: 'eyebrow' }, `שבוע ${weekNo(CUR_WEEK)} · ${weekLabel(CUR_WEEK)}`),
+    h('h2', null, cur ? 'השבוע סופר. תודה' : 'המבט השבועי'),
+    h('p', null, cur ? (n ? `${nConv(n)} נכנסו לסיפור של השנה. אפשר לעדכן עד סוף השבוע.` : 'שבוע בלי שיחות נשמר. אפשר לעדכן עד סוף השבוע.') : 'שתי דקות על השיחות של השבוע. כל שיחה ממלאת את העמודה.'),
+    bars,
+    link(`/me/report/${CUR_WEEK}`, cur ? 'לעדכן את השבוע' : 'לספר על השבוע', 'cta light'),
+    h('small', null, [streak > 1 ? `${streak} שבועות ברצף · ` : '', h('a', { href: '#/me', onclick: (ev) => { ev.preventDefault(); go('/me'); } }, 'כל השבועות שלי')]));
+  const list = allConvs(), deep = list.filter((c) => c.depth >= 4).length, talk = avgTalk(list);
+  const stat = (v, l, c) => h('div', { class: 'stat' }, h('span', { class: 'sdot', style: `background:${c}` }), h('span', { class: 'sv num' }, v), h('span', { class: 'sl' }, l));
+  const kids = map.students.length, waiting = map.students.filter((s) => !s.rounds.some(Boolean)).length;
+  const journey = h('section', { class: 'esec rise' }, h('h3', { class: 'sh' }, 'המסע שלך עד עכשיו'),
+    h('div', { class: 'hs' }, stat(String(list.length), 'שיחות אישיות מתחילת השנה', BRAND.blue), stat(String(deep), 'שיחות בעומק אישי', BRAND.purple),
+      talk !== null ? stat(`${talk}%`, 'מהזמן התלמידים דיברו', BRAND.turq) : null, stat(String(myReports.length), 'שבועות שנשלחו', BRAND.sky)));
+  const klass = h('section', { class: 'esec rise' }, h('h3', { class: 'sh' }, 'הכיתה שלי', kids ? link('/mapping', 'לכל הכיתה', 'shl') : null),
+    h('div', { class: 'panel' }, kids
+      ? [h('div', { class: 'mini', 'aria-hidden': 'true' }, map.students.slice(0, 40).map((s) => h('i', { class: s.rounds.some(Boolean) ? 'on' : '' }))),
+        h('div', { class: 'row between' }, h('div', null, h('b', { class: 'big' }, `${waiting} תלמידים`), h('div', { class: 'small muted' }, 'עוד מחכים לשיחה ראשונה')), link('/mapping', 'למיפוי', 'btn sm'))]
+      : h('div', { class: 'row between' }, h('div', null, h('b', null, 'עוד לא הוספת את הכיתה'), h('div', { class: 'small muted' }, 'נשמר רק במכשיר שלך')), link('/mapping', 'להוספת הכיתה', 'btn sm'))));
+  const tools = h('section', { class: 'esec rise' }, h('h3', { class: 'sh' }, 'כלים לשיחה הבאה', link('/tools', 'לכל הכלים', 'shl')),
+    h('div', { class: 'hs' }, HOME_TOOLS.map((t) => h('a', { class: 'tcard', style: `background:${t.c}`, href: '#' + t.to, onclick: (ev) => { ev.preventDefault(); go(t.to); } },
+      ic(t.i, { size: 34, tone: 'white' }), h('span', null, h('b', null, t.t), h('span', null, t.d))))));
+  const who = pub.leadSeesNames ? 'מנהלת התכנית רואה את כל המבטים. המובילה בבית הספר רואה רק את בית הספר שלה, כולל שמות והערות.' : 'מנהלת התכנית רואה את כל המבטים. המובילה בבית הספר רואה רק נתונים מצטברים של בית הספר שלה, בלי שמות.';
+  const privacy = h('section', { class: 'frame quiet' }, h('details', null, h('summary', null, ic('lock', { size: 20 }), 'מה נשמר, ומי רואה?'),
+    h('ul', { class: 'plain' }, h('li', null, 'לא נשמרים שמות תלמידים ולא תיעוד על ילד או ילדה.'), h('li', null, 'בכל שבוע נשמר מספר השיחות, ולכל שיחה כמה בחירות קצרות והערה חופשית.'),
+      h('li', null, 'מיפוי הכיתה נשאר במכשיר שלך. מנהלת התכנית יודעת רק אם נפתח.'), h('li', null, who))));
+  const top = h('div', { class: 'etop' }, h('div', null, h('div', { class: 'hello' }, `שלום ${firstName(e.name)}`), h('div', { class: 'small muted' }, e.schoolName)),
+    h('a', { class: 'avatar', href: '#/me', 'aria-label': 'השבועות והחשבון שלי', onclick: (ev) => { ev.preventDefault(); go('/me'); } }, firstName(e.name).slice(0, 1)));
+  const tg = togetherBox(h('div'));
+  const root = h('div', { class: 'ehome' }, top, hero, journey, klass, tools, tg, privacy);
+  if (justRegistered) { justRegistered = false; toast('הקוד נשמר. בפעם הבאה נכנסים עם בית ספר, שם והקוד.'); }
+  return root;
+}
+
+/* ---------- איורים: סוגי שיחה, צוללן ופרצופים ---------- */
+const KIND_ART = {
+  intro: '<svg viewBox="0 0 56 56" width="56" height="56"><rect x="4" y="8" width="30" height="22" rx="10" fill="#0046ff"/><path d="M12 30l-2 8 9-8z" fill="#0046ff"/><rect x="22" y="22" width="30" height="22" rx="10" fill="#23d7cd"/><path d="M44 44l2 8-9-8z" fill="#23d7cd"/><circle cx="31" cy="33" r="2.2" fill="#10131f"/><circle cx="37" cy="33" r="2.2" fill="#10131f"/><circle cx="43" cy="33" r="2.2" fill="#10131f"/><path d="M13 19h12" stroke="#f0f0f0" stroke-width="3" stroke-linecap="round"/></svg>',
+  notebook: '<svg viewBox="0 0 56 56" width="56" height="56"><rect x="5" y="16" width="22.5" height="28" rx="5" fill="#0046ff"/><rect x="28.5" y="16" width="22.5" height="28" rx="5" fill="#23d7cd"/><circle cx="28.5" cy="30" r="6.5" fill="#0046ff"/><circle cx="39.75" cy="16" r="5.5" fill="#23d7cd"/><circle cx="16.25" cy="44" r="5.5" fill="#0046ff"/><path d="M44 6l1.6 3.4 3.4 1.6-3.4 1.6L44 16l-1.6-3.4-3.4-1.6 3.4-1.6z" fill="#6437eb"/></svg>',
+  complex: '<svg viewBox="0 0 56 56" width="56" height="56"><circle cx="28" cy="28" r="24" fill="#e8efff"/><path d="M10 30c6-14 14 10 20-4s-8-14-12-4 10 18 18 8 2-14-4-8" stroke="#6437eb" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="40" cy="22" r="4" fill="#23d7cd"/></svg>',
+  grades: '<svg viewBox="0 0 56 56" width="56" height="56"><rect x="6" y="10" width="40" height="30" rx="4" fill="#f0f0f0" stroke="#0046ff" stroke-width="3"/><path d="M13 20h20M13 27h14" stroke="#0046ff" stroke-width="2.5" stroke-linecap="round"/><circle cx="40" cy="36" r="9" fill="#6437eb"/><path d="M35 43l-3 10 8-5 8 5-3-10" fill="#23d7cd"/><circle cx="40" cy="36" r="4" fill="#f0f0f0"/></svg>',
+  parents: '<svg viewBox="0 0 56 56" width="56" height="56"><circle cx="15" cy="16" r="7" fill="#0046ff"/><path d="M4 46c0-12 5-20 11-20s11 8 11 20z" fill="#0046ff"/><circle cx="41" cy="16" r="7" fill="#6437eb"/><path d="M30 46c0-12 5-20 11-20s11 8 11 20z" fill="#6437eb"/><circle cx="28" cy="30" r="5.5" fill="#23d7cd"/><path d="M20 50c0-8 3.5-13 8-13s8 5 8 13z" fill="#23d7cd"/></svg>',
+  other: '<svg viewBox="0 0 56 56" width="56" height="56"><path d="M28 6l4.5 13.5L46 24l-13.5 4.5L28 42l-4.5-13.5L10 24l13.5-4.5z" fill="#0fb4f5"/><circle cx="44" cy="44" r="4" fill="#6437eb"/><circle cx="12" cy="44" r="3" fill="#23d7cd"/><circle cx="46" cy="10" r="2.5" fill="#0046ff"/></svg>',
+};
+const AXIS_LOOK = { identity: { i: 'id', c: BRAND.turq }, goals: { i: 'target', c: BRAND.sky }, agency: { i: 'empower', c: BRAND.purple }, other: { i: 'idea', c: BRAND.deep } };
+const DIVER = '<svg class="dsvg" viewBox="0 0 64 64" width="70" height="70"><path d="M20 53l-9 8h11z" fill="#0046ff"/><path d="M44 53l9 8H42z" fill="#0046ff"/><ellipse cx="32" cy="46" rx="13" ry="11" fill="#6437eb"/><path class="arm" d="M21 44q-9-1-11-9" stroke="#6437eb" stroke-width="5" stroke-linecap="round" fill="none"/><path d="M43 44q7 2 9-3" stroke="#6437eb" stroke-width="5" stroke-linecap="round" fill="none"/><circle cx="32" cy="25" r="16" fill="#6437eb"/><circle cx="32" cy="27" r="12.5" fill="#f0f0f0"/><path d="M47 21V7h4" stroke="#0fb4f5" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="18" y="17" width="28" height="13" rx="6.5" fill="#23d7cd"/><rect x="20.5" y="19.3" width="23" height="8.4" rx="4.2" fill="#f0f0f0"/><g class="eyes"><circle cx="27.5" cy="23.5" r="2.4" fill="#10131f"/><circle cx="36.5" cy="23.5" r="2.4" fill="#10131f"/></g><circle cx="23" cy="34" r="2" fill="#0fb4f5" opacity=".5"/><circle cx="41" cy="34" r="2" fill="#0fb4f5" opacity=".5"/><path d="M28 34q4 3.5 8 0" stroke="#10131f" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>';
+const FISH = '<svg width="30" height="16" viewBox="0 0 30 16"><ellipse cx="11" cy="8" rx="10" ry="6" fill="#f0f0f0"/><path d="M20 8l9-6v12z" fill="#f0f0f0"/><circle cx="6" cy="7" r="1.4" fill="#10131f"/></svg>';
+const SEA = [BRAND.turq, BRAND.sky, BRAND.deep, BRAND.blue, BRAND.purple];
+const FACE_LOOK = { inspired: { c: '#0046ff', k: '#f0f0f0', f: 'wow' }, good: { c: '#23d7cd', k: '#10131f', f: 'good' }, neutral: { c: '#0fb4f5', k: '#10131f', f: 'flat' }, thoughtful: { c: '#3c5af0', k: '#f0f0f0', f: 'think' }, frustrated: { c: '#6437eb', k: '#f0f0f0', f: 'frus' }, heavy: { c: '#55585f', k: '#f0f0f0', f: 'heavy' } };
+const starPath = (x, y, r, fill) => { let p = ''; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; p += (i ? 'L' : 'M') + (x + Math.cos(a) * rr).toFixed(1) + ' ' + (y + Math.sin(a) * rr).toFixed(1); } return `<path d="${p}z" fill="${fill}"/>`; };
+function faceSvg({ c, k, f }) {
+  const s = `stroke="${k}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"`;
+  const dots = `<g class="eyes"><circle cx="23" cy="31" r="3.2" fill="${k}"/><circle cx="41" cy="31" r="3.2" fill="${k}"/></g>`;
+  const P = {
+    wow: `${starPath(23, 30, 6.5, k)}${starPath(41, 30, 6.5, k)}<path d="M21 39h22a11 11 0 0 1-22 0z" fill="${k}"/><path d="M7 8v8M3 12h8M57 6v6M54 9h6" stroke="#23d7cd" stroke-width="2.5" stroke-linecap="round"/>`,
+    good: `<path d="M18 32q5-6 10 0M36 32q5-6 10 0" ${s}/><path d="M22 40q10 9 20 0" ${s}/><circle cx="16" cy="39" r="3.5" fill="#f0f0f0" opacity=".55"/><circle cx="48" cy="39" r="3.5" fill="#f0f0f0" opacity=".55"/>`,
+    flat: `${dots}<path d="M24 43h16" ${s}/>`,
+    think: `<g class="eyes"><circle cx="25" cy="29" r="3.2" fill="${k}"/><circle cx="43" cy="29" r="3.2" fill="${k}"/></g><path d="M37 20q5-4 10-1" ${s}/><path d="M26 44q5-3 11 0" ${s}/><circle cx="53" cy="10" r="4" fill="#0fb4f5"/><circle cx="59" cy="3.5" r="2.4" fill="#0fb4f5"/>`,
+    frus: `<path d="M17 22l9 4M47 22l-9 4" ${s}/>${dots}<path d="M21 45l4-3 4 3 4-3 4 3 4-3 3 2" ${s}/>`,
+    heavy: `<path d="M18 30q5 4 10 0M36 30q5 4 10 0" ${s}/><path d="M25 46q7-5 14 0" ${s}/><path d="M46 36q3.5 4.5 0 7q-3.5-2.5 0-7z" fill="#0fb4f5"/>`,
+  };
+  return `<svg viewBox="0 0 64 64" width="58" height="58"><circle cx="32" cy="35" r="27" fill="${c}"/>${P[f]}</svg>`;
+}
+// עומק השיחה כצלילה: גוררים את הצוללן או מקישים על שכבה. נשמר כשלב 1 עד 5, כמו קודם.
+function diveSlider({ value, onChange }) {
+  let lvl = value || null, drag = false;
+  const ruler = h('div', { class: 'ruler', 'aria-hidden': 'true' }, DEPTH_LEVELS.map((l, i) => h('div', { class: 'rl' }, h('b', null, l.t), h('span', null, `${i * 10}–${(i + 1) * 10} מ'`))));
+  const diver = svgSpan(DIVER, 'diver');
+  const ocean = h('div', { class: 'ocean', role: 'slider', tabindex: '0', 'aria-label': 'עומק השיחה', 'aria-valuemin': '1', 'aria-valuemax': '5' },
+    SEA.map((c, i) => h('div', { class: 'band', style: `top:${i * 20}%;background:${c}` })),
+    svgSpan('<svg viewBox="0 0 200 12" preserveAspectRatio="none"><path d="M0 6 Q12.5 0 25 6 T50 6 T75 6 T100 6 T125 6 T150 6 T175 6 T200 6 V0 H0z" fill="#f0f0f0"/></svg>', 'wave'),
+    [31, 55, 83].map((t, i) => svgSpan(FISH, 'fish')).map((f, i) => { f.style.cssText = `top:${[31, 55, 83][i]}%;--fd:${[9, 12, 15][i]}s;animation-delay:-${[0, 5, 2][i]}s`; return f; }),
+    diver);
+  const read = h('div', { class: 'depthread', 'aria-live': 'polite' });
+  const paint = () => {
+    diver.style.top = lvl ? `${(lvl - 0.5) * 20}%` : '34px';
+    [...ruler.children].forEach((r, i) => r.classList.toggle('on', i === lvl - 1));
+    clear(read);
+    if (lvl) { const L = DEPTH_LEVELS[lvl - 1]; add(read, [h('b', null, L.t), h('span', null, L.d)]); ocean.setAttribute('aria-valuenow', String(lvl)); ocean.setAttribute('aria-valuetext', L.t); }
+    else add(read, [h('span', null, 'אפשר לגרור את הצוללן למטה, או להקיש על עומק')]);
+  };
+  const set = (v) => { v = Math.max(1, Math.min(5, v)); if (v === lvl) return; const was = lvl; lvl = v; paint(); onChange(v); if (v === 5 && was !== 5) burstFrom(diver, 30); };
+  const at = (ev) => { const r = ocean.getBoundingClientRect(); return Math.ceil(((ev.clientY - r.top) / r.height) * 5); };
+  ocean.addEventListener('pointerdown', (ev) => { drag = true; try { ocean.setPointerCapture(ev.pointerId); } catch { /* ignore */ } set(at(ev)); });
+  ocean.addEventListener('pointermove', (ev) => { if (drag) set(at(ev)); });
+  ocean.addEventListener('pointerup', () => { drag = false; }); ocean.addEventListener('pointercancel', () => { drag = false; });
+  ocean.addEventListener('keydown', (ev) => { const d = { ArrowDown: 1, ArrowUp: -1, ArrowLeft: 1, ArrowRight: -1 }[ev.key]; if (d === undefined) return; ev.preventDefault(); set((lvl || 0) + d); });
+  // בועות שעולות מהצוללן, יותר ככל שצוללים עמוק
+  if (!reduceMotion()) {
+    const t = setInterval(() => {
+      if (!document.body.contains(ocean)) { clearInterval(t); return; }
+      const n = 1 + Math.floor((lvl || 0) / 2);
+      for (let k = 0; k < n; k++) {
+        const b = h('i', { class: 'bb' }), s = 4 + Math.random() * 7;
+        b.style.cssText = `width:${s}px;height:${s}px;left:calc(50% + ${(Math.random() - 0.5) * 30}px);top:calc(${diver.style.top} - 20px);animation-delay:${k * 120}ms`;
+        ocean.append(b); setTimeout(() => b.remove(), 2200);
+      }
+    }, 420);
+  }
+  paint();
+  return h('div', { class: 'stack', style: 'gap:10px' }, h('div', { class: 'dive' }, ruler, ocean), read);
+}
+
+/* ---------- המבט השבועי: שאלה אחת למסך ---------- */
+const STEPS = ['axis', 'kind', 'depth', 'talk', 'feel'];
+function eduWeek(week) {
+  if (week > CUR_WEEK || week < joinWeek()) return h('section', { class: 'frame' }, h('h2', null, 'השבוע הזה לא פתוח למבט'), link('/', 'חזרה לבית'));
+  const e = session, existing = myReport(week);
+  // טיוטה של מבט שעוד לא נשלח נשמרת רק במכשיר הזה, ונמחקת כשהמבט נשלח
+  const dkey = `${DRAFT_KEY}.${e.id}.${week}`;
+  const saved = (() => { try { return JSON.parse(lsGet(dkey) || 'null'); } catch { return null; } })();
+  const draft = JSON.parse(JSON.stringify(saved && Array.isArray(saved.convs) ? saved : existing ? { convs: existing.convs.map((c) => ({ ...c, legacy: c.depth == null && c.talkPct == null })), noneReason: existing.noneReason || '' } : { convs: [], noneReason: '' }));
+  draft.convs.forEach((c) => {
+    if (!Array.isArray(c.axes)) c.axes = c.axis ? [c.axis] : [];
+    if (!Array.isArray(c.kinds)) c.kinds = c.kind ? [c.kind] : [];
+    delete c.axis; delete c.kind;
+    if (c.kinds.includes('deep')) { c.kinds = [...new Set(c.kinds.map((k) => (k === 'deep' ? 'other' : k)))]; c.kindOther = c.kindOther || 'שיחת עומק'; }
+    c.axisOther = c.axisOther || ''; c.kindOther = c.kindOther || ''; c.note = c.note || '';
+  });
+  const F = { step: 'count', ci: 0, sending: false, err: '' };
+  let t = null;
+  const persist = () => lsSet(dkey, JSON.stringify(draft));
+  const touch = () => { clearTimeout(t); t = setTimeout(persist, 400); };
+  const root = h('div', { class: 'flow' });
+  const cur = () => draft.convs[F.ci];
+  const nameWarn = (texts) => { const names = findNames(texts.join(' ')); return names.length ? `נראה שמופיע שם (${names.join(', ')}). המבט לא צריך שמות תלמידים: אפשר לכתוב "התלמיד/ה".` : ''; };
+  const canNext = () => {
+    const c = cur();
+    switch (F.step) {
+      case 'axis': return c.axes.length && (!c.axes.includes('other') || c.axisOther.trim());
+      case 'kind': return c.kinds.length && (!c.kinds.includes('other') || c.kindOther.trim());
+      case 'depth': return !!c.depth || !!c.legacy;
+      case 'talk': return (c.talkPct !== null && c.talkPct !== undefined) || !!c.legacy;
+      case 'feel': return !!c.feeling;
+      default: return true;
+    }
+  };
+  let nextBtn = null;
+  const upd = () => { if (nextBtn) nextBtn.disabled = !canNext() || F.sending; };
+  const go2 = (step) => { F.step = step; paint(); };
+  const back = () => {
+    const s = F.step, pop = () => { F.ci--; F.step = 'feel'; };
+    if (s === 'zero') F.step = 'count';
+    else if (s === 'axis') { if (F.ci === 0) F.step = 'count'; else pop(); }
+    else if (STEPS.includes(s)) F.step = STEPS[STEPS.indexOf(s) - 1];
+    else if (s === 'saved') pop();
+    paint();
+  };
+  const close = () => { persist(); go('/'); };
+
+  function progress() {
+    const n = Math.max(1, draft.convs.length);
+    if (F.step === 'count' || F.step === 'zero') return h('div', { class: 'prog' }, h('i', { class: 'c' }), Array.from({ length: n }, () => h('i')));
+    return h('div', { class: 'prog' }, h('i', { class: 'd' }), Array.from({ length: n }, (_, k) => h('i', { class: F.step === 'done' || k < F.ci ? 'd' : k === F.ci ? 'c' : '' })));
+  }
+  function head() {
+    return h('div', { class: 'wtop' },
+      F.step !== 'count' && F.step !== 'done' ? h('button', { class: 'xbtn', type: 'button', 'aria-label': 'חזרה לשאלה הקודמת', onclick: back }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>')) : null,
+      progress(),
+      F.step !== 'done' ? h('button', { class: 'xbtn', type: 'button', 'aria-label': 'סגירה. הטיוטה נשמרת במכשיר', onclick: close }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>')) : null);
+  }
+  const q = (kicker, title, sub, ...body) => h('div', { class: 'qwrap' }, kicker ? h('span', { class: 'qk' }, kicker) : null, h('h2', { class: 'q' }, title), sub ? h('p', { class: 'qs' }, sub) : null, ...body);
+  const nextButton = (label, onclick, cls = 'cta') => { nextBtn = h('button', { class: cls, type: 'button', onclick }, label); upd(); return nextBtn; };
+  const convKick = () => `שיחה ${F.ci + 1} מתוך ${draft.convs.length}${week < CUR_WEEK ? ` · שבוע ${weekNo(week)}` : ''}`;
+  const tile = (on, art, label, onclick) => h('button', { class: 'tile' + (on ? ' on' : ''), type: 'button', 'aria-pressed': String(on), onclick }, art, h('span', null, label));
+  const otherInput = (val, ph, onInput) => {
+    const warn = h('p', { class: 'warn-note', hidden: true });
+    const inp = h('input', { class: 'input othin', value: val, placeholder: ph, maxlength: '120', 'aria-label': ph, oninput: (ev) => { onInput(ev.target.value); const w = nameWarn([ev.target.value]); warn.hidden = !w; warn.textContent = w; upd(); } });
+    return [inp, warn];
+  };
+
+  function body() {
+    nextBtn = null;
+    const s = F.step, n = draft.convs.length;
+    if (s === 'count') {
+      const out = h('span', { class: 'cnum num', 'aria-live': 'polite' }, String(n));
+      const tokens = h('div', { class: 'tokens', 'aria-hidden': 'true' });
+      const msg = h('div', { class: 'cmsg' });
+      const next = h('button', { class: 'cta', type: 'button' });
+      const paintCount = () => {
+        const k = draft.convs.length;
+        out.textContent = String(k);
+        clear(tokens); add(tokens, draft.convs.map((_, i) => h('i', { style: `background:${[BRAND.blue, BRAND.purple, BRAND.turq, BRAND.sky, BRAND.deep][i % 5]}` }, String(i + 1))));
+        msg.textContent = k ? COUNT_MSG[Math.min(k, 5)] : '';
+        next.textContent = k ? 'לשיחה הראשונה' : week === CUR_WEEK ? 'לא היו השבוע שיחות' : 'לא היו שיחות בשבוע הזה';
+        minus.disabled = k === 0; plus.disabled = k >= 15;
+      };
+      const minus = h('button', { class: 'cbtn', type: 'button', 'aria-label': 'שיחה אחת פחות', onclick: () => { draft.convs.pop(); touch(); paintCount(); } }, '−');
+      const plus = h('button', { class: 'cbtn plus', type: 'button', 'aria-label': 'עוד שיחה', onclick: () => { draft.convs.push(newConv()); touch(); paintCount(); out.classList.remove('pop'); void out.offsetWidth; out.classList.add('pop'); celebrate(draft.convs.length); } }, '+');
+      next.onclick = () => { F.ci = 0; go2(draft.convs.length ? 'axis' : 'zero'); };
+      paintCount();
+      return q(`המבט השבועי · שבוע ${weekNo(week)}`, week === CUR_WEEK ? 'כמה שיחות אישיות היו לך השבוע?' : `כמה שיחות אישיות היו לך בשבוע ${weekNo(week)}?`, 'שיחה אישית היא רגע אחד על אחד עם תלמיד/ה, גם קצר.',
+        existing ? h('p', { class: 'tag', style: 'align-self:flex-start' }, week === CUR_WEEK ? 'המבט לשבוע הזה כבר נשלח. אפשר לעדכן אותו.' : `המבט לשבוע ${weekNo(week)} כבר נשלח. אפשר לעדכן אותו.`) : null,
+        h('div', { class: 'counter' }, minus, out, plus), tokens, msg, next);
+    }
+    if (s === 'zero') {
+      return q('שבוע בלי שיחות', 'מה היה השבוע?', 'זה קורה. זה עוזר לנו להבין את הקצב של השנה. לא חובה לבחור.',
+        h('div', { class: 'chips' }, NONE_REASONS.map((r) => h('button', { class: 'pick' + (draft.noneReason === r.v ? ' on' : ''), type: 'button', 'aria-pressed': String(draft.noneReason === r.v), onclick: () => { draft.noneReason = draft.noneReason === r.v ? '' : r.v; touch(); paint(); } }, r.t))),
+        nextButton(F.sending ? 'שולחים…' : 'שליחת המבט', submit), F.err ? h('p', { class: 'err', role: 'alert' }, F.err) : null);
+    }
+    const c = cur();
+    if (s === 'axis') {
+      const [inp, warn] = otherInput(c.axisOther, 'על מה עוד דיברתם? כמה מילים', (v) => { c.axisOther = v; touch(); });
+      return q(convKick(), 'על מה דיברתם?', 'אפשר לבחור יותר מאחד',
+        h('div', { class: 'tiles' }, AXES.map((a) => tile(c.axes.includes(a.v), h('span', { class: 'tic', style: `background:${AXIS_LOOK[a.v].c}` }, ic(AXIS_LOOK[a.v].i, { size: 30, tone: 'white' })), a.v === 'other' ? 'משהו אחר' : a.t, () => {
+          c.axes = c.axes.includes(a.v) ? c.axes.filter((x) => x !== a.v) : [...c.axes, a.v]; touch(); paint(); if (a.v === 'other' && c.axes.includes('other')) root.querySelector('.othin')?.focus();
+        }))),
+        c.axes.includes('other') ? [inp, warn] : null, nextButton('המשך', () => go2('kind')));
+    }
+    if (s === 'kind') {
+      const [inp, warn] = otherInput(c.kindOther, 'איזו שיחה? כמה מילים', (v) => { c.kindOther = v; touch(); });
+      return q(convKick(), 'איזו שיחה זו הייתה?', 'אפשר לבחור יותר מאחת',
+        h('div', { class: 'tiles' }, KINDS.map((k) => {
+          const b = tile(c.kinds.includes(k.v), svgSpan(KIND_ART[k.v], 'ill'), k.t, () => {
+            const on = !c.kinds.includes(k.v); c.kinds = on ? [...c.kinds, k.v] : c.kinds.filter((x) => x !== k.v); touch(); if (on) burstFrom(b, 18); paint();
+            if (k.v === 'other' && on) root.querySelector('.othin')?.focus();
+          });
+          return b;
+        })),
+        c.kinds.includes('other') ? [inp, warn] : null, nextButton('המשך', () => go2('depth')));
+    }
+    if (s === 'depth') {
+      return q(convKick(), 'כמה עמוק צללתם?', 'עמוק זה לא בהכרח טוב יותר. גם שיחה עניינית חשובה.',
+        diveSlider({ value: c.depth, onChange: (v) => { c.depth = v; touch(); upd(); } }), nextButton('המשך', () => go2('talk')));
+    }
+    if (s === 'talk') {
+      return q(convKick(), TALK_SCALE.q, 'לגרור את הקו לפי התחושה. לא צריך לדייק.',
+        talkSlider({ value: c.talkPct, onChange: (v) => { c.talkPct = v; touch(); upd(); } }), nextButton('המשך', () => go2('feel')));
+    }
+    if (s === 'feel') {
+      const warn = h('p', { class: 'warn-note', hidden: true });
+      const note = h('textarea', { class: 'textarea', rows: '2', placeholder: 'מילה אחת לזכור (בלי שמות)', maxlength: '1000', 'aria-label': 'מילה אחת לזכור, לא חובה', oninput: (ev) => { c.note = ev.target.value; touch(); const w = nameWarn([c.note]); warn.hidden = !w; warn.textContent = w; } });
+      note.value = c.note;
+      const last = F.ci >= draft.convs.length - 1;
+      const who = pub.leadSeesNames ? 'רק לך, למובילה בבית הספר ולצוות התכנית יש גישה לזה' : 'רק לך ולצוות התכנית יש גישה לזה';
+      return q(convKick(), 'איך יצאת מהשיחה?', null,
+        h('div', { class: 'faces', role: 'radiogroup', 'aria-label': 'איך יצאת מהשיחה' }, FEELINGS.map((f) => h('button', { class: 'face' + (c.feeling === f.v ? ' on' : ''), type: 'button', role: 'radio', 'aria-checked': String(c.feeling === f.v), onclick: () => { c.feeling = f.v; touch(); paint(); } },
+          svgSpan(faceSvg(FACE_LOOK[f.v]), 'fsvg'), h('span', null, f.t)))),
+        note, warn, h('p', { class: 'lockline' }, ic('lock', { size: 16 }), who),
+        nextButton(last ? (F.sending ? 'שולחים…' : 'שליחת המבט') : 'שמירת השיחה', () => { if (last) submit(); else { F.ci++; go2('saved'); confetti(25, 0.5); } }),
+        F.err ? h('p', { class: 'err', role: 'alert' }, F.err) : null);
+    }
+    if (s === 'saved') {
+      const left = draft.convs.length - F.ci;
+      return h('div', { class: 'qwrap saved' }, h('div', { class: 'badge' }, ic('check', { size: 54, tone: 'white' })), h('h2', { class: 'q' }, `שיחה ${F.ci} נשמרה`), h('p', { class: 'qs' }, left === 1 ? 'נשארה עוד שיחה אחת' : `נשארו עוד ${left}`),
+        h('button', { class: 'cta violet', type: 'button', onclick: () => { const src = draft.convs[F.ci - 1]; for (let k = F.ci; k < draft.convs.length; k++) draft.convs[k] = { ...JSON.parse(JSON.stringify(src)), note: '' }; touch(); submit(); } }, 'השיחות הבאות דומות לקודמת · שמירה ושליחה'),
+        h('button', { class: 'cta', type: 'button', onclick: () => go2('axis') }, `לשאלות על שיחה ${F.ci + 1}`),
+        F.err ? h('p', { class: 'err', role: 'alert' }, F.err) : null);
+    }
+    if (s === 'done') return doneScreen();
+    return null;
+  }
+  function doneScreen() {
+    const r = myReport(week), list = r ? r.convs : [], deep = list.filter((c) => c.depth >= 4).length, talk = avgTalk(list), streak = streakWeeks();
+    const sug = talk !== null && talk < 50 ? HOME_TOOLS[1] : HOME_TOOLS[3];
+    const sugText = talk !== null && talk < 50 ? 'השבוע דיברת לא מעט. הכלי הזה עוזר להקשיב יותר.' : sug.d;
+    return h('div', { class: 'qwrap saved' }, h('div', { class: 'badge v' }, ic('check', { size: 54, tone: 'white' })),
+      h('h2', { class: 'q' }, 'המבט נשלח'), streak > 1 ? h('p', { class: 'qs' }, `${streak} שבועות ברצף`) : null,
+      list.length ? h('div', { class: 'sumrow' }, h('div', null, h('b', { class: 'num' }, String(list.length)), h('span', null, 'שיחות')), h('div', null, h('b', { class: 'num' }, String(deep)), h('span', null, 'בעומק אישי')),
+        h('div', null, h('b', { class: 'num' }, talk === null ? '–' : `${talk}%`), h('span', null, 'התלמידים דיברו'))) : null,
+      togetherBox(h('div', { style: 'width:100%' })),
+      list.length ? h('a', { class: 'nextcard', href: '#' + sug.to, onclick: (ev) => { ev.preventDefault(); go(sug.to); } }, h('span', { class: 'small' }, 'רעיון לשבוע הבא'), h('b', null, sug.t), h('span', null, sugText)) : null,
+      link('/', 'חזרה לבית', 'cta'));
+  }
+  function submit() {
+    if (F.sending) return;
+    const doSubmit = async () => {
+      F.sending = true; F.err = ''; upd();
+      try {
+        const res = await api('PUT', `/api/me/reports/${week}`, { convs: draft.convs.map(({ legacy, ...c }) => c), noneReason: draft.convs.length ? '' : draft.noneReason });
+        const i = myReports.findIndex((r) => r.week === week);
+        if (i >= 0) myReports[i] = res.report; else myReports.push(res.report);
+        lsDel(dkey); clearTimeout(t); t = null;
+        F.sending = false; F.step = 'done'; paint(); window.scrollTo(0, 0);
+        celebrate(Math.max(2, Math.min(res.report.convs.length + 1, 5)));
+      } catch (ex) { F.sending = false; F.err = ex.message; paint(); }
+    };
+    const named = draft.convs.some((c) => findNames([c.note, c.axisOther, c.kindOther].join(' ')).length);
+    if (named) {
+      openSheet((closeSheet) => h('div', { class: 'stack' }, h('h3', null, 'נראה שמופיעים שמות'), h('p', null, 'הכלל במבט השבועי: בלי שמות תלמידים. אפשר לחזור ולתקן, או לשלוח בכל זאת.'),
+        h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => closeSheet() }, 'לחזור ולתקן'), h('button', { class: 'btn soft', type: 'button', onclick: () => { closeSheet(); doSubmit(); } }, 'לשלוח בכל זאת'))));
+    } else doSubmit();
+  }
+  function paint() { clear(root); add(root, [head(), body()]); }
+  paint();
+  return root;
+}
+
 async function boot() {
   try {
     await refreshPublic();

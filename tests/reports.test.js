@@ -32,6 +32,26 @@ test('שליחת מבט לשבוע הנוכחי, קריאה חוזרת וערי�
   assert.equal(again.json.reports[0].convs[0].feeling, 'inspired');
 });
 
+test('שיחה בלי סבב נשמרת (הסבב יצא מהמבט השבועי), וסבב ישן עדיין נשמר', async () => {
+  const c = await newEducator('בדיקה בלי סבב');
+  const { round, ...noRound } = conv();
+  const r = await c.put('/api/me/reports/2026-10-11', { convs: [noRound, conv({ round: 2 })] });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.report.convs[0].round, null);
+  assert.equal(r.json.report.convs[1].round, 2);
+});
+
+test('"יחד": מחנכת רואה רק שני מספרים כוללים', async () => {
+  const c = await newEducator('בדיקה יחד');
+  await c.put('/api/me/reports/2026-10-11', { convs: [conv(), conv()] });
+  const r = await c.get('/api/me/together');
+  assert.equal(r.status, 200);
+  assert.deepEqual(Object.keys(r.json).sort(), ['convs', 'educators']);
+  assert.ok(r.json.educators >= 1);
+  assert.ok(r.json.convs >= 2);
+  assert.equal((await app.client().get('/api/me/together')).status, 401);
+});
+
 test('שבוע בלי שיחות נספר, עם סיבה אופציונלית', async () => {
   const c = await newEducator('בדיקה שתיים');
   const r = await c.put('/api/me/reports/2026-10-11', { convs: [], noneReason: 'holiday' });

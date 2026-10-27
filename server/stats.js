@@ -190,7 +190,7 @@ async function exportRows() {
     const base = [r.week, weekNo(r.week), e.school_name, e.name, r.convs.length];
     if (!r.convs.length) rows.push([...base, '', '', '', '', '', '', r.noneReason ? `ללא שיחות: ${LABELS.none[r.noneReason] || ''}` : '', r.at]);
     for (const c of r.convs) {
-      rows.push([...base, LABELS.round[c.round], c.axes.map((a) => (a === 'other' ? `אחר: ${c.axisOther}` : LABELS.axis[a])).join(' + '), c.kinds.map((k) => (k === 'other' ? `אחר: ${c.kindOther}` : LABELS.kind[k])).join(' + '), c.depth ?? '', c.talkPct ?? '', LABELS.feeling[c.feeling], c.note || '', r.at]);
+      rows.push([...base, LABELS.round[c.round] || '',c.axes.map((a) => (a === 'other' ? `אחר: ${c.axisOther}` : LABELS.axis[a])).join(' + '), c.kinds.map((k) => (k === 'other' ? `אחר: ${c.kindOther}` : LABELS.kind[k])).join(' + '), c.depth ?? '', c.talkPct ?? '', LABELS.feeling[c.feeling], c.note || '', r.at]);
     }
   }
   return rows;

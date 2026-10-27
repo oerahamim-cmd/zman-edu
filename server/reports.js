@@ -27,7 +27,8 @@ function validateReport(body) {
   if (body.convs.length > config.MAX_CONVS_PER_WEEK) throw new HttpError(400, `אפשר לדווח על עד ${config.MAX_CONVS_PER_WEEK} שיחות בשבוע.`);
   const convs = body.convs.map((c, i) => {
     if (!c || typeof c !== 'object') throw new HttpError(400, `שיחה ${i + 1} לא תקינה.`);
-    if (!ROUNDS.includes(c.round)) throw new HttpError(400, `בשיחה ${i + 1} חסר סבב.`);
+    // הסבב כבר לא נשאל במבט השבועי. מבט ישן שנערך מחדש עדיין יכול לשלוח אותו, ואז הוא חייב להיות בטווח
+    if (c.round !== undefined && c.round !== null && !ROUNDS.includes(c.round)) throw new HttpError(400, `בשיחה ${i + 1} ערך לא תקין בסבב.`);
     // אפשר לסמן כמה צירים וכמה סוגי שיחה. ערך בודד (axis / kind) מהמבטים הישנים מתקבל גם הוא
     const axes = pickMany(c.axes, c.axis, AXES), kinds = pickMany(c.kinds, c.kind, KINDS);
     if (!axes) throw new HttpError(400, `בשיחה ${i + 1} חסר ציר שיחה.`);
@@ -41,7 +42,7 @@ function validateReport(body) {
     const kindOther = kinds.includes('other') ? clip(c.kindOther, 120) : '';
     if (axes.includes('other') && !axisOther) throw new HttpError(400, `בשיחה ${i + 1} צריך לכתוב על מה דיברתם.`);
     if (kinds.includes('other') && !kindOther) throw new HttpError(400, `בשיחה ${i + 1} צריך לכתוב איזו שיחה זו הייתה.`);
-    return { round: c.round, axes, axisOther, kinds, kindOther, depth: c.depth ?? null, talkPct: c.talkPct ?? null, feeling: c.feeling, note: clip(c.note, 1000) };
+    return { round: c.round ?? null, axes, axisOther, kinds, kindOther, depth: c.depth ?? null, talkPct: c.talkPct ?? null, feeling: c.feeling, note: clip(c.note, 1000) };
   });
   let noneReason = '';
   if (!convs.length && body.noneReason) {

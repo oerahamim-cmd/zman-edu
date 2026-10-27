@@ -218,6 +218,15 @@ route('PUT', '/api/me/reports/:week', ['educator'], async (ctx) => {
   return { report: reports.publicReport(saved) };
 });
 
+// "יחד": כמה מחנכות בתכנית, וכמה שיחות אישיות היו בארבעת השבועות האחרונים בכל בתי הספר. שני מספרים כוללים בלבד, בלי שמות ובלי פילוח.
+route('GET', '/api/me/together', ['educator'], async () => {
+  const from = weeks.addDays(weeks.curWeek(), -21);
+  const e = await db.get("SELECT COUNT(*)::int AS n FROM users WHERE role = 'educator' AND active = 1");
+  const c = await db.get(`SELECT COUNT(*)::int AS n FROM conversations c JOIN reports r ON r.id = c.report_id JOIN users u ON u.id = r.educator_id
+    WHERE u.active = 1 AND r.week >= ?`, [from]);
+  return { educators: e.n, convs: c.n };
+});
+
 // עצם השימוש בכלי אישי (כרגע: מיפוי הכיתה), כדי שמנהלת התכנית תדע מי משתמשת. נשמר רק מי, מתי וכמה ימים. לא נשלח ולא נשמר שום תוכן.
 route('POST', '/api/me/usage', ['educator'], async (ctx) => {
   const tool = ctx.body.tool;
