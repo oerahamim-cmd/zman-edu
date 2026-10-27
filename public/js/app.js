@@ -17,7 +17,7 @@ const AXES = [
 ];
 const KINDS = [
   { v: 'intro', t: `שיחת היכרות` },
-  { v: 'notebook', t: `שיחת מחברת` },
+  { v: 'notebook', t: `שיחה מחברת` },
   { v: 'complex', t: `שיחה מורכבת` },
   { v: 'grades', t: `הערכה לקראת תעודות` },
   { v: 'parents', t: `לקראת יום הורים` },

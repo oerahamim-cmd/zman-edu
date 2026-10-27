@@ -24,7 +24,7 @@ module.exports = { ROUNDS, AXES, KINDS, SCALE, USAGE_TOOLS, FEELINGS, NONE_REASO
 const LABELS = {
   round: { 1: 'סבב ראשון', 2: 'סבב שני', 3: 'סבב שלישי' },
   axis: { identity: 'זהות וחוזקות', goals: 'יעדים ומטרות', agency: "אייג'נסי", other: 'אחר' },
-  kind: { intro: 'שיחת היכרות', notebook: 'שיחת מחברת', complex: 'שיחה מורכבת', grades: 'הערכה לקראת תעודות', parents: 'לקראת יום הורים', deep: 'שיחת עומק (ישן)', other: 'אחר' },
+  kind: { intro: 'שיחת היכרות', notebook: 'שיחה מחברת', complex: 'שיחה מורכבת', grades: 'הערכה לקראת תעודות', parents: 'לקראת יום הורים', deep: 'שיחת עומק (ישן)', other: 'אחר' },
   depth: { 1: 'מידע ומעשיות', 2: 'בעיקר עניינית', 3: 'גם וגם', 4: 'בעיקר אישית', 5: 'עולם פנימי' },
   talk: { 1: 'בעיקר אני דיברתי', 2: 'אני דיברתי יותר', 3: 'חלוקה שווה בערך', 4: 'התלמיד/ה דיברו יותר', 5: 'בעיקר התלמיד/ה דיברו' },
   feeling: { inspired: 'מעורר השראה', good: 'טוב ומספק', neutral: 'רגיל', thoughtful: 'מעורר מחשבות', frustrated: 'מתסכל', heavy: 'כבד' },
