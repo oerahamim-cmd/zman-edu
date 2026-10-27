@@ -718,6 +718,8 @@ body.has-bn { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 .depthread { background: #fff; border-radius: 18px; padding: 12px 14px; min-height: 72px; display: flex; flex-direction: column; gap: 2px; font-size: 15px; color: var(--ink2); }
 .depthread b { font-size: 18px; color: var(--lead); }
 .flow .talkbar.unset .talkseg.me { background: #fff; }
+.flow .input, .flow .textarea { background: #fff; }
+.flow .textarea { min-height: 72px; }
 .faces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .face { border: 2px solid transparent; background: #fff; border-radius: 18px; padding: 10px 4px 8px; display: grid; justify-items: center; gap: 4px; font: 500 13px/1.2 var(--font); color: var(--ink); cursor: pointer; }
 .face.on { border-color: var(--lead); color: var(--lead); font-weight: 700; }
