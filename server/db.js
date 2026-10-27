@@ -154,6 +154,11 @@ async function init() {
       first_day TEXT NOT NULL, last_day TEXT NOT NULL, days INTEGER NOT NULL DEFAULT 1, started_day TEXT,
       PRIMARY KEY (user_id, tool))`);
 
+    // סבבי השיחות מהמיפוי: רק ארבעה מספרים לכל מחנכת (כמה תלמידים עוד לא, אחרי סבב ראשון, שני, שלישי). בלי שמות ובלי שום פרט על תלמיד/ה.
+    await run(`CREATE TABLE IF NOT EXISTS class_rounds (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      r0 INTEGER NOT NULL, r1 INTEGER NOT NULL, r2 INTEGER NOT NULL, r3 INTEGER NOT NULL, updated_at TEXT NOT NULL)`);
+
     for (const s of SCHOOLS) await run('INSERT INTO schools (slug, name, sort_order) VALUES (?, ?, ?) ON CONFLICT (slug) DO NOTHING', [s.slug, s.name, s.order]);
     // קודי הצטרפות: נוצרים פעם אחת, ומנהלת התכנית יכולה להחליף אותם בכל רגע
     const rows = await all('SELECT id, educator_code, lead_code FROM schools');

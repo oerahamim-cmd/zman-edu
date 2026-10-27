@@ -219,3 +219,30 @@ test('מחנכת שהוסרה: אי אפשר להירשם מחדש לחשבון 
   // המבטים של החשבון שהוסר נשמרים במסד (לייצוא ולסטטיסטיקה), מקושרים למזהה הישן בלבד
   assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM reports WHERE educator_id = ?', [victim.id])).n, beforeReports);
 });
+
+test('סבבים מהמיפוי: מחנכת שולחת רק ארבעה מספרים, מובילה רואה סכום לבית הספר, מנהלת גם לכל מחנכת', async () => {
+  const e = app.client();
+  assert.equal((await educatorLogin(e, EDUCATORS.findIndex((x) => x[1] === NAOMI[0]))).status, 200);
+  for (const bad of [{ r0: 1, r1: 2, r2: 3 }, { r0: -1, r1: 0, r2: 0, r3: 0 }, { r0: 1.5, r1: 0, r2: 0, r3: 0 }, { r0: '3', r1: 0, r2: 0, r3: 0 }, { r0: 999, r1: 0, r2: 0, r3: 0 }]) {
+    assert.equal((await e.put('/api/me/class-rounds', bad)).status, 400, JSON.stringify(bad));
+  }
+  assert.equal((await e.put('/api/me/class-rounds', { r0: 8, r1: 12, r2: 6, r3: 2, names: ['נועה'] })).status, 200);
+  const row = await db.get('SELECT * FROM class_rounds WHERE user_id = ?', [await idOf(NAOMI[0])]);
+  assert.deepEqual(Object.keys(row).sort(), ['r0', 'r1', 'r2', 'r3', 'updated_at', 'user_id']); // שום שדה נוסף לא נשמר
+  await setLeadNames(false);
+  const lead = await leadNaomi();
+  assert.equal((await lead.put('/api/me/class-rounds', { r0: 1, r1: 1, r2: 1, r3: 1 })).status, 403);
+  const lv = (await lead.get('/api/lead/overview')).json.classRounds;
+  assert.equal(lv.educators, 1);
+  assert.deepEqual(lv.rounds.map((x) => (x.hidden ? 'h' : x.n)), [8, 12, 6, 'h']); // 2 מתחת לסף: לא נשלח
+  const m = await manager();
+  const av = (await m.get('/api/admin/overview')).json.classRounds;
+  assert.deepEqual(av.rounds.map((x) => x.n), [8, 12, 6, 2]);
+  assert.deepEqual((await m.get(`/api/admin/educators/${await idOf(NAOMI[0])}`)).json.educator.classRounds.r, [8, 12, 6, 2]);
+  // גם כשהמובילה רואה שמות, אין לה את המספרים של מחנכת בודדת
+  await m.put('/api/admin/settings', { leadSeesNames: true });
+  const one = await (await leadNaomi()).get(`/api/lead/educators/${await idOf(NAOMI[0])}`);
+  assert.equal(one.status, 200);
+  assert.ok(!('classRounds' in one.json.educator));
+  await m.put('/api/admin/settings', { leadSeesNames: false });
+});

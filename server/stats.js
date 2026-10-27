@@ -36,6 +36,13 @@ async function usageOf(ids, tool = 'mapping') {
   }
   return out;
 }
+// סבבי השיחות מהמיפוי: ארבעה מספרים לכל מחנכת (עוד לא, אחרי סבב ראשון, שני, שלישי). אין כאן שמות.
+async function classRoundsOf(ids) {
+  const out = new Map();
+  if (!ids.length) return out;
+  for (const r of await db.all(`SELECT user_id, r0, r1, r2, r3, updated_at FROM class_rounds WHERE user_id IN ${db.inList(ids)}`, ids)) out.set(r.user_id, { r: [r.r0, r.r1, r.r2, r.r3], at: r.updated_at });
+  return out;
+}
 const joinWeekOf = (e, start) => (e.joined_week > start ? e.joined_week : start);
 
 function distribution(allConvs, getter, values, mask) {
@@ -100,6 +107,13 @@ async function overview(scope, { week, school } = {}) {
       talk: distribution(allConvs, (c) => talkBucket(c.talkPct), SCALE, mask),
     },
     talkAvg: talkAverage(allConvs, mask),
+    // כמה תלמידים בכל סבב, סכום של כל המחנכות שמיפו. למובילה ערכים קטנים מהסף לא נשלחים
+    classRounds: await (async () => {
+      const cr = await classRoundsOf(edus.map((e) => e.id));
+      const sums = [0, 0, 0, 0];
+      for (const v of cr.values()) v.r.forEach((n, i) => { sums[i] += n; });
+      return { educators: cr.size, of: edus.length, rounds: sums.map((n, i) => (mask && n < config.K_MIN ? { v: i, hidden: true } : { v: i, n })) };
+    })(),
     masked: mask,
   };
 
@@ -155,7 +169,8 @@ async function educatorDetail(scope, id) {
     return { week: wk, report: r ? { week: r.week, noneReason: r.noneReason, at: r.at, convs: r.convs } : null };
   });
   const mapping = scope.admin ? ((await usageOf([e.id])).get(e.id) || null) : undefined;
-  return { educator: { id: e.id, name: e.name, schoolName: e.school_name, joinedWeek: joinWeek, ...(scope.admin ? { mapping } : {}) }, weeks: list, reportsCount: reports.length, convs: reports.reduce((n, r) => n + r.convs.length, 0) };
+  const classRounds = scope.admin ? ((await classRoundsOf([e.id])).get(e.id) || null) : undefined;
+  return { educator: { id: e.id, name: e.name, schoolName: e.school_name, joinedWeek: joinWeek, ...(scope.admin ? { mapping, classRounds } : {}) }, weeks: list, reportsCount: reports.length, convs: reports.reduce((n, r) => n + r.convs.length, 0) };
 }
 
 async function notes(scope, { school, feeling, axis } = {}) {

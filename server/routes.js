@@ -227,6 +227,15 @@ route('GET', '/api/me/together', ['educator'], async () => {
   return { educators: e.n, convs: c.n };
 });
 
+// סבבי השיחות מהמיפוי: המכשיר שולח רק כמה תלמידים בכל סבב. השמות נשארים במכשיר.
+route('PUT', '/api/me/class-rounds', ['educator'], async (ctx) => {
+  const r = [0, 1, 2, 3].map((i) => ctx.body[`r${i}`]);
+  if (!r.every((n) => Number.isInteger(n) && n >= 0 && n <= 200)) throw new HttpError(400, 'המספרים לא תקינים.');
+  await db.run(`INSERT INTO class_rounds (user_id, r0, r1, r2, r3, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT (user_id) DO UPDATE SET r0 = excluded.r0, r1 = excluded.r1, r2 = excluded.r2, r3 = excluded.r3, updated_at = excluded.updated_at`, [ctx.user.id, ...r, nowIso()]);
+  return { ok: true };
+});
+
 // עצם השימוש בכלי אישי (כרגע: מיפוי הכיתה), כדי שמנהלת התכנית תדע מי משתמשת. נשמר רק מי, מתי וכמה ימים. לא נשלח ולא נשמר שום תוכן.
 route('POST', '/api/me/usage', ['educator'], async (ctx) => {
   const tool = ctx.body.tool;
