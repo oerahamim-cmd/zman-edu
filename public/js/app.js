@@ -363,7 +363,7 @@ function render() {
   const view = resolve(p);
   clear(app);
   // מחנכת מחוברת: סרגל ניווט תחתון במקום התפריט העליון. במבט השבועי המסך כולו לשאלות, בלי סרגלים
-  const edu = !!me() && state.area !== 'admin', inflow = edu && (p.startsWith('/me/report/') || (p.startsWith('/tools/cards/') && CARDS_IMMERSIVE(p.slice('/tools/cards/'.length))));
+  const edu = !!me() && state.area !== 'admin', inflow = edu && (p.startsWith('/me/report/') || p.startsWith('/welcome') || (p.startsWith('/tools/cards/') && CARDS_IMMERSIVE(p.slice('/tools/cards/'.length))));
   app.className = 'wrap' + (state.area === 'admin' ? ' admin' : '') + (edu ? ' edu' : '') + (inflow ? ' inflow' : '');
   document.body.classList.toggle('has-bn', edu && !inflow);
   add(app, inflow ? [view] : [header(), edu ? null : sessionBar(), view, h('p', { class: 'footer-note' }, 'זמן לחינוך · חותם ורשת אורט'), edu ? eduNav() : null]);
@@ -388,6 +388,8 @@ function resolve(p) {
   if (p === '/enter') return viewEnter('new', '/me');
   if (p === '/enter/manager') return viewEnter('manager', '/admin');
   if (p === '/me') return gate(p, viewMe);
+  if (p === '/welcome') return gate(p, eduWelcome);
+  if (p === '/welcome/practice') return gate(p, () => eduWeek(CUR_WEEK, { practice: true }));
   if ((m = /^\/me\/report\/(\d{4}-\d{2}-\d{2})$/.exec(p))) { const wk = m[1]; return gate(p, () => eduWeek(wk)); }
   if (p.startsWith('/lead')) return gateLead(p, () => viewLead(p));
   if (p.startsWith('/admin')) return isAdmin() ? viewAdmin(p) : redirect('/enter/manager');
@@ -909,7 +911,7 @@ function viewEnter(mode, next = '/me') {
     if (pin.value !== pin2.value) { err.textContent = 'שני הקודים צריכים להיות זהים.'; return false; }
     return true;
   };
-  const done = async (res, to, fresh) => { await enter(res.user); justRegistered = !!fresh; if (res.user.role !== 'manager') { lsSet(RETURN_KEY, '1'); if (school) lsSet(SCHOOL_KEY, school); } go(to); };
+  const done = async (res, to, fresh) => { await enter(res.user); justRegistered = !!fresh; if (res.user.role !== 'manager') { lsSet(RETURN_KEY, '1'); if (school) lsSet(SCHOOL_KEY, school); } if (res.user.role === 'educator' && !lsGet(ONBOARD_KEY + '.' + res.user.id)) { WEL.step = 0; to = '/welcome'; } go(to); };
 
   function paint() {
     clear(root);
@@ -1046,7 +1048,7 @@ function viewMe() {
     root.push(h('section', { class: 'frame' }, h('div', { class: 'row between' }, h('h3', null, 'השבועות שלי'), h('span', { class: 'small muted' }, `שבועות שנשלחו: ${done} מתוך ${weeks.length} · ${nConv(convs)}`)), list));
     const cc = changeCodeBox();
     root.push(h('section', { class: 'frame' }, h('h3', null, 'החשבון שלי'), h('p', { class: 'muted' }, `${e.name} · ${e.schoolName}`),
-      h('div', { class: 'row' }, link('/tools', 'לארגז הכלים', 'btn soft sm'), link('/mapping', 'למיפוי הכיתה', 'btn soft sm'), h('button', { class: 'btn soft sm', onclick: cc.open }, 'החלפת קוד'), h('button', { class: 'btn soft sm', onclick: logout }, 'יציאה')), cc.box));
+      h('div', { class: 'row' }, link('/tools', 'לארגז הכלים', 'btn soft sm'), link('/mapping', 'למיפוי הכיתה', 'btn soft sm'), h('button', { class: 'btn soft sm', onclick: cc.open }, 'החלפת קוד'), h('button', { class: 'btn soft sm', onclick: () => { WEL.step = 0; go('/welcome'); } }, 'הכניסה הראשונה, שוב'), h('button', { class: 'btn soft sm', onclick: logout }, 'יציאה')), cc.box));
     return root;
   });
 }
@@ -1571,13 +1573,14 @@ function diveSlider({ value, onChange }) {
 
 /* ---------- המבט השבועי: שאלה אחת למסך ---------- */
 const STEPS = ['axis', 'kind', 'depth', 'talk', 'feel'];
-function eduWeek(week) {
+function eduWeek(week, opts = {}) {
+  const practice = !!opts.practice;
   if (week > CUR_WEEK || week < joinWeek()) return h('section', { class: 'frame' }, h('h2', null, 'השבוע הזה לא פתוח למבט'), link('/', 'חזרה לבית'));
   const e = session, existing = myReport(week);
   // טיוטה של מבט שעוד לא נשלח נשמרת רק במכשיר הזה, ונמחקת כשהמבט נשלח
   const dkey = `${DRAFT_KEY}.${e.id}.${week}`;
-  const saved = (() => { try { return JSON.parse(lsGet(dkey) || 'null'); } catch { return null; } })();
-  const draft = JSON.parse(JSON.stringify(saved && Array.isArray(saved.convs) ? saved : existing ? { convs: existing.convs.map((c) => ({ ...c, legacy: c.depth == null && c.talkPct == null })), noneReason: existing.noneReason || '' } : { convs: [], noneReason: '' }));
+  const saved = practice ? null : (() => { try { return JSON.parse(lsGet(dkey) || 'null'); } catch { return null; } })();
+  const draft = JSON.parse(JSON.stringify(saved && Array.isArray(saved.convs) ? saved : existing && !practice ? { convs: existing.convs.map((c) => ({ ...c, legacy: c.depth == null && c.talkPct == null })), noneReason: existing.noneReason || '' } : { convs: [], noneReason: '' }));
   draft.convs.forEach((c) => {
     if (!Array.isArray(c.axes)) c.axes = c.axis ? [c.axis] : [];
     if (!Array.isArray(c.kinds)) c.kinds = c.kind ? [c.kind] : [];
@@ -1587,7 +1590,7 @@ function eduWeek(week) {
   });
   const F = { step: 'count', ci: 0, sending: false, err: '' };
   let t = null;
-  const persist = () => lsSet(dkey, JSON.stringify(draft));
+  const persist = () => { if (!practice) lsSet(dkey, JSON.stringify(draft)); };
   const touch = () => { clearTimeout(t); t = setTimeout(persist, 400); };
   const root = h('div', { class: 'wflow' });
   const cur = () => draft.convs[F.ci];
@@ -1614,7 +1617,7 @@ function eduWeek(week) {
     else if (s === 'saved') pop();
     paint();
   };
-  const close = () => { persist(); go('/'); };
+  const close = () => { persist(); if (practice) { WEL.step = 2; go('/welcome'); } else go('/'); };
 
   function progress() {
     const n = Math.max(1, draft.convs.length);
@@ -1625,7 +1628,7 @@ function eduWeek(week) {
     return h('div', { class: 'wtop' },
       F.step !== 'count' && F.step !== 'done' ? h('button', { class: 'fbtn', type: 'button', 'aria-label': 'חזרה לשאלה הקודמת', onclick: back }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>')) : null,
       progress(),
-      F.step !== 'done' ? h('button', { class: 'fbtn', type: 'button', 'aria-label': 'סגירה. הטיוטה נשמרת במכשיר', onclick: close }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>')) : null);
+      F.step !== 'done' ? h('button', { class: 'fbtn', type: 'button', 'aria-label': practice ? 'סיום התרגול' : 'סגירה. הטיוטה נשמרת במכשיר', onclick: close }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>')) : null);
   }
   const q = (kicker, title, sub, ...body) => h('div', { class: 'qwrap' }, kicker ? h('span', { class: 'qk' }, kicker) : null, h('h2', { class: 'qt' }, title), sub ? h('p', { class: 'qs' }, sub) : null, ...body);
   const nextButton = (label, onclick, cls = 'cta') => { nextBtn = h('button', { class: cls, type: 'button', onclick }, label); upd(); return nextBtn; };
@@ -1719,6 +1722,8 @@ function eduWeek(week) {
     return null;
   }
   function doneScreen() {
+    if (practice) return h('div', { class: 'qwrap saved' }, h('div', { class: 'badge v' }, ic('check', { size: 54, tone: 'white' })), h('h2', { class: 'qt' }, 'ככה זה עובד'),
+      h('p', { class: 'qs' }, 'פעם בשבוע, בערך שתי דקות. התרגול לא נשמר.'), h('button', { class: 'cta', type: 'button', onclick: () => { WEL.step = 2; go('/welcome'); } }, 'המשך'));
     const r = myReport(week), list = r ? r.convs : [], deep = list.filter((c) => c.depth >= 4).length, talk = avgTalk(list), streak = streakWeeks();
     const sug = talk !== null && talk < 50 ? HOME_TOOLS[1] : HOME_TOOLS[3];
     const sugText = talk !== null && talk < 50 ? 'השבוע דיברת לא מעט. הכלי הזה עוזר להקשיב יותר.' : sug.d;
@@ -1733,6 +1738,7 @@ function eduWeek(week) {
   function submit() {
     if (F.sending) return;
     const doSubmit = async () => {
+      if (practice) { F.step = 'done'; paint(); window.scrollTo(0, 0); celebrate(Math.max(2, Math.min(draft.convs.length + 1, 5))); return; }
       F.sending = true; F.err = ''; upd();
       try {
         const res = await api('PUT', `/api/me/reports/${week}`, { convs: draft.convs.map(({ legacy, ...c }) => c), noneReason: draft.convs.length ? '' : draft.noneReason });
@@ -1749,7 +1755,7 @@ function eduWeek(week) {
         h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => closeSheet() }, 'לחזור ולתקן'), h('button', { class: 'btn soft', type: 'button', onclick: () => { closeSheet(); doSubmit(); } }, 'לשלוח בכל זאת'))));
     } else doSubmit();
   }
-  function paint() { clear(root); add(root, [head(), body()]); }
+  function paint() { clear(root); add(root, [head(), practice && PRACTICE_TIPS[F.step] ? h('div', { class: 'ptip' }, ic('idea', { size: 18, tone: 'white' }), PRACTICE_TIPS[F.step]) : null, body()]); }
   paint();
   return root;
 }
@@ -2151,6 +2157,51 @@ function focusPrompt() {
     h('button', { class: 'cta', type: 'button', onclick: close }, 'אפשר להתחיל')));
 }
 
+/* ---------- כניסה ראשונה: פתיחה, מבט שבועי לתרגול, והוספה למסך הבית ----------
+   מופיעה פעם אחת בכל מכשיר אחרי הכניסה, ואפשר לראות אותה שוב מ"השבועות שלי". התרגול לא נשמר. */
+const ONBOARD_KEY = 'zmw.onboarded';
+const WEL = { step: 0, os: null };
+const PRACTICE_TIPS = {
+  count: 'תרגול: אפשר לבחור כל מספר. שום דבר לא נשמר.', zero: 'גם שבוע בלי שיחות נשלח בשתי נגיעות.',
+  axis: 'אלה הצירים מההכשרה. אפשר לבחור כמה.', kind: 'ואיזו שיחה זו הייתה.', depth: 'גרירה של הצוללן, או נגיעה בעומק.',
+  talk: 'כמה מקום היה לקול של התלמיד/ה.', feel: 'ואיך השיחה הייתה בשבילך.', saved: 'כשהשיחות דומות, כפתור אחד שומר את כולן.',
+};
+// הוספה למסך הבית: ב-Android הדפדפן מציע התקנה בלחיצה אחת. באייפון מסבירים איפה הכפתור.
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; });
+window.addEventListener('appinstalled', () => { installPrompt = null; });
+const isStandalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch { return false; } };
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function finishWelcome() { const e = me(); if (e) lsSet(ONBOARD_KEY + '.' + e.id, '1'); WEL.step = 0; }
+function eduWelcome() {
+  const dots = (n) => h('div', { class: 'odots', 'aria-hidden': 'true' }, [0, 1, 2].map((i) => h('i', { class: i === n ? 'on' : '' })));
+  if (WEL.step === 2) {
+    if (!WEL.os) WEL.os = isIOS() ? 'ios' : 'android';
+    const ios = WEL.os === 'ios';
+    const steps = ios ? [['send', 'נגיעה בכפתור השיתוף בתחתית הדפדפן'], ['plan', '"הוספה למסך הבית"'], ['check', '"הוספה", וזהו']]
+      : [['gear', 'נגיעה בשלוש הנקודות למעלה'], ['plan', '"הוספה למסך הבית" או "התקנת אפליקציה"'], ['check', '"הוספה", וזהו']];
+    const done = () => { finishWelcome(); go('/'); setTimeout(() => { confetti(90, 1); toast('הכול מוכן'); }, 50); };
+    return h('div', { class: 'onb' },
+      h('span', { class: 'obadge' }, ic('school', { size: 34, tone: 'white' })), h('h2', null, 'על המסך של הטלפון'),
+      isStandalone() ? h('p', null, 'האפליקציה כבר נפתחת מהמסך של הטלפון. אפשר להמשיך.')
+        : [h('p', null, 'כך האפליקציה נפתחת בנגיעה אחת, כמו כל אפליקציה.'),
+          installPrompt ? h('button', { class: 'cta', type: 'button', onclick: async () => { const p = installPrompt; installPrompt = null; try { p.prompt(); await p.userChoice; } catch { /* הדפדפן סירב */ } render(); } }, 'הוספה למסך הבית') : null,
+          segTabs([['ios', 'iPhone'], ['android', 'Android']], WEL.os, (v) => { WEL.os = v; render(); }),
+          h('ol', { class: 'how3' }, steps.map(([, t], k) => h('li', null, h('b', null, String(k + 1)), t))),
+          h('div', { class: 'homegrid', 'aria-hidden': 'true' }, Array.from({ length: 8 }, (_, i) => (i === 5 ? h('span', { class: 'appic on' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('small', null, 'זמן לחינוך')) : h('span', { class: 'appic' }, h('i'), h('small')))))],
+      h('div', { class: 'spacer' }), h('button', { class: 'cta', type: 'button', onclick: done }, 'סיימתי'), dots(2));
+  }
+  return h('div', { class: 'onb' },
+    h('img', { class: 'onblogo', src: 'assets/logo/zman-logo.svg', alt: 'זמן לחינוך' }),
+    h('div', { class: 'onbart', 'aria-hidden': 'true' }, h('span', { class: 'oa1' }, h('i', { style: 'height:30%' }), h('i', { style: 'height:55%' }), h('i', { style: 'height:80%' }), h('i', { class: 'q' }, '?')),
+      h('span', { class: 'oa2' }, ic('idea', { size: 34, tone: 'white' })), h('span', { class: 'oa3' }, ROUND_LOOK.concat(ROUND_LOOK.slice(1, 3)).map((L) => h('i', { style: `background:${L.c}` })))),
+    h('h2', null, 'שמחים שהגעת'),
+    h('p', null, 'כאן אפשר לספר על השיחות האישיות שלך, בשתי דקות בשבוע, ולמצוא כלים לשיחה הבאה.'),
+    h('div', { class: 'spacer' }),
+    h('button', { class: 'cta', type: 'button', onclick: () => go('/welcome/practice') }, 'לנסות עכשיו · דקה אחת'),
+    h('button', { class: 'linkbtn', type: 'button', style: 'align-self:center', onclick: () => { finishWelcome(); go('/'); } }, 'לדלג לדף הבית'), dots(0));
+}
+
 async function boot() {
   try {
     await refreshPublic();
@@ -2163,6 +2214,7 @@ async function boot() {
   }
   current = location.hash.slice(1) || '/';
   render();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 boot();
 })();

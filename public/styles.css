@@ -922,6 +922,33 @@ body:not(.has-bn) .printbar { bottom: 10px; }
 .row .segt button { white-space: nowrap; padding-inline: 12px; }
 .cardsview.full .cardbtns .btn { white-space: nowrap; }
 @media (max-width: 640px) { .cardsview.full .cardcat { bottom: 86px; } }
+/* כניסה ראשונה */
+.onb { min-height: calc(100vh - 2 * var(--r)); display: flex; flex-direction: column; gap: 14px; text-align: center; padding-top: 8px; }
+.onb h2 { font-size: 28px; }
+.onb > p { color: var(--ink2); font-size: 16px; }
+.onb .spacer { flex: 1; }
+.onblogo { height: 60px; width: auto; align-self: center; }
+.onbart { position: relative; height: 200px; margin: 6px 0; }
+.onbart > span { position: absolute; border-radius: 22px; display: flex; animation: rise .6s ease both; }
+.oa1 { right: 8%; top: 10px; width: 56%; height: 124px; background: var(--lead); padding: 16px; gap: 8px; align-items: flex-end; transform: rotate(-4deg); }
+.oa1 i { flex: 1; background: var(--turq); border-radius: 6px 6px 3px 3px; }
+.oa1 i.q { background: transparent; border: 2px dashed rgba(255, 255, 255, .75); height: 70%; color: #fff; font-style: normal; font-weight: 900; display: grid; place-items: center; }
+.oa2 { left: 8%; top: 0; width: 96px; height: 124px; background: var(--violet); align-items: center; justify-content: center; transform: rotate(6deg); animation-delay: .1s; }
+.oa3 { left: 18%; bottom: 0; width: 66%; height: 62px; background: #fff; box-shadow: 0 6px 18px rgba(16, 19, 31, .12); padding: 12px; gap: 8px; align-items: center; justify-content: center; animation-delay: .2s; }
+.oa3 i { width: 28px; height: 28px; border-radius: 50%; }
+.obadge { align-self: center; width: 70px; height: 70px; border-radius: 50%; background: var(--lead); display: grid; place-items: center; }
+.odots { display: flex; gap: 6px; justify-content: center; padding-top: 4px; }
+.odots i { width: 8px; height: 8px; border-radius: 50%; background: #dcdcdc; }
+.odots i.on { width: 24px; border-radius: 4px; background: var(--lead); }
+.onb .how3 { text-align: start; }
+.homegrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: var(--deep); border-radius: 22px; padding: 16px 12px; }
+.appic { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.appic i { width: 46px; height: 46px; border-radius: 12px; background: rgba(240, 240, 240, .25); }
+.appic small { font-size: 10.5px; color: #fff; min-height: 13px; }
+.appic img { width: 46px; height: 46px; border-radius: 12px; background: #fff; }
+.appic.on img { animation: kpulse 1.4s ease-in-out infinite; }
+.ptip { display: flex; gap: 8px; align-items: center; background: var(--violet); color: #fff; border-radius: 12px; padding: 9px 12px; font-size: 14px; font-weight: 500; margin-top: 8px; animation: rise .35s ease both; }
+
 @media (prefers-reduced-motion: reduce) { .wrap.edu *, .wrap.inflow *, .heartpop { animation: none !important; transition: none !important; } }
 
 /* טבלת תפקידים להדפסה: מופיעה רק בזמן הדפסה */
