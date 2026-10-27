@@ -389,6 +389,7 @@ function resolve(p) {
   if (p === '/enter/manager') return viewEnter('manager', '/admin');
   if (p === '/me') return gate(p, viewMe);
   if (p === '/welcome') return gate(p, eduWelcome);
+  if (p === '/reminder') return gate(p, eduReminder);
   if (p === '/welcome/practice') return gate(p, () => eduWeek(CUR_WEEK, { practice: true }));
   if ((m = /^\/me\/report\/(\d{4}-\d{2}-\d{2})$/.exec(p))) { const wk = m[1]; return gate(p, () => eduWeek(wk)); }
   if (p.startsWith('/lead')) return gateLead(p, () => viewLead(p));
@@ -440,7 +441,7 @@ function viewHome() {
       h('ul', { class: 'plain' },
         h('li', null, 'לא נשמרים שמות תלמידים ולא תיעוד על ילד או ילדה.'),
         h('li', null, 'בכל שבוע נשמר מספר השיחות, ולכל שיחה כמה בחירות קצרות והערה חופשית.'),
-        h('li', null, 'שמות התלמידים במיפוי הכיתה נשארים במכשיר שלך. לשרת עולה רק כמה תלמידים בכל סבב, בלי שמות.'),
+        h('li', null, 'שמות התלמידים במיפוי הכיתה נשארים במכשיר שלך. לשרת עולה רק כמה תלמידים בכל סבב, בלי שמות.'), h('li', null, 'אם בחרת תזכורת במייל, הכתובת נשמרת רק בשביל התזכורת.'),
         h('li', null, who))),
     session ? null : h('details', null, h('summary', null, ic('question', { size: 20 }), 'פעם ראשונה? איך נכנסים'),
       h('ol', { class: 'plain' },
@@ -1048,7 +1049,7 @@ function viewMe() {
     root.push(h('section', { class: 'frame' }, h('div', { class: 'row between' }, h('h3', null, 'השבועות שלי'), h('span', { class: 'small muted' }, `שבועות שנשלחו: ${done} מתוך ${weeks.length} · ${nConv(convs)}`)), list));
     const cc = changeCodeBox();
     root.push(h('section', { class: 'frame' }, h('h3', null, 'החשבון שלי'), h('p', { class: 'muted' }, `${e.name} · ${e.schoolName}`),
-      h('div', { class: 'row' }, link('/tools', 'לארגז הכלים', 'btn soft sm'), link('/mapping', 'למיפוי הכיתה', 'btn soft sm'), h('button', { class: 'btn soft sm', onclick: cc.open }, 'החלפת קוד'), h('button', { class: 'btn soft sm', onclick: () => { WEL.step = 0; go('/welcome'); } }, 'הכניסה הראשונה, שוב'), h('button', { class: 'btn soft sm', onclick: logout }, 'יציאה')), cc.box));
+      h('div', { class: 'row' }, link('/tools', 'לארגז הכלים', 'btn soft sm'), link('/mapping', 'למיפוי הכיתה', 'btn soft sm'), h('button', { class: 'btn soft sm', onclick: cc.open }, 'החלפת קוד'), h('button', { class: 'btn soft sm', onclick: () => go('/reminder') }, 'תזכורת שבועית'), h('button', { class: 'btn soft sm', onclick: () => { WEL.step = 0; go('/welcome'); } }, 'הכניסה הראשונה, שוב'), h('button', { class: 'btn soft sm', onclick: logout }, 'יציאה')), cc.box));
     return root;
   });
 }
@@ -1498,7 +1499,7 @@ function eduHome() {
   const top = h('div', { class: 'etop' }, h('div', null, h('div', { class: 'hello' }, `שלום ${firstName(e.name)}`), h('div', { class: 'small muted' }, e.schoolName)),
     h('a', { class: 'avatar', href: '#/me', 'aria-label': 'השבועות והחשבון שלי', onclick: (ev) => { ev.preventDefault(); go('/me'); } }, firstName(e.name).slice(0, 1)));
   const tg = togetherBox(h('div'));
-  const root = h('div', { class: 'ehome' }, top, hero, journey, klass, tools, tg, privacy);
+  const root = h('div', { class: 'ehome' }, top, hero, remChip(), journey, klass, tools, tg, privacy);
   if (justRegistered) { justRegistered = false; toast('הקוד נשמר. בפעם הבאה נכנסים עם בית ספר, שם והקוד.'); }
   return root;
 }
@@ -2174,8 +2175,13 @@ const isStandalone = () => { try { return matchMedia('(display-mode: standalone)
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function finishWelcome() { const e = me(); if (e) lsSet(ONBOARD_KEY + '.' + e.id, '1'); WEL.step = 0; }
 function eduWelcome() {
-  const dots = (n) => h('div', { class: 'odots', 'aria-hidden': 'true' }, [0, 1, 2].map((i) => h('i', { class: i === n ? 'on' : '' })));
+  const dots = (n) => h('div', { class: 'odots', 'aria-hidden': 'true' }, [0, 1, 2, 3].map((i) => h('i', { class: i === n ? 'on' : '' })));
   if (WEL.step === 2) {
+    return h('div', { class: 'onb' }, h('span', { class: 'obadge' }, ic('calendar', { size: 34, tone: 'white' })), h('h2', null, 'מתי נוח לקבל תזכורת?'), h('p', null, 'פעם בשבוע, בזמן שמתאים לך.'),
+      reminderPanel(() => { WEL.step = 3; render(); }, 'המשך'),
+      h('button', { class: 'linkbtn', type: 'button', style: 'align-self:center', onclick: () => { WEL.step = 3; render(); } }, 'בלי תזכורת בינתיים'), dots(2));
+  }
+  if (WEL.step === 3) {
     if (!WEL.os) WEL.os = isIOS() ? 'ios' : 'android';
     const ios = WEL.os === 'ios';
     const steps = ios ? [['send', 'נגיעה בכפתור השיתוף בתחתית הדפדפן'], ['plan', '"הוספה למסך הבית"'], ['check', '"הוספה", וזהו']]
@@ -2189,7 +2195,7 @@ function eduWelcome() {
           segTabs([['ios', 'iPhone'], ['android', 'Android']], WEL.os, (v) => { WEL.os = v; render(); }),
           h('ol', { class: 'how3' }, steps.map(([, t], k) => h('li', null, h('b', null, String(k + 1)), t))),
           h('div', { class: 'homegrid', 'aria-hidden': 'true' }, Array.from({ length: 8 }, (_, i) => (i === 5 ? h('span', { class: 'appic on' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('small', null, 'זמן לחינוך')) : h('span', { class: 'appic' }, h('i'), h('small')))))],
-      h('div', { class: 'spacer' }), h('button', { class: 'cta', type: 'button', onclick: done }, 'סיימתי'), dots(2));
+      h('div', { class: 'spacer' }), h('button', { class: 'cta', type: 'button', onclick: done }, 'סיימתי'), dots(3));
   }
   return h('div', { class: 'onb' },
     h('img', { class: 'onblogo', src: 'assets/logo/zman-logo.svg', alt: 'זמן לחינוך' }),
@@ -2200,6 +2206,90 @@ function eduWelcome() {
     h('div', { class: 'spacer' }),
     h('button', { class: 'cta', type: 'button', onclick: () => go('/welcome/practice') }, 'לנסות עכשיו · דקה אחת'),
     h('button', { class: 'linkbtn', type: 'button', style: 'align-self:center', onclick: () => { finishWelcome(); go('/'); } }, 'לדלג לדף הבית'), dots(0));
+}
+
+/* ---------- תזכורת שבועית: יום, שעה, התראה בטלפון ו/או מייל ----------
+   ההגדרות נשמרות בשרת. מייל נשמר רק אם בוחרים תזכורת במייל. נגיעה בתזכורת פותחת ישר את המבט לשבוע הזה. */
+const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+let REM = null;
+async function loadReminder(force) { if (!REM || force) REM = await api('GET', '/api/me/reminder'); return REM; }
+const remOn = () => !!(REM && REM.reminder && (REM.reminder.push || REM.reminder.mail));
+const remLabel = () => (!remOn() ? 'להגדרת תזכורת שבועית' : REM.reminder.skipWeek ? 'בלי תזכורת השבוע' : `תזכורת בימי ${DAYS_HE[REM.reminder.day]} · ${REM.reminder.hour}:00`);
+function remChip() {
+  const chip = h('a', { class: 'remchip', href: '#/reminder', onclick: (e) => { e.preventDefault(); go('/reminder'); } }, ic('calendar', { size: 18 }), h('span', null, REM ? remLabel() : 'תזכורת שבועית'));
+  if (!REM) loadReminder().then(() => { if (document.body.contains(chip)) chip.lastChild.textContent = remLabel(); }, () => {});
+  return chip;
+}
+const b64ToBytes = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
+// הפעלת התראות בטלפון. מחזיר 'ok' או סיבה למה לא
+async function enablePush() {
+  if (isIOS() && !isStandalone()) return 'ios-install';
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return 'unsupported';
+  if (!REM.pushReady || !REM.vapidPublicKey) return 'server';
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') return 'denied';
+  const reg = await navigator.serviceWorker.ready;
+  // טלפון שלא עונה לבקשה תוך 20 שניות: מחזירים תשובה, ולא משאירים את הכפתור תקוע
+  const late = new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 20000));
+  const sub = await Promise.race([(async () => (await reg.pushManager.getSubscription()) || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(REM.vapidPublicKey) }))(), late]);
+  await api('POST', '/api/me/push-subscriptions', sub.toJSON());
+  return 'ok';
+}
+const PUSH_WHY = {
+  'ios-install': 'באייפון, התראות עובדות רק אחרי שהאפליקציה נוספה למסך הבית. אפשר להוסיף אותה ואז לחזור לכאן.',
+  unsupported: 'הדפדפן הזה לא תומך בהתראות. אפשר לבחור מייל במקום.',
+  server: 'ההתראות בטלפון עוד לא הופעלו באפליקציה. ההגדרה תישמר ותעבוד ברגע שיופעלו.',
+  denied: 'ההתראות חסומות בהגדרות של הטלפון. אפשר לאשר אותן שם, או לבחור מייל.',
+  failed: 'לא הצלחנו להפעיל התראות במכשיר הזה. אפשר לנסות שוב, או לבחור מייל.',
+};
+// הלוח עצמו: משמש גם בדף התזכורת וגם בכניסה הראשונה
+function reminderPanel(onSaved, saveLabel = 'שמירה') {
+  const host = h('div', { class: 'remb' }, h('p', { class: 'muted', role: 'status' }, 'טוענים…'));
+  let D = null, note = '';
+  const paint = () => {
+    clear(host);
+    const hourOpts = [13, 15, 17, 20];
+    add(host, [
+      h('h3', { class: 'sub2' }, 'באיזה יום?'),
+      h('div', { class: 'days' }, DAYS_HE.map((d, i) => h('button', { class: 'day' + (D.day === i ? ' on' : ''), type: 'button', 'aria-pressed': String(D.day === i), 'aria-label': d, onclick: () => { D.day = i; paint(); } }, 'אבגדהו'[i] + '׳'))),
+      h('h3', { class: 'sub2' }, 'באיזו שעה?'),
+      h('div', { class: 'chips' }, hourOpts.map((x) => h('button', { class: 'zpick' + (D.hour === x ? ' on' : ''), type: 'button', onclick: () => { D.hour = x; paint(); } }, `${x}:00`)),
+        h('select', { class: 'select hoursel', 'aria-label': 'שעה אחרת', onchange: (e) => { D.hour = Number(e.target.value); paint(); } },
+          Array.from({ length: 17 }, (_, k) => k + 6).map((x) => h('option', { value: String(x), selected: D.hour === x }, hourOpts.includes(x) ? `${x}:00` : `שעה אחרת · ${x}:00`)))),
+      h('h3', { class: 'sub2' }, 'איך? אפשר את שתיהן'),
+      h('div', { class: 'chtog' },
+        h('button', { class: D.push ? 'on' : '', type: 'button', 'aria-pressed': String(D.push), onclick: async () => {
+          if (D.push) { D.push = false; note = ''; paint(); return; }
+          note = 'מפעילים התראות…'; paint();
+          const r = await enablePush().catch(() => 'failed');
+          D.push = r === 'ok' || r === 'server'; note = r === 'ok' ? '' : PUSH_WHY[r]; paint();
+        } }, ic(D.push ? 'check' : 'idea', { size: 18 }), 'התראה בטלפון'),
+        h('button', { class: D.mail ? 'on' : '', type: 'button', 'aria-pressed': String(D.mail), onclick: () => { D.mail = !D.mail; paint(); if (D.mail) setTimeout(() => host.querySelector('.remmail')?.focus(), 0); } }, ic(D.mail ? 'check' : 'send', { size: 18 }), 'מייל')),
+      note ? h('p', { class: 'warn-note' }, note) : null,
+      D.mail ? [h('input', { class: 'input remmail', type: 'email', value: D.email, placeholder: 'כתובת המייל שלך', 'aria-label': 'כתובת המייל לתזכורת', autocomplete: 'email', oninput: (e) => { D.email = e.target.value; } }),
+        h('p', { class: 'small muted' }, 'הכתובת נשמרת רק בשביל התזכורת, ונמחקת כשמכבים את המייל.'), REM.mailReady ? null : h('p', { class: 'small muted' }, 'המייל עוד לא הופעל באפליקציה. ההגדרה תישמר ותעבוד ברגע שיופעל.')] : null,
+      D.push ? h('div', { class: 'lock' }, h('span', { class: 'lktime num' }, `${D.hour}:00`), h('span', { class: 'lkday' }, `יום ${DAYS_HE[D.day]}`),
+        h('span', { class: 'ncard' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('span', null, h('b', null, 'המבט השבועי'), 'שתי דקות על השיחות של השבוע?'), h('small', null, 'עכשיו'))) : null,
+      D.mail ? h('div', { class: 'mail2' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('span', null, h('b', null, 'זמן לחינוך'), h('span', { class: 'subj' }, 'המבט השבועי · שתי דקות'), h('span', { class: 'snip' }, `יום ${DAYS_HE[D.day]}, ${D.hour}:00 · כפתור אחד שפותח את המבט`))) : null,
+      D.push || D.mail ? h('p', { class: 'small muted', style: 'text-align:center' }, 'נגיעה בתזכורת פותחת ישר את השאלה הראשונה. אם המבט כבר נשלח, לא תגיע תזכורת.') : null,
+      remOn() || D.push || D.mail ? h('button', { class: 'cta ' + (D.skipWeek ? 'violet' : 'ghostc'), type: 'button', onclick: () => { D.skipWeek = !D.skipWeek; paint(); } }, D.skipWeek ? 'בלי תזכורת השבוע · לביטול' : 'השבוע חג או חופשה? דילוג על תזכורת אחת') : null,
+      h('button', { class: 'cta', type: 'button', onclick: async (e) => {
+        if (D.mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(D.email.trim())) { toast('כדאי לבדוק את כתובת המייל'); return; }
+        const b = e.currentTarget; b.disabled = true;
+        try { await api('PUT', '/api/me/reminder', { day: D.day, hour: D.hour, push: D.push, mail: D.mail, email: D.email.trim(), skipWeek: D.skipWeek }); await loadReminder(true); toast(D.push || D.mail ? 'התזכורת נשמרה' : 'התזכורת כבויה'); if (onSaved) onSaved(); else paint(); }
+        catch (ex) { toast(ex.message); b.disabled = false; }
+      } }, saveLabel),
+      remOn() && !onSaved ? h('button', { class: 'linkbtn', type: 'button', style: 'align-self:center', onclick: async () => {
+        try { const r = (await api('POST', '/api/me/reminder/test')).sent; toast(r.failed && r.failed.length ? `לא נשלח ${r.failed.includes('mail') ? 'מייל' : 'התראה'}. כדאי לבדוק את ההגדרות ולנסות שוב.` : r.push || r.mail ? `נשלחה תזכורת לניסיון${r.push ? ' לטלפון' : ''}${r.push && r.mail ? ' ו' : ''}${r.mail ? 'למייל' : ''}` : 'לא נשלח: הערוצים עוד לא פעילים באפליקציה'); } catch (ex) { toast(ex.message); }
+      } }, 'שליחת תזכורת לניסיון') : null]);
+  };
+  loadReminder(true).then(() => { const r = REM.reminder || {}; D = { day: r.day ?? 4, hour: r.hour ?? 17, push: !!r.push, mail: !!r.mail, email: r.email || '', skipWeek: !!r.skipWeek }; paint(); },
+    (ex) => { clear(host); add(host, [h('p', { class: 'err' }, ex.message)]); });
+  return host;
+}
+function eduReminder() {
+  return h('div', { class: 'etools' }, h('div', { class: 'ttop' }, backBtn('/', 'בית'), h('h2', null, 'תזכורת שבועית')),
+    h('p', { class: 'qs' }, 'פעם בשבוע, בזמן שמתאים לך.'), reminderPanel(null));
 }
 
 async function boot() {

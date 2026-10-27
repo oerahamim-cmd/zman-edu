@@ -159,6 +159,16 @@ async function init() {
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       r0 INTEGER NOT NULL, r1 INTEGER NOT NULL, r2 INTEGER NOT NULL, r3 INTEGER NOT NULL, updated_at TEXT NOT NULL)`);
 
+    // תזכורת שבועית: יום (0 ראשון עד 5 שישי), שעה בשעון ישראל, ערוצים, ומייל רק אם המחנכת בחרה תזכורת במייל
+    await run(`CREATE TABLE IF NOT EXISTS reminders (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      day INTEGER NOT NULL CHECK (day BETWEEN 0 AND 5), hour INTEGER NOT NULL CHECK (hour BETWEEN 6 AND 22),
+      push INTEGER NOT NULL DEFAULT 0, mail INTEGER NOT NULL DEFAULT 0, email TEXT, skip_week TEXT, last_sent TEXT, updated_at TEXT NOT NULL)`);
+    // מנוי להתראות בטלפון: הכתובת והמפתחות שהדפדפן נותן. בלי שום תוכן אחר.
+    await run(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id ${ID}, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL)`);
+
     for (const s of SCHOOLS) await run('INSERT INTO schools (slug, name, sort_order) VALUES (?, ?, ?) ON CONFLICT (slug) DO NOTHING', [s.slug, s.name, s.order]);
     // קודי הצטרפות: נוצרים פעם אחת, ומנהלת התכנית יכולה להחליף אותם בכל רגע
     const rows = await all('SELECT id, educator_code, lead_code FROM schools');

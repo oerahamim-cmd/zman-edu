@@ -949,6 +949,31 @@ body:not(.has-bn) .printbar { bottom: 10px; }
 .appic.on img { animation: kpulse 1.4s ease-in-out infinite; }
 .ptip { display: flex; gap: 8px; align-items: center; background: var(--violet); color: #fff; border-radius: 12px; padding: 9px 12px; font-size: 14px; font-weight: 500; margin-top: 8px; animation: rise .35s ease both; }
 
+/* תזכורת שבועית */
+.remchip { align-self: flex-start; margin-top: -12px; background: #fff; color: var(--lead); border-radius: 999px; padding: 8px 14px; font-size: 14px; font-weight: 700; display: inline-flex; gap: 6px; align-items: center; text-decoration: none; }
+.remb { display: flex; flex-direction: column; gap: 10px; text-align: start; }
+.remb .sub2 { margin-top: 4px; }
+.days { display: flex; gap: 6px; }
+.day { flex: 1; border: 0; background: #fff; border-radius: 12px; padding: 12px 0; font: 700 16px/1 var(--font); color: var(--ink); cursor: pointer; }
+.day.on { background: var(--lead); color: #fff; }
+.hoursel { width: auto; background: #fff; padding: 9px 12px; font-size: 15px; border-radius: 999px; }
+.chtog { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chtog button { border: 2px solid #dcdcdc; background: #fff; border-radius: 14px; padding: 12px 8px; font: 700 15px/1.1 var(--font); color: var(--ink2); display: flex; gap: 6px; align-items: center; justify-content: center; cursor: pointer; }
+.chtog button.on { border-color: var(--lead); background: #e8efff; color: var(--lead); }
+.remb .input { background: #fff; }
+.lock { background: var(--deep); border-radius: 22px; padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #fff; }
+.lktime { font-size: 36px; font-weight: 900; line-height: 1; }
+.lkday { font-size: 13.5px; opacity: .88; margin-bottom: 8px; }
+.ncard { width: 100%; background: rgba(240, 240, 240, .94); color: var(--ink); border-radius: 16px; padding: 10px; display: flex; gap: 10px; align-items: center; text-align: start; }
+.ncard img, .mail2 img { width: 38px; height: 38px; border-radius: 10px; background: #fff; flex: none; }
+.ncard > span { display: flex; flex-direction: column; font-size: 14px; flex: 1; }
+.ncard small { font-size: 11.5px; color: var(--ink2); align-self: flex-start; }
+.mail2 { background: #fff; border-radius: 18px; padding: 12px; display: flex; gap: 10px; align-items: flex-start; }
+.mail2 > span { display: flex; flex-direction: column; flex: 1; font-size: 13.5px; }
+.mail2 .subj { font-weight: 700; color: var(--ink); }
+.mail2 .snip { color: var(--ink2); }
+.onb .remb { text-align: start; }
+
 @media (prefers-reduced-motion: reduce) { .wrap.edu *, .wrap.inflow *, .heartpop { animation: none !important; transition: none !important; } }
 
 /* טבלת תפקידים להדפסה: מופיעה רק בזמן הדפסה */

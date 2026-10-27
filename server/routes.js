@@ -236,6 +236,55 @@ route('PUT', '/api/me/class-rounds', ['educator'], async (ctx) => {
   return { ok: true };
 });
 
+// ====================== תזכורת שבועית ======================
+const reminders = require('./reminders');
+const isEmail = (s) => typeof s === 'string' && s.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+route('GET', '/api/me/reminder', ['educator'], async (ctx) => {
+  const r = await db.get('SELECT day, hour, push, mail, email, skip_week FROM reminders WHERE user_id = ?', [ctx.user.id]);
+  const subs = (await db.get('SELECT COUNT(*)::int AS n FROM push_subscriptions WHERE user_id = ?', [ctx.user.id])).n;
+  return {
+    reminder: r ? { day: r.day, hour: r.hour, push: !!r.push, mail: !!r.mail, email: r.email || '', skipWeek: r.skip_week === weeks.curWeek() } : null,
+    pushReady: reminders.pushReady(), mailReady: reminders.mailReady(), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '', devices: subs,
+  };
+});
+route('PUT', '/api/me/reminder', ['educator'], async (ctx) => {
+  const b = ctx.body || {};
+  if (!Number.isInteger(b.day) || b.day < 0 || b.day > 5) throw new HttpError(400, 'היום לא תקין.');
+  if (!Number.isInteger(b.hour) || b.hour < 6 || b.hour > 22) throw new HttpError(400, 'השעה לא תקינה.');
+  const push = b.push === true, mail = b.mail === true;
+  const email = mail ? str(b.email, 120).trim() : '';
+  if (mail && !isEmail(email)) throw new HttpError(400, 'כתובת המייל לא תקינה.');
+  const skip = b.skipWeek === true ? weeks.curWeek() : null;
+  // מייל נשמר רק כשבחרו תזכורת במייל. כיבוי המייל מוחק את הכתובת.
+  await db.run(`INSERT INTO reminders (user_id, day, hour, push, mail, email, skip_week, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (user_id) DO UPDATE SET day = excluded.day, hour = excluded.hour, push = excluded.push, mail = excluded.mail, email = excluded.email, skip_week = excluded.skip_week, updated_at = excluded.updated_at`,
+  [ctx.user.id, b.day, b.hour, push ? 1 : 0, mail ? 1 : 0, email || null, skip, nowIso()]);
+  if (!push) await db.run('DELETE FROM push_subscriptions WHERE user_id = ?', [ctx.user.id]);
+  return { ok: true };
+});
+route('POST', '/api/me/push-subscriptions', ['educator'], async (ctx) => {
+  const b = ctx.body || {}, keys = b.keys || {};
+  const endpoint = str(b.endpoint, 1000), p256dh = str(keys.p256dh, 200), auth = str(keys.auth, 200);
+  if (!/^https:\/\//.test(endpoint) || !p256dh || !auth) throw new HttpError(400, 'המנוי לא תקין.');
+  // מכשיר שעבר בין מחנכות שייך למי שהפעילה אותו אחרונה
+  await db.run(`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth`, [ctx.user.id, endpoint, p256dh, auth, nowIso()]);
+  // עד חמישה מכשירים לכל מחנכת: הישנים יוצאים
+  await db.run(`DELETE FROM push_subscriptions WHERE user_id = ? AND id NOT IN (SELECT id FROM push_subscriptions WHERE user_id = ? ORDER BY id DESC LIMIT 5)`, [ctx.user.id, ctx.user.id]);
+  return { ok: true };
+});
+route('POST', '/api/me/reminder/test', ['educator'], async (ctx) => ({ sent: await reminders.sendTo(ctx.user.id, weeks.curWeek()) }));
+// הריצה השעתית: מוגנת בסוד (CRON_SECRET). Vercel Cron שולח אותו בכותרת Authorization; מתזמן חיצוני צריך לשלוח אותה כותרת.
+route('GET', '/api/cron/reminders', 'public', async (ctx) => {
+  const secret = process.env.CRON_SECRET || '';
+  if (!secret) throw new HttpError(503, 'התזכורות לא הוגדרו.');
+  const got = String(ctx.req.headers.authorization || '');
+  const want = `Bearer ${secret}`;
+  const a = Buffer.from(got), b = Buffer.from(want);
+  if (a.length !== b.length || !require('node:crypto').timingSafeEqual(a, b)) throw new HttpError(401, 'אין הרשאה.');
+  return reminders.run();
+});
+
 // עצם השימוש בכלי אישי (כרגע: מיפוי הכיתה), כדי שמנהלת התכנית תדע מי משתמשת. נשמר רק מי, מתי וכמה ימים. לא נשלח ולא נשמר שום תוכן.
 route('POST', '/api/me/usage', ['educator'], async (ctx) => {
   const tool = ctx.body.tool;
@@ -335,6 +384,9 @@ route('POST', '/api/admin/educators/:id/remove', ['manager'], async (ctx) => {
   // הסרה היא סופית: מלבד איפוס הקוד, פורשים את מפתח השם כך שאי אפשר להירשם מחדש לאותו חשבון
   // (ולרשת את המבטים שלו) עם קוד ההצטרפות. אדם חדש עם אותו שם מקבל חשבון חדש וריק.
   await db.run("UPDATE users SET active = 0, secret_hash = NULL, name_key = 'removed:' || id::text || ':' || name_key WHERE id = ?", [u.id]);
+  // תזכורות ומנויים להתראות (כולל כתובת המייל) נמחקים יחד עם החשבון
+  await db.run('DELETE FROM reminders WHERE user_id = ?', [u.id]);
+  await db.run('DELETE FROM push_subscriptions WHERE user_id = ?', [u.id]);
   await auth.destroyUserSessions(u.id);
   await audit(ctx.user, 'remove_educator', u.id);
 });
@@ -348,6 +400,9 @@ route('POST', '/api/admin/leads/:id/remove', ['manager'], async (ctx) => {
   const u = await personInManagerScope(ctx.params.id, 'lead');
   // כמו במחנכת: הסרה סופית שפורשת את מפתח השם, כדי שאי אפשר יהיה להירשם מחדש לאותו חשבון
   await db.run("UPDATE users SET active = 0, secret_hash = NULL, name_key = 'removed:' || id::text || ':' || name_key WHERE id = ?", [u.id]);
+  // תזכורות ומנויים להתראות (כולל כתובת המייל) נמחקים יחד עם החשבון
+  await db.run('DELETE FROM reminders WHERE user_id = ?', [u.id]);
+  await db.run('DELETE FROM push_subscriptions WHERE user_id = ?', [u.id]);
   await auth.destroyUserSessions(u.id);
   await audit(ctx.user, 'remove_lead', u.id);
 });
