@@ -359,12 +359,11 @@ function render() {
   const y0 = window.scrollY, same = p === lastRoute;
   lastRoute = p;
     if (!p.startsWith('/tools/cards') && typeof cardsLeave === 'function') cardsLeave();
-  if (p !== '/tools/identity/cards') sc = null;
   state.area = p.startsWith('/admin') || p.startsWith('/lead') ? 'admin' : 'public';
   const view = resolve(p);
   clear(app);
   // מחנכת מחוברת: סרגל ניווט תחתון במקום התפריט העליון. במבט השבועי המסך כולו לשאלות, בלי סרגלים
-  const edu = !!me() && state.area !== 'admin', inflow = edu && p.startsWith('/me/report/');
+  const edu = !!me() && state.area !== 'admin', inflow = edu && (p.startsWith('/me/report/') || (p.startsWith('/tools/cards/') && CARDS_IMMERSIVE(p.slice('/tools/cards/'.length))));
   app.className = 'wrap' + (state.area === 'admin' ? ' admin' : '') + (edu ? ' edu' : '') + (inflow ? ' inflow' : '');
   document.body.classList.toggle('has-bn', edu && !inflow);
   add(app, inflow ? [view] : [header(), edu ? null : sessionBar(), view, h('p', { class: 'footer-note' }, 'זמן לחינוך · חותם ורשת אורט'), edu ? eduNav() : null]);
@@ -373,13 +372,13 @@ function render() {
 function resolve(p) {
   let m;
   if (p === '/') return me() ? eduHome() : viewHome();
-  if (p === '/tools') return viewTools();
+  if (p === '/tools') return toolsHome();
   if (p === '/tools/cards' || p.startsWith('/tools/cards/')) return viewCards(p);
-  if (p === '/tools/identity/listen') return viewListen();
-  if (p === '/tools/identity/cards') return viewStrengthCards();
-  if (p === '/tools/goals/journal') return viewJournal();
-  if (p === '/tools/agency/partnership') return viewPartnership();
-  if ((m = /^\/tools\/(identity|goals|agency)$/.exec(p))) return viewFolder(m[1]);
+  if (p === '/tools/identity/listen') return listenTool();
+  if (p === '/tools/identity/cards') return identityCards();
+  if (p === '/tools/goals/journal') return journeyTool();
+  if (p === '/tools/agency/partnership') return partnershipTool();
+  if ((m = /^\/tools\/(identity|goals|agency)$/.exec(p))) return axisPage(m[1]);
   const gate = (path, view) => (me() ? view() : isAdmin() || leadUser() ? viewEducatorsOnly() : viewEnter('new', path));
   const gateMap = (path, view) => gate(path, () => { ensureMap(); pingMapping(); return view(); });
   const gateLead = (path, view) => (leadUser() ? view() : me() || isAdmin() ? viewLeadsOnly() : viewEnter('lead', path));
@@ -453,478 +452,9 @@ function viewHome() {
 
 
 /* =====================================================================
-   ארגז כלים (פתוח לכולם)
-   ===================================================================== */
-function viewTools() {
-  // שמות הכלים בכל תיקייה מופיעים על הכרטיס, כדי שיהיה ברור מה יש בפנים לפני שנכנסים
-  const names = (id) => [...builtinTools(id).map((x) => x.t), ...pub.tools.filter((t) => t.folder === id && !t.example).map((t) => t.title)];
-  const inside = (id) => { const n = names(id); return n.length ? h('ul', { class: 'foldertools' }, n.map((t) => h('li', null, t))) : h('span', { class: 'tag', style: 'align-self:flex-start' }, 'בקרוב'); };
-  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
-    h('section', { class: 'frame' }, h('h2', null, 'ארגז כלים'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'כלים ופרקטיקות לשיחות אישיות. פתוח לכולם, בלי כניסה. התכנים יתווספו כאן לאורך השנה.')),
-    h('a', { class: 'frame cardsfeature', href: '#/tools/cards', onclick: (e) => { e.preventDefault(); go('/tools/cards'); } },
-      h('img', { src: 'cards/t05.webp', alt: '', loading: 'lazy' }),
-      h('div', { class: 'stack' }, h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'חדש'), h('h3', null, 'קלפי שיח וקשר אישי'), h('p', { class: 'muted' }, `${((window.ZMAN_CARDS || {}).cards || []).length || 63} קלפים עם שאלה בצד אחד ותמונה בצד השני: לפי נושא, דרך תמונה, קלף מעורבב או לפי עומק וסוג השיחה. עובד גם בטלפון, בשיחה אישית.`), h('span', { class: 'btn', style: 'align-self:flex-start' }, 'לפתיחת הקלפים'))),
-    h('div', { class: 'grid' }, FOLDERS.map((f) => h('a', { class: 'folder', href: '#/tools/' + f.id, onclick: (e) => { e.preventDefault(); go('/tools/' + f.id); } },
-      h('span', { class: 'ic-big' }, ic(f.icon, { size: 38, tone: 'blue' })), h('h3', null, f.t), h('p', { class: 'muted' }, f.d),
-      inside(f.id)))));
-}
-
-const builtinTools = (id) => (id === 'identity' ? IDENTITY_TOOLS : id === 'goals' ? GOALS_TOOLS : id === 'agency' ? AGENCY_TOOLS : []);
-function viewFolder(id) {
-  const f = FOLDERS.find((x) => x.id === id);
-  const back = link('/tools', 'ארגז כלים', 'btn ghost');
-  const items = pub.tools.filter((t) => t.folder === id);
-  const builtin = builtinTools(id).map(identityTile);
-  const list = builtin.length || items.length ? [...builtin, ...items.filter((t) => !builtin.length || !t.example).map(toolCard)] : [h('div', { class: 'frame' }, h('p', { class: 'muted' }, 'הכלים והפרקטיקות בציר הזה יתווספו כאן.'))];
-  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
-    h('section', { class: 'frame' }, h('div', null, back), h('div', { class: 'row' }, ic(f.icon, { size: 44, tone: 'blue' }), h('h2', null, f.t)), h('p', { class: 'muted' }, f.d)),
-    id === 'agency' ? agencyIntro() : null,
-    h('div', { class: 'grid' }, list),
-    isAdmin() ? h('div', null, link('/admin/tools', 'הוספה ועריכה של כלים', 'btn soft')) : null);
-}
-function toolCard(t) {
-  return h('article', { class: 'frame tool' + (t.example ? ' example' : '') },
-    h('div', { class: 'row' }, h('span', { class: 'tag lead' }, t.type || 'כלי'), t.example ? h('span', { class: 'tag' }, 'דוגמה לתצוגה') : null),
-    h('h3', null, t.title), h('p', { class: 'muted' }, t.desc),
-    t.url ? h('div', null, h('a', { class: 'btn sm', href: t.url, target: '_blank', rel: 'noopener' }, 'פתיחה')) : null);
-}
-
-/* =====================================================================
-   זהות וחוזקות: שני כלים. "להקשיב לכוחות" (למחנכת) ו"יש בי יותר ממה שרואים" (שיחה משותפת)
-   התוכן ב-js/identity-data.js. שום דבר לא נשלח לשרת ולא נשמר: הכול נשאר על המסך.
-   ===================================================================== */
-const IDT = () => window.ZMAN_IDENTITY;
-const IDENTITY_TOOLS = [
-  { to: '/tools/identity/listen', icon: 'eye', t: 'להקשיב לכוחות', who: 'למחנכת', d: 'ארבע עדשות להקשבה לסיפור של התלמיד/ה, וארבעה שלבים לשיקוף חוזקה בלי לתייג.' },
-  { to: '/tools/identity/cards', icon: 'care', t: 'יש בי יותר ממה שרואים', who: 'שיחה משותפת', d: 'התלמיד/ה בוחר/ת קלף ומספר/ת סיפור, והמחנכת מציעה חוזקות. התלמיד/ה מסכימ/ה, מדייק/ת או דוחה.' },
-];
-function identityTile(x) {
-  return h('a', { class: 'folder tile idtool', href: '#' + x.to, onclick: (e) => { e.preventDefault(); go(x.to); } },
-    h('span', { class: 'ic-big' }, ic(x.icon, { size: 38, tone: 'blue' })),
-    h('div', { class: 'row', style: 'gap:8px' }, h('span', { class: 'tag lead' }, x.who)),
-    h('h3', null, x.t), h('p', { class: 'muted' }, x.d), h('span', { class: 'btn sm', style: 'align-self:flex-start' }, 'לפתיחה'));
-}
-function idHead(title, sub) {
-  return h('section', { class: 'frame' }, h('div', null, link('/tools/identity', 'זהות וחוזקות', 'btn ghost sm')), h('h2', null, title), sub ? h('p', { class: 'muted', style: 'max-width:62ch' }, sub) : null);
-}
-
-/* ---------- כלי 1: להקשיב לכוחות (גרסה 1.2) ---------- */
-let listenTab = 'lenses', listenLens = null, listenStep = null, listenEx = 'E01', listenWord = '', listenTopic = null, listenAsk = false;
-function viewListen() {
-  const D = window.ZMAN_LISTEN;
-  const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  const TABS = [['lenses', 'עדשות'], ['reflect', 'שיקוף'], ['examples', 'דוגמאות']];
-  const lenses = () => h('section', { class: 'frame' },
-    h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'ארבע עדשות להקשבה'), h('p', { class: 'muted', style: 'max-width:60ch' }, D.lensesIntro)),
-    h('div', { class: 'lensgrid' }, D.lenses.map((l, i) => {
-      const open = listenLens === l.id;
-      return h('div', { class: 'lens', 'data-open': String(open) },
-        h('button', { class: 'lenshead', type: 'button', 'aria-expanded': String(open), onclick: () => { listenLens = open ? null : l.id; paint(); } },
-          h('span', { class: 'lensnum', 'aria-hidden': 'true' }, String(i + 1)), h('span', { class: 'stack', style: 'gap:4px' }, h('b', { class: 'lenstitle' }, l.title), open ? null : h('span', { class: 'muted' }, l.prompt))),
-        open ? h('div', { class: 'lensbody' },
-          h('p', null, l.prompt),
-          h('div', { class: 'row', style: 'gap:8px' }, l.signals.map((g) => h('span', { class: 'tag' }, g))),
-          h('div', { class: 'stack', style: 'gap:8px' }, h('h4', null, 'אפשר לשאול'), l.examples.map((q) => h('p', { class: 'qquote' }, q)))) : null);
-    })),
-    h('p', { class: 'small muted' }, 'לא כל שיחה צריכה להסתיים בחוזקה. לפעמים הקשבה בלבד היא הדבר הנכון.'));
-  const reflect = () => h('section', { class: 'frame' },
-    h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'מהקשבה לשיקוף'), h('p', { class: 'muted', style: 'max-width:60ch' }, D.reflectIntro)),
-    h('div', { class: 'lensgrid' }, D.reflect.map((st, i) => {
-      const open = listenStep === st.id;
-      return h('div', { class: 'lens', 'data-open': String(open) },
-        h('button', { class: 'lenshead', type: 'button', 'aria-expanded': String(open), onclick: () => { listenStep = open ? null : st.id; paint(); } },
-          h('span', { class: 'lensnum', 'aria-hidden': 'true' }, String(i + 1)),
-          h('span', { class: 'stack', style: 'gap:4px' }, h('b', { class: 'lenstitle' }, st.title), h('span', { class: 'muted' }, st.micro))),
-        open ? h('div', { class: 'lensbody' },
-          h('p', null, st.instruction),
-          h('div', { class: 'stack', style: 'gap:4px' }, h('small', { class: 'qlab' }, 'במקום'), h('p', { class: 'instead' }, h('s', null, st.insteadOf))),
-          h('div', { class: 'stack', style: 'gap:4px' }, h('small', { class: 'qlab' }, 'אפשר'), h('p', { class: 'qquote' }, st.tryThis))) : null);
-    })));
-  const bubbles = (e) => h('div', { class: 'idchat', 'aria-live': 'polite' },
-    h('div', { class: 'hintbox' }, h('b', null, e.hintLabel || 'רמזים אפשריים:'), h('div', { class: 'row', style: 'gap:8px' }, e.hints.map((x) => h('span', { class: 'tag' }, x)))),
-    e.lines.map((l) => h('div', { class: 'msg ' + (l.who === 'student' ? 'st' : 'ed') }, h('small', null, l.who === 'student' ? 'תלמיד/ה' : 'מחנך/ת'), h('div', { class: 'mb' }, l.text))),
-    e.note ? h('p', { class: 'note-tl' }, e.note) : null);
-  // "המקרה שלי": כותבים מילה אחת, עונים איך התלמיד/ה מדברים עליה, ונבנית דוגמה לשיחה. הכול בדפדפן ולא נשמר
-  const buildTopic = (w) => { const word = w.replace(/["״׳']/g, '').trim(); if (word.length < 2) return; listenWord = word; listenAsk = true; paint(); };
-  const setMood = (m) => { listenTopic = D.exampleForTopic(listenWord, m); listenAsk = false; paint(); };
-  const topicReset = () => { listenTopic = null; listenWord = ''; listenAsk = false; paint(); };
-  const topic = () => {
-    if (listenTopic) {
-      return h('div', { class: 'stack' },
-        h('div', { class: 'well stack', style: 'gap:6px' }, h('small', { class: 'qlab' }, 'המילה שלך'), h('p', null, listenWord),
-          h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: topicReset }, 'מילה אחרת'))),
-        bubbles(listenTopic),
-        h('p', { class: 'small muted' }, 'הדוגמה נבנית אוטומטית סביב המילה ואינה שיחה אמיתית. אפשר לשנות כל משפט.'));
-    }
-    if (listenAsk) {
-      return h('div', { class: 'stack' },
-        h('div', { class: 'well stack', style: 'gap:6px' }, h('small', { class: 'qlab' }, 'המילה שלך'), h('p', null, listenWord),
-          h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: topicReset }, 'מילה אחרת'))),
-        h('h3', null, 'איך התלמיד/ה מדברים על זה?'),
-        h('p', { class: 'muted', style: 'max-width:60ch' }, 'אותה מילה יכולה להיות סיפור הצלחה או סיפור כאב. הבחירה קובעת איך תיראה השיחה.'),
-        h('div', { class: 'stack', style: 'gap:8px' },
-          [['good', 'בהתלהבות או בגאווה'], ['hard', 'בקושי: מתקשים, נכשלו או רוצים להתרחק'], ['unsure', 'עוד לא ברור']].map(([m, t2]) => h('button', { class: 'btn soft guidedopt', type: 'button', onclick: () => setMood(m) }, t2))));
-    }
-    const inp = h('input', { class: 'input', id: 'ls-word', type: 'text', maxlength: '30', 'aria-label': 'מילה על הנושא', placeholder: 'למשל: גיימינג', value: listenWord });
-    const btn = h('button', { class: 'btn', type: 'button', disabled: listenWord.trim().length < 2, onclick: () => buildTopic(inp.value) }, 'להמשך');
-    inp.addEventListener('input', () => { listenWord = inp.value; btn.disabled = inp.value.trim().length < 2; });
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') buildTopic(inp.value); });
-    return h('div', { class: 'stack' },
-      h('label', { for: 'ls-word' }, h('h3', null, 'על מה התלמיד/ה מספר/ת?')),
-      h('p', { class: 'muted', style: 'max-width:60ch' }, 'כותבים מילה אחת, והמערכת בונה דוגמה לשיחה סביבה.'),
-      inp,
-      h('div', { class: 'row', style: 'gap:8px' }, D.topicSuggestions.map((sg) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => buildTopic(sg) }, sg))),
-      h('div', null, btn),
-      h('p', { class: 'small muted' }, 'בלי שמות של תלמידים. הטקסט נשאר על המסך ולא נשמר ולא נשלח.'));
-  };
-  const examples = () => {
-    const mine = listenEx === 'mine';
-    const cur = D.examples.find((x) => x.id === listenEx) || D.examples[0];
-    let body;
-    if (mine) body = topic();
-    else body = bubbles(cur);
-    return h('section', { class: 'frame' },
-      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'דוגמאות לשיחה'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'בוחרים נושא וקוראים איך שיחה כזו יכולה להישמע. הדוגמאות אינן תסריט.')),
-      chipGroup({ options: [{ v: 'mine', t: '+ המקרה שלי' }, ...D.examples.map((x) => ({ v: x.id, t: x.category }))], value: listenEx, label: 'נושא הדוגמה', onChange: (v) => { listenEx = v; paint(); } }),
-      body,
-      h('p', { class: 'small muted' }, 'חוזקות מוצגות כהשערות ולא כאבחנות: התלמיד/ה יכול/ה לדייק או לדחות.'));
-  };
-  const principles = h('section', { class: 'frame quiet' }, h('details', null, h('summary', null, ic('insight', { size: 20 }), 'עקרונות להקשבה'),
-    h('ul', { class: 'plain' }, D.principles.map((p) => h('li', null, p)))));
-  function paint() {
-    const y = window.scrollY;
-    clear(host);
-    const body = { lenses, reflect, examples }[listenTab]();
-    add(host, [
-      idHead(D.name, D.tagline + ' תזכורת קצרה למחנכת, בכל שיחה אישית, גם כשהנושא אינו חוזקות.'),
-      h('div', { class: 'idtabs', role: 'tablist', 'aria-label': 'חלקי הכלי' }, TABS.map(([id, t]) => h('button', { class: 'idtab', type: 'button', role: 'tab', 'aria-selected': String(listenTab === id), onclick: () => { listenTab = id; paint(); } }, t))),
-      body, principles]);
-    window.scrollTo(0, y);
-  }
-  paint();
-  return host;
-}
-
-/* דף הסבר על קלפי השיח להדפסה: מופיע בפתיחת הכלי, ומוביל להורדת הקובץ */
-function printBanner() {
-  return h('section', { class: 'frame printbanner' },
-    h('img', { src: 'assets/preview/cards-guide-1.jpg', alt: 'עמוד ההסבר של קובץ קלפי השיח להדפסה', loading: 'lazy' }),
-    h('div', { class: 'stack' },
-      h('h3', null, 'רוצים לנסות בשיחה הבאה?'),
-      h('p', null, h('a', { href: 'assets/pdf/kalfei-sicha.pdf', download: 'kalfei-sicha-hotam.pdf' }, 'לחצו כאן'), ' להורדה והדפסת הקלפים.'),
-      h('p', { class: 'small muted' }, 'קובץ PDF להדפסה בגודל A4, 7 עמודים: קלפי שאלה, קלפי חוזקה ודף ״מה גילינו״.'),
-      h('div', null, h('a', { class: 'btn', href: 'assets/pdf/kalfei-sicha.pdf', download: 'kalfei-sicha-hotam.pdf' }, 'הורדת הקלפים להדפסה'))));
-}
-
-/* =====================================================================
-   יעדים ומטרות: "יומן המסע שלי". חוברת אישית לתלמיד/ה לכל השנה.
-   שתי לשוניות: "למחנכת" (המדריך: איך עובדים עם החוברת בשלוש השיחות) ו"להורדה" (קובצי ההדפסה).
-   התוכן ב-js/goals-data.js, והוא זהה למדריך ב-PDF. שום דבר לא נשלח לשרת ולא נשמר.
-   ===================================================================== */
-const GOALS_TOOLS = [
-  { to: '/tools/goals/journal', icon: 'target', t: 'יומן המסע שלי', who: 'למחנכת ולתלמיד/ה', d: 'חוברת אישית למטרות: SWOT, SMART, תכנית, עצירות ביניים ותעודה אישית. שאלות לשיחה, ודפים להדפסה: אפשר לקחת דף אחד או את כולה.' },
-];
-let journalTab = 'guide';
-function viewJournal() {
-  const G = window.ZMAN_GOALS;
-  const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  const TABS = [['guide', 'למחנכת'], ['print', 'להדפסה']];
-  const list = (xs) => h('ul', { class: 'jlist' }, xs.map((x) => h('li', null, ic('chev', { size: 16, tone: 'blue' }), h('span', null, x))));
-  const head = (icon, title) => h('div', { class: 'row', style: 'gap:10px' }, ic(icon, { size: 32, tone: 'blue' }), h('h3', null, title));
-  const toTab = (t) => () => { journalTab = t; paint(); window.scrollTo(0, 0); };
-  const guide = () => [
-    h('section', { class: 'frame' }, head('checklist', 'איך מנהלים שיחה על מטרות'), list(G.how),
-      h('div', { class: 'grid' },
-        h('div', { class: 'well stack', style: 'gap:6px' }, h('span', { class: 'jlab' }, 'לפתוח'), h('p', null, G.open)),
-        h('div', { class: 'well stack', style: 'gap:6px' }, h('span', { class: 'jlab' }, 'לסיים'), h('p', null, G.close)))),
-    h('section', { class: 'frame' }, head('calendar', 'מתי מתאים'), h('p', { class: 'muted', style: 'max-width:70ch' }, G.momentsIntro),
-      h('div', { class: 'grid' }, G.moments.map((m) => h('div', { class: 'well stack', style: 'gap:6px' },
-        h('div', { class: 'row', style: 'gap:12px;flex-wrap:nowrap;align-items:flex-start' }, h('span', { class: 'lensnum' }, String(m.n)),
-          h('div', { class: 'stack', style: 'gap:2px' }, h('h4', null, m.t), h('p', { class: 'small muted' }, m.when))),
-        h('p', null, m.do), h('p', { class: 'small jlab' }, m.pages))))),
-    h('section', { class: 'frame' }, head('question', 'שאלות שעוזרות בשיחה'), h('p', { class: 'muted', style: 'max-width:70ch' }, G.questionsIntro),
-      h('div', { class: 'grid' }, G.questions.map((q) => h('div', { class: 'well stack', style: 'gap:8px' },
-        h('div', null, h('h4', null, q.t), h('p', { class: 'small muted' }, q.sub)), list(q.q))))),
-    h('section', { class: 'frame' }, head('insight', 'דגשים'), list(G.tips),
-      h('div', null, h('button', { class: 'btn', type: 'button', onclick: toTab('print') }, 'לדפים להדפסה'))),
-  ];
-  const file = (name, text, cls = 'btn') => h('a', { class: cls, href: G.files.dir + name, download: name }, text);
-  const pageCard = (p) => h('div', { class: 'well stack', style: 'gap:8px' },
-    h('div', { class: 'row', style: 'gap:8px' }, h('h4', null, p.t), p.tag ? h('span', { class: 'tag' }, p.tag) : null),
-    h('p', null, p.d),
-    h('p', { class: 'small muted' }, 'זמן משוער: ' + p.time),
-    h('div', { class: 'row', style: 'gap:8px' }, p.f.map(([n, l], i) => file(n, p.f.length > 1 || l !== 'הדף' ? 'להדפסה · ' + l : 'להדפסה', i ? 'btn soft sm' : 'btn sm'))));
-  const printTab = () => [
-    h('section', { class: 'frame' }, head('form', 'דף אחד, שיחה אחת'), h('p', { class: 'muted', style: 'max-width:70ch' }, G.printIntro),
-      G.pageGroups.map((g) => h('div', { class: 'stack', style: 'gap:10px' }, h('h4', { class: 'jlab' }, g.t), h('div', { class: 'grid' }, g.items.map(pageCard))))),
-    h('section', { class: 'frame printbanner' },
-      h('img', { src: 'assets/preview/yoman-hamasa.jpg', alt: 'השער של החוברת יומן המסע שלי', loading: 'lazy' }),
-      h('div', { class: 'stack' },
-        h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'לתלמיד/ה'),
-        h('h3', null, G.fullTitle),
-        h('p', null, G.fullText),
-        h('div', { class: 'row' },
-          h('a', { class: 'btn', href: G.files.print, download: 'yoman-hamasa-a4.pdf' }, 'הורדה להדפסה, A4 לרוחב'),
-          h('a', { class: 'btn soft', href: G.files.a5, download: 'yoman-hamasa-a5.pdf' }, 'גרסת A5, עמוד בכל דף')))),
-    h('section', { class: 'frame' }, head('checklist', 'הדפסה והכנה'), list(G.print)),
-  ];
-  function paint() {
-    const y = window.scrollY;
-    clear(host);
-    add(host, [
-      h('section', { class: 'frame' }, h('div', null, link('/tools/goals', 'יעדים ומטרות', 'btn ghost sm')), h('h2', null, G.name), h('p', { class: 'muted', style: 'max-width:62ch' }, G.tagline)),
-      h('div', { class: 'idtabs', role: 'tablist', 'aria-label': 'חלקי הכלי' }, TABS.map(([id, t]) => h('button', { class: 'idtab', type: 'button', role: 'tab', 'aria-selected': String(journalTab === id), onclick: () => { journalTab = id; paint(); } }, t))),
-      (journalTab === 'print' ? printTab : guide)()]);
-    window.scrollTo(0, y);
-  }
-  paint();
-  return host;
-}
-
-/* =====================================================================
-   אייג'נסי: "שותפות תלמידים". הסבר, סולם השותפות, תפקידים, מהלך לכיתה י' וחוברת להדפסה.
-   התוכן ב-js/agency-data.js, והוא זהה לחוברת ב-PDF. הבחירות על המסך (סולם, תפקידים) לא נשמרות ולא נשלחות.
+   ארגז הכלים: המסכים נמצאים בחלק של חוויית המחנכת (toolsHome, axisPage והכלים עצמם)
    ===================================================================== */
 const AG = () => window.ZMAN_AGENCY;
-const AGENCY_TOOLS = [
-  { to: '/tools/agency/partnership', icon: 'team', t: 'שותפות תלמידים', who: 'למחנכת ולכיתה', d: 'סולם של שש צורות שותפות, בניית מסגרת, בנק תפקידים לכיתה, ומהלך מוצע לכיתה י\' שמסתיים בשיחה אישית על התפקיד.' },
-];
-// ההסבר בראש תיקיית אייג'נסי: מה זה, ואיך זה מתחבר לשותפות
-function agencyIntro() {
-  const F = AG().folderIntro;
-  return h('section', { class: 'frame agintro' }, h('h3', null, F.title), h('p', { style: 'max-width:70ch' }, F.text),
-    h('div', { class: 'agparts' }, AG().what.parts.map((p) => h('div', { class: 'well stack', style: 'gap:4px' }, h('b', null, p.t), h('p', { class: 'small' }, p.d)))),
-    h('p', { class: 'agbridge' }, F.link));
-}
-let agTab = 'what', agStep = null, agCheck = {}, agRoles = new Set();
-function viewPartnership() {
-  const D = AG();
-  const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  const TABS = [['what', 'מה זה'], ['ladder', 'סולם השותפות'], ['roles', 'תפקידים'], ['class', 'בכיתה י\''], ['print', 'להדפסה']];
-  const list = (xs) => h('ul', { class: 'jlist' }, xs.map((x) => h('li', null, ic('chev', { size: 16, tone: 'blue' }), h('span', null, x))));
-  const head = (icon, title) => h('div', { class: 'row', style: 'gap:10px' }, ic(icon, { size: 32, tone: 'blue' }), h('h3', null, title));
-  const toTab = (t) => () => { agTab = t; paint(); window.scrollTo(0, 0); };
-  const what = () => [
-    h('section', { class: 'frame' }, head('empower', 'מה זה אייג\'נסי'), h('p', { style: 'max-width:70ch' }, D.folderIntro.text),
-      h('div', { class: 'agparts' }, D.what.parts.map((p) => h('div', { class: 'well stack', style: 'gap:4px' }, h('b', null, p.t), h('p', { class: 'small' }, p.d))))),
-    h('section', { class: 'frame' }, head('team', 'ומה הקשר לשותפות תלמידים'), h('p', { class: 'agbridge' }, D.what.definition), h('p', { style: 'max-width:70ch' }, D.what.how), h('p', { style: 'max-width:70ch' }, D.what.bridge)),
-    h('div', { class: 'grid' },
-      h('section', { class: 'frame' }, head('school', 'למה דווקא בכיתה י\''), h('p', null, D.what.grade)),
-      h('section', { class: 'frame' }, head('care', 'ומה זה נותן לשיחה האישית'), h('p', null, D.what.personal))),
-    h('section', { class: 'frame' }, head('insight', 'איך הכלי עוזר לכם'), h('div', { class: 'grid' }, D.forYou.map((x) => h('div', { class: 'well stack', style: 'gap:4px' }, h('h4', null, x.t), h('p', { class: 'small' }, x.d)))),
-      h('div', null, h('button', { class: 'btn', type: 'button', onclick: toTab('ladder') }, 'לסולם השותפות'))),
-  ];
-  // סולם: לוחצים על שלב לפרטים. מתחת, בדיקה קצרה "איפה זה אצלנו" לכמה נושאים, על המסך בלבד
-  const ladder = () => {
-    const steps = h('ol', { class: 'agladder' }, D.ladder.map((s) => {
-      const open = agStep === s.n;
-      return h('li', { 'data-open': String(open) }, h('button', { class: 'agstep', type: 'button', 'aria-expanded': String(open), onclick: () => { agStep = open ? null : s.n; paint(); } },
-        h('span', { class: 'lensnum', 'aria-hidden': 'true' }, String(s.n)), h('span', { class: 'stack', style: 'gap:2px' }, h('b', null, s.t, s.sub ? ' ' + s.sub : ''), open ? null : h('span', { class: 'small muted' }, s.d))),
-        open ? h('div', { class: 'lensbody' }, h('p', null, s.d), h('div', { class: 'stack', style: 'gap:4px' }, h('small', { class: 'qlab' }, 'למשל בכיתה'), h('p', { class: 'qquote' }, s.ex))) : null);
-    }));
-    const levels = Object.values(agCheck);
-    const low = D.checkTopics.filter((t) => agCheck[t] && agCheck[t] <= 2);
-    return [
-      h('section', { class: 'frame' }, head('steps', 'שש צורות של שותפות'), h('p', { class: 'muted', style: 'max-width:70ch' }, D.ladderIntro), steps, h('p', { class: 'micro muted' }, D.ladderSource)),
-      h('section', { class: 'frame' }, head('question', 'איפה זה נמצא אצלנו?'), h('p', { class: 'muted', style: 'max-width:70ch' }, 'בוחרים לכל נושא את השלב שבו הוא נמצא היום בכיתה. זה רק על המסך, לא נשמר. אפשר לעשות את זה גם עם התלמידים.'),
-        h('div', { class: 'stack' }, D.checkTopics.map((t) => h('div', { class: 'agcheck' }, h('b', null, t),
-          chipGroup({ options: D.ladder.map((s) => ({ v: s.n, t: s.t })), value: agCheck[t] || null, cls: 'sm', label: t, onChange: (v) => { agCheck[t] = v; paint(); } })))),
-        levels.length ? h('div', { class: 'well stack', style: 'gap:6px' }, h('b', null, 'מה עולה מכאן'),
-          h('p', null, low.length ? `${low.join(', ')}: ${low.length > 1 ? 'נמצאים' : 'נמצא'} בשלבים הראשונים. בחרו נושא אחד ונסו להעלות אותו שלב אחד החודש, למשל מיידוע להיוועצות.` : 'יפה. בחרו נושא אחד שבו השותפות כבר חזקה, ושאלו את התלמידים מה עוד הם רוצים להחליט בעצמם.')) : null),
-      h('section', { class: 'frame' }, head('idea', 'למה זה טוב'), h('div', { class: 'agwhy' }, D.why.map((w) => h('span', null, w)))),
-    ];
-  };
-  const toggleRole = (r) => { agRoles.has(r) ? agRoles.delete(r) : agRoles.add(r); paint(); };
-  const roles = () => [
-    h('section', { class: 'frame' }, head('checklist', 'בנק תפקידים לכיתה'), h('p', { class: 'muted', style: 'max-width:70ch' }, 'מסמנים את התפקידים שמתאימים לכיתה, ומדפיסים טבלה עם התפקידים שבחרתם. את השמות ואת היעדים ממלאים ביד, יחד עם התלמידים.'),
-      D.roleGroups.map((g) => h('div', { class: 'stack', style: 'gap:10px' }, h('h4', { class: 'jlab' }, g.t),
-        h('div', { class: 'chips' }, g.items.map((r) => h('button', { class: 'tag pick agrole', type: 'button', 'aria-pressed': String(agRoles.has(r)), onclick: () => toggleRole(r) }, r))))),
-      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: printRoles }, agRoles.size ? `הדפסת הטבלה (${agRoles.size} תפקידים)` : 'הדפסת טבלה ריקה'),
-        agRoles.size ? h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { agRoles.clear(); paint(); } }, 'ניקוי הבחירה') : null),
-      h('p', { class: 'small muted' }, 'הבחירה נשארת על המסך בלבד, ולא נשמרת ולא נשלחת.')),
-    h('section', { class: 'frame' }, head('gear', D.authority.title),
-      h('div', { class: 'grid' }, [D.authority.resp, D.authority.auth].map((x) => h('div', { class: 'well stack', style: 'gap:4px' }, h('h4', null, x.t), h('p', null, x.d)))),
-      h('p', { style: 'max-width:70ch' }, D.authority.note)),
-    h('section', { class: 'frame' }, head('secure', 'בונים את המסגרת'), h('p', { class: 'muted', style: 'max-width:70ch' }, D.frameIntro),
-      h('div', { class: 'grid agframe' }, D.frame.map((f) => h('div', { class: 'well stack', style: 'gap:4px' }, h('h4', null, f.t), h('p', { class: 'small' }, f.q))))),
-  ];
-  const cls = () => [
-    h('section', { class: 'frame' }, head('plan', 'מהלך מוצע לכיתה י\''), h('p', { class: 'muted', style: 'max-width:70ch' }, 'ארבעה צעדים לאורך מחצית. אפשר לקחת צעד אחד ולהתחיל ממנו.'),
-      h('div', { class: 'stack' }, D.steps.map((s) => h('div', { class: 'well stack', style: 'gap:8px' },
-        h('div', { class: 'row', style: 'gap:12px;flex-wrap:nowrap;align-items:flex-start' }, h('span', { class: 'lensnum' }, String(s.n)),
-          h('div', { class: 'stack', style: 'gap:2px' }, h('h4', null, s.t), h('p', { class: 'small muted' }, s.time))),
-        s.parts ? h('div', { class: 'agparts4' }, s.parts.map((p) => h('div', { class: 'stack', style: 'gap:2px' }, h('small', { class: 'qlab' }, `${p.t} · ${p.time}`), h('p', { class: 'small' }, p.d)))) : h('p', null, s.d))))),
-    h('section', { class: 'frame' }, head('question', 'שאלות לשיחה האישית על התפקיד'), h('p', { class: 'muted', style: 'max-width:70ch' }, 'מספיקות שאלה או שתיים. אחרי השיחה, במבט השבועי, מסמנים את הציר אייג\'נסי.'), list(D.questions),
-      h('div', { class: 'row' }, link('/tools/cards/type/agency', 'קלפי שיח: אייג\'נסי ושותפות', 'btn soft'), link('/me', 'למבט השבועי', 'btn soft'))),
-    h('section', { class: 'frame' }, head('insight', 'דגשים'), list(D.tips)),
-  ];
-  const print = () => [
-    h('section', { class: 'frame printbanner' },
-      h('img', { src: D.files.preview, alt: 'השער של החוברת שותפות תלמידים', loading: 'lazy' }),
-      h('div', { class: 'stack' },
-        h('span', { class: 'tag lead', style: 'align-self:flex-start' }, 'למחנכת'),
-        h('h3', null, 'החוברת המלאה: שותפות תלמידים'),
-        h('p', null, D.pdfText),
-        h('div', { class: 'row' }, h('a', { class: 'btn', href: D.files.pdf, download: 'shutfut-talmidim.pdf' }, 'הורדה להדפסה')))),
-  ];
-  function paint() {
-    const y = window.scrollY;
-    clear(host);
-    add(host, [
-      h('section', { class: 'frame' }, h('div', null, link('/tools/agency', 'אייג\'נסי', 'btn ghost sm')), h('h2', null, D.name), h('p', { class: 'muted', style: 'max-width:62ch' }, D.tagline)),
-      h('div', { class: 'idtabs', role: 'tablist', 'aria-label': 'חלקי הכלי' }, TABS.map(([id, t]) => h('button', { class: 'idtab', type: 'button', role: 'tab', 'aria-selected': String(agTab === id), onclick: () => { agTab = id; paint(); } }, t))),
-      ({ what, ladder, roles, class: cls, print })[agTab]()]);
-    window.scrollTo(0, y);
-  }
-  paint();
-  return host;
-}
-// הדפסת טבלת התפקידים: דף נפרד שמופיע רק בהדפסה, ונעלם אחריה
-function printRoles() {
-  const chosen = [...agRoles];
-  const rows = Math.max(12, chosen.length);
-  const sheet = h('div', { id: 'printsheet', dir: 'rtl' },
-    h('div', { class: 'ps-head' }, h('img', { src: 'assets/logo/hotam-logo.png', alt: 'חותם' }), h('img', { src: 'assets/logo/ort-logo.png', alt: 'רשת אורט' }), h('img', { src: 'assets/logo/zman-logo.svg', alt: 'זמן לחינוך' })),
-    h('h1', null, 'תפקידים כיתתיים'),
-    h('table', null, h('thead', null, h('tr', null, h('th', null, 'תפקיד'), h('th', null, 'שם התלמיד/ה'), h('th', null, 'עד מתי'), h('th', null, 'מה היעד'))),
-      h('tbody', null, Array.from({ length: rows }, (_, i) => h('tr', null, h('td', null, chosen[i] || ''), h('td'), h('td'), h('td'))))),
-    h('p', { class: 'ps-foot' }, 'זמן לחינוך · שותפות תלמידים'));
-  document.body.append(sheet);
-  const done = () => { sheet.remove(); window.removeEventListener('afterprint', done); };
-  window.addEventListener('afterprint', done);
-  setTimeout(() => window.print(), 50);
-}
-
-/* ---------- כלי 2: יש בי יותר ממה שרואים ---------- */
-let sc = null; // מצב השיחה: חי רק כל עוד נשארים בכלי, ולא נשמר בשום מקום
-const scFresh = () => ({ step: 1, q: null, offered: [], resp: {}, own: [], ownText: '' });
-const SC_MAX = 3;
-const SC_STEPS = ['קלף שאלה', 'הסיפור', 'חוזקות', 'סיכום'];
-const SC_RESP = [{ v: 'yes', t: 'מתאים' }, { v: 'close', t: 'קרוב, לא בדיוק' }, { v: 'no', t: 'לא מתאים' }];
-function viewStrengthCards() {
-  const D = IDT().cards;
-  const L = window.ZMAN_LISTEN.lenses;
-  if (!sc) sc = scFresh();
-  const host = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  const strength = (id) => D.strengths.find((s) => s.id === id);
-  const go2 = (step) => { sc.step = step; paint(); window.scrollTo(0, 0); };
-  const restart = () => { sc = scFresh(); paint(); window.scrollTo(0, 0); };
-  const progress = () => h('ol', { class: 'idprog', 'aria-label': 'שלבי השיחה' }, SC_STEPS.map((t, i) => h('li', { class: i + 1 < sc.step ? 'done' : i + 1 === sc.step ? 'cur' : '', 'aria-current': i + 1 === sc.step ? 'step' : null }, `${i + 1}. ${t}`)));
-
-  // 1. בוחרים קלף שאלה
-  const stepPick = () => {
-    const choose = (q) => { sc.q = q; go2(2); };
-    return h('section', { class: 'frame' },
-      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'בוחרים קלף שאלה'), h('p', { class: 'muted', style: 'max-width:60ch' }, 'התלמיד/ה בוחר/ת קלף אחד שיש לו/ה על מה לספר. אין תשובה נכונה, ואפשר תמיד להחליף.')),
-      h('div', { class: 'qcards' }, D.questions.map((q) => h('button', { class: 'qcard', type: 'button', onclick: () => choose(q) }, h('span', null, q.title)))),
-      h('div', { class: 'row' }, h('button', { class: 'btn soft', type: 'button', onclick: () => choose(D.questions[Math.floor(Math.random() * D.questions.length)]) }, 'קלף מעורבב'), h('span', { class: 'small muted' }, 'כשקשה להחליט.')));
-  };
-
-  // 2. הסיפור
-  const stepStory = () => h('section', { class: 'frame' },
-    h('div', { class: 'storycard' }, h('p', { class: 'qlab' }, 'הקלף שנבחר'), h('p', { class: 'storyq' }, sc.q.title), h('p', { class: 'storyf' }, h('small', null, 'שאלת המשך: '), sc.q.follow)),
-    h('div', { class: 'grid' },
-      h('div', { class: 'well stack', style: 'gap:6px' }, h('h4', null, 'התלמיד/ה'), h('p', null, 'מספר/ת בחופשיות, כמה שבא לו/ה. אפשר לדלג על חלקים.')),
-      h('div', { class: 'well stack', style: 'gap:6px' }, h('h4', null, 'המחנכת'), h('p', null, 'מקשיבה, שואלת שאלות המשך, ועוד לא נותנת שם. השם בא בשלב הבא.'))),
-    h('details', { class: 'idlens' }, h('summary', null, 'תזכורת: שאלות המשך לפי ארבע עדשות'),
-      h('div', { class: 'grid', style: 'margin-top:12px' }, L.map((l) => h('div', { class: 'well stack', style: 'gap:6px' }, h('h4', null, l.title), h('p', { class: 'small' }, l.examples[0]))))),
-    h('div', { class: 'row' },
-      h('button', { class: 'btn', type: 'button', onclick: () => go2(3) }, 'סיימנו לספר: לחוזקות'),
-      h('button', { class: 'btn soft', type: 'button', onclick: () => go2(4) }, 'לסיים בלי חוזקות'),
-      h('button', { class: 'btn ghost', type: 'button', onclick: () => go2(1) }, 'החלפת קלף')),
-    h('p', { class: 'small muted' }, 'לא כל שיחה צריכה להסתיים בחוזקה. הסיפור לבדו שווה את הזמן.'));
-
-  // 3. המחנכת מציעה חוזקות כהשערות
-  const stepOffer = () => {
-    const search = h('input', { class: 'input', type: 'search', placeholder: 'חיפוש חוזקה', 'aria-label': 'חיפוש חוזקה' });
-    const counter = h('p', { class: 'tag lead', 'aria-live': 'polite' });
-    const next = h('button', { class: 'btn', type: 'button', onclick: () => go2(4) });
-    const els = D.strengths.map((s) => {
-      const b = h('button', { class: 'scard', type: 'button', onclick: () => {
-        const i = sc.offered.indexOf(s.id);
-        if (i >= 0) sc.offered.splice(i, 1);
-        else if (sc.offered.length < SC_MAX) sc.offered.push(s.id);
-        sync();
-      } }, h('b', null, s.name), h('span', null, s.desc));
-      return { s, b };
-    });
-    const empty = h('p', { class: 'muted', hidden: true }, 'לא נמצאה חוזקה בשם הזה. אפשר לנסות מילה אחרת.');
-    function sync() {
-      const full = sc.offered.length >= SC_MAX;
-      els.forEach(({ s, b }) => {
-        const on = sc.offered.includes(s.id);
-        b.setAttribute('aria-pressed', String(on));
-        b.setAttribute('aria-disabled', String(full && !on));
-      });
-      counter.textContent = `הוצעו ${sc.offered.length} מתוך ${SC_MAX}`;
-      next.textContent = sc.offered.length ? 'להמשך: מה מתאים לתלמיד/ה?' : 'להמשיך בלי להציע';
-    }
-    search.addEventListener('input', () => {
-      const q = search.value.trim();
-      let any = false;
-      els.forEach(({ s, b }) => { const ok = !q || (s.name + ' ' + s.desc).includes(q); b.hidden = !ok; if (ok) any = true; });
-      empty.hidden = any;
-    });
-    sync();
-    return h('section', { class: 'frame' },
-      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'המחנכת מציעה חוזקות, כהשערות'), h('p', { class: 'muted', style: 'max-width:62ch' }, `בוחרות עד ${SC_MAX} קלפים שנשמעו בסיפור, ואחר כך שואלות את התלמיד/ה אם הם מתאימים. מתחילות ממה שנעשה בסיפור. אין חובה לבחור.`)),
-      h('div', { class: 'row between' }, h('div', { style: 'flex:1 1 220px;max-width:340px' }, search), counter),
-      h('div', { class: 'scards' }, els.map((x) => x.b)), empty,
-      h('div', { class: 'row' }, next, h('button', { class: 'btn ghost', type: 'button', onclick: () => go2(2) }, 'חזרה לסיפור')));
-  };
-
-  // 4. תגובת התלמיד/ה וסיכום
-  const stepSummary = () => {
-    const sumBox = h('div', { class: 'grid', 'aria-live': 'polite' });
-    const sumUpdate = () => {
-      const chosen = [...sc.offered.filter((id) => sc.resp[id] === 'yes' || sc.resp[id] === 'close').map((id) => ({ t: strength(id).name, n: sc.resp[id] === 'close' ? 'קרוב, לא בדיוק' : '' })),
-        ...sc.own.map((id) => ({ t: strength(id).name, n: 'בחירה של התלמיד/ה' })), ...(sc.ownText.trim() ? [{ t: sc.ownText.trim(), n: 'במילים של התלמיד/ה' }] : [])];
-      const label = { yes: 'מתאים', close: 'קרוב, לא בדיוק', no: 'התלמיד/ה לא הסכימ/ה' };
-      clear(sumBox);
-      add(sumBox, [
-        h('div', { class: 'well stack', style: 'gap:8px' }, h('h4', null, 'מה התלמיד/ה בחר/ה?'),
-          chosen.length ? h('ul', { class: 'sumlist' }, chosen.map((c) => h('li', null, h('b', null, c.t), c.n ? h('small', null, c.n) : null))) : h('p', { class: 'muted small' }, 'עדיין לא נבחרה חוזקה. וזה בסדר גמור.')),
-        h('div', { class: 'well stack', style: 'gap:8px' }, h('h4', null, 'מה המחנכת הציעה?'),
-          sc.offered.length ? h('ul', { class: 'sumlist' }, sc.offered.map((id) => h('li', null, h('b', null, strength(id).name), h('small', null, label[sc.resp[id]] || 'עדיין בלי תגובה')))) : h('p', { class: 'muted small' }, 'לא הוצעו חוזקות.'))]);
-    };
-    const offeredBlock = sc.offered.length
-      ? h('div', { class: 'stack' }, sc.offered.map((id) => {
-        const s = strength(id);
-        return h('div', { class: 'respcard' }, h('div', { class: 'stack', style: 'gap:2px' }, h('b', { style: 'font-size:20px' }, s.name), h('span', { class: 'muted' }, s.desc)),
-          h('div', { class: 'stack', style: 'gap:6px' }, h('span', { class: 'small muted' }, 'מה התלמיד/ה אומר/ת?'),
-            chipGroup({ options: SC_RESP, value: sc.resp[id], cls: 'sm', label: `תגובה לחוזקה ${s.name}`, onChange: (v) => { sc.resp[id] = v; sumUpdate(); } })));
-      }))
-      : h('p', { class: 'muted' }, 'לא הוצעו חוזקות, ואפשר גם להסתפק בסיפור. אם התלמיד/ה רוצה לומר מה הוא/היא רואה בעצמו/ה, אפשר לבחור למטה.');
-    const pills = D.strengths.filter((s) => !sc.offered.includes(s.id)).map((s) => {
-      const b = h('button', { class: 'pillbtn', type: 'button', 'aria-pressed': String(sc.own.includes(s.id)), title: s.desc, onclick: () => {
-        const i = sc.own.indexOf(s.id);
-        if (i >= 0) sc.own.splice(i, 1); else if (sc.own.length < SC_MAX) sc.own.push(s.id); else return;
-        b.setAttribute('aria-pressed', String(sc.own.includes(s.id))); sumUpdate();
-      } }, s.name);
-      return b;
-    });
-    const ownText = h('input', { class: 'input', type: 'text', maxlength: '60', placeholder: 'חוזקה במילים של התלמיד/ה', 'aria-label': 'חוזקה במילים של התלמיד/ה', value: sc.ownText });
-    ownText.addEventListener('input', () => { sc.ownText = ownText.value; sumUpdate(); });
-    sumUpdate();
-    return h('section', { class: 'frame' },
-      h('div', { class: 'stack', style: 'gap:6px' }, h('h3', null, 'מה מתאים לתלמיד/ה?'), h('p', { class: 'muted', style: 'max-width:62ch' }, 'התלמיד/ה מחליט/ה. אפשר להסכים, לדייק, לדחות, או להציע חוזקה אחרת.')),
-      offeredBlock,
-      h('details', { class: 'idlens', open: sc.own.length > 0 || !sc.offered.length }, h('summary', null, 'התלמיד/ה מציע/ה חוזקה אחרת'),
-        h('div', { class: 'stack', style: 'margin-top:12px' }, h('p', { class: 'small muted' }, `אפשר לבחור עד ${SC_MAX} קלפים.`), h('div', { class: 'row', style: 'gap:8px' }, pills), ownText)),
-      h('div', { class: 'stack', style: 'gap:10px' }, h('h3', null, 'סיכום אופציונלי'), sumBox,
-        h('p', { class: 'privnote small' }, ic('lock', { size: 18 }), ' הסיכום מוצג רק על המסך הזה. הוא לא נשמר: לא בשרת, לא בדפדפן ולא בפרופיל, ונעלם כשיוצאים מהכלי. אם התלמיד/ה מסכימ/ה, אפשר לרשום אותו במחברת.')),
-      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: restart }, 'שיחה חדשה, קלף אחר'), h('button', { class: 'btn soft', type: 'button', onclick: () => go2(sc.offered.length ? 3 : 2) }, 'חזרה'), link('/tools/identity', 'לסיום', 'btn ghost')));
-  };
-
-  function paint() {
-    clear(host);
-    add(host, [idHead('יש בי יותר ממה שרואים', 'שיחה אישית משותפת: סיפור קצר, ואחריו שם לכוחות שנראים בו, בלי תיוג מלמעלה. כל התהליך נשאר על המסך.'),
-      sc.step === 1 ? printBanner() : null,
-      progress(), [stepPick, stepStory, stepOffer, stepSummary][sc.step - 1]()]);
-  }
-  paint();
-  return host;
-}
 
 /* =====================================================================
    קלפי שיח וקשר אישי (כלי בארגז הכלים, פתוח לכולם)
@@ -1272,7 +802,8 @@ function viewCards(p) {
   document.body.classList.toggle('cards-full', on);
   // הקלף נפתח במסך מלא. הבקשה למסך מלא של הדפדפן נעשית מתוך הלחיצה שהביאה אותנו לכאן.
   if (on) { cardsNative(true); if (!cardsWakeLock) cardsSetWake(true); } else if (!imm && sub !== 'browse') cardsLeave();
-  if (on && !cardsChromeOff && !cardsHinted) { cardsHinted = true; setTimeout(() => toast('הקישו על הקלף כדי להסתיר את הסרגל'), 700); }
+  if (imm) setTimeout(focusPrompt, 0);
+  if (on && !cardsChromeOff && !cardsHinted) { cardsHinted = true; setTimeout(() => toast('נגיעה בקלף מסתירה את הסרגל'), 700); }
   return h('div', { class: 'cardsview' + (imm ? ' imm' : '') + (on ? ' full' : '') + (on && cardsRot ? ' rot' : '') + (cardsContain ? ' contain' : '') + (on && cardsChromeOff ? ' nochrome' : '') }, cardsRoute(p),
     h('button', { class: 'chromehandle', type: 'button', 'aria-label': 'הצגת הסרגל', onclick: () => cardsSetChrome(true) }, '⋯'));
 }
@@ -2251,7 +1782,8 @@ function bottomSheet(build) {
   const sh = h('div', { class: 'bsheet', role: 'dialog', 'aria-modal': 'true' });
   const ov = h('div', { class: 'boverlay', onclick: (e) => { if (e.target === ov) close(); } }, sh);
   add(sh, [h('span', { class: 'grab', 'aria-hidden': 'true' }), build(close)]);
-  document.body.append(ov);
+  // במסך מלא של הדפדפן רק האלמנט שבמסך מלא נראה, ולכן החלונית נכנסת לתוכו
+  (document.fullscreenElement || document.body).append(ov);
   return close;
 }
 const lockLine = (t) => h('p', { class: 'lockline' }, ic('lock', { size: 16 }), t);
@@ -2356,6 +1888,267 @@ function classData() {
       h('button', { class: 'linkbtn', type: 'button', style: 'align-self:center;color:var(--violet)', onclick: () => confirmInline(host, 'למחוק את כל השמות והסבבים מהמכשיר הזה? אי אפשר לשחזר.', 'מחיקה', () => { map = emptyMap(); saveClass(); close(); classEdit = false; render(); toast('הנתונים נמחקו מהמכשיר'); }) }, 'מחיקת כל הנתונים מהמכשיר')]);
     return host;
   });
+}
+
+/* ---------- ארגז הכלים: שלושת צירי ההכשרה, באותו צבע וסמל כמו במבט השבועי ----------
+   פתוח לכולם, גם בלי כניסה. שום דבר בכלים לא נשמר ולא נשלח: הבחירות נשארות על המסך. */
+const AXIS_WORLD = {
+  identity: { c: BRAND.deep, a: BRAND.turq, i: 'id', line: 'לעזור לתלמיד/ה לראות את הכוחות שלו/ה', tools: ['/tools/identity/listen', '/tools/identity/cards'] },
+  goals: { c: BRAND.blue, a: BRAND.sky, i: 'target', line: 'מה חשוב לתלמיד/ה להשיג, ואיך מגיעים לשם', tools: ['/tools/goals/journal'] },
+  agency: { c: BRAND.purple, a: BRAND.turq, i: 'empower', line: 'לתלמיד/ה יש קול והשפעה בכיתה ובבית הספר', tools: ['/tools/agency/partnership'] },
+};
+const TOOL_INFO = {
+  '/tools/identity/listen': { t: 'להקשיב לכוחות', d: 'ארבע שאלות לראש, שיקוף, ושיחה לדוגמה', i: 'eye', ax: 'identity' },
+  '/tools/identity/cards': { t: 'יש בי יותר ממה שרואים', d: 'קלפי סיפור להדפסה, לשיחה האישית', i: 'care', ax: 'identity' },
+  '/tools/goals/journal': { t: 'המסע שלי', d: 'שאלות לשיחה על מטרות, ודפים להדפסה', i: 'target', ax: 'goals' },
+  '/tools/agency/partnership': { t: 'שותפות תלמידים', d: 'שאלות לשיחה האישית, סולם ותפקידים לכיתה', i: 'team', ax: 'agency' },
+};
+const HOW_TO = {
+  '/tools/identity/listen': ['לפני השיחה: דקה אחת עם ארבע השאלות.', 'בשיחה: להקשיב לסיפור, ולשים לב לאחת מהן.', 'לשקף במילים פשוטות מה התלמיד/ה עשה/תה, ולשאול אם זה מתאים.', 'אם התלמיד/ה לא מסכים/ה עם השם לכוח, אפשר לוותר עליו. לפעמים רק להקשיב זה הכי נכון.'],
+  '/tools/identity/cards': ['בחירת קלף שאלה. אפשר להחליף או לדלג.', 'התלמיד/ה מספר/ת. התפקיד שלך: שאלות המשך.', 'אפשר להציע 2–3 קלפי חוזקה, כהצעה ולא כקביעה.', 'התלמיד/ה בוחר/ת, מדייק/ת, דוחה או כותב/ת חוזקה משלו/ה.'],
+  '/tools/goals/journal': ['השיחה מתחילה מהתלמיד/ה. התפקיד שלך לשאול ולהקשיב, והתלמיד/ה מנסח/ת וכותב/ת.', 'מספיקות עשר דקות ושאלה אחת טובה. לא צריך להכין תכנית שלמה.', 'מטרה אחת קטנה וברורה עדיפה על שלוש כלליות.'],
+  '/tools/agency/partnership': [],
+};
+const axisCards = (id) => ((window.ZMAN_CARDS || {}).cards || []).filter((c) => (c.a || []).includes(id)).length;
+const goA = (to, cls, ...kids) => h('a', { class: cls, href: '#' + to, onclick: (e) => { e.preventDefault(); go(to); } }, ...kids);
+const chev = () => svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>', 'chev');
+const backBtn = (to, label) => goA(to, 'fbtn', svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'), h('span', { class: 'sr' }, label));
+const segTabs = (tabs, cur, set) => h('div', { class: 'segt', role: 'tablist' }, tabs.map(([v, t]) => h('button', { class: cur === v ? 'on' : '', type: 'button', role: 'tab', 'aria-selected': String(cur === v), onclick: () => set(v) }, t)));
+function howSheet(to) {
+  bottomSheet((close) => h('div', { class: 'stack' }, h('h3', null, `איך משתמשים · ${TOOL_INFO[to].t}`),
+    h('ol', { class: 'how3' }, HOW_TO[to].map((x, i) => h('li', null, h('b', null, String(i + 1)), x))), h('button', { class: 'cta', type: 'button', onclick: close }, 'הבנתי')));
+}
+function toolTop(to) {
+  const info = TOOL_INFO[to];
+  return h('div', { class: 'ttop' }, backBtn('/tools/' + info.ax, FOLDERS.find((f) => f.id === info.ax).t), h('h2', null, info.t),
+    HOW_TO[to].length ? h('button', { class: 'howbtn', type: 'button', onclick: () => howSheet(to) }, 'איך משתמשים') : null);
+}
+
+function toolsHome() {
+  return h('div', { class: 'etools' },
+    h('div', { class: 'mhead' }, h('h2', null, 'ארגז הכלים'), h('p', { class: 'muted' }, 'שלושת צירי השיחה האישית, כמו בהכשרה')),
+    h('div', { class: 'axes' }, FOLDERS.map((f) => {
+      const w = AXIS_WORLD[f.id];
+      return goA('/tools/' + f.id, 'axcard', h('span', { class: 'axic', style: `background:${w.a}` }, ic(w.i, { size: 30, tone: 'white' })),
+        h('span', { class: 'axt' }, h('b', null, f.t), h('span', null, w.line),
+          h('span', { class: 'axtools' }, w.tools.map((to) => h('i', null, TOOL_INFO[to].t)), h('i', null, 'קלפי שיח'))));
+    }).map((a, i) => { a.style.background = AXIS_WORLD[FOLDERS[i].id].c; return a; })),
+    goA('/tools/cards', 'cardsban', ic('idea', { size: 30 }), h('span', null, h('b', null, 'קלפי שיח · לכל הצירים'), h('span', null, `${((window.ZMAN_CARDS || {}).cards || []).length} קלפים: לפי נושא, דרך תמונה, לפי עומק, או קלף מעורבב`))));
+}
+function axisPage(id) {
+  const f = FOLDERS.find((x) => x.id === id), w = AXIS_WORLD[id];
+  const extra = pub.tools.filter((t) => t.folder === id && !t.example);
+  const row = (to, icon, title, sub, bg, fg) => goA(to, 'trow', h('span', { class: 'tric', style: `background:${bg}` }, ic(icon, { size: 28, tone: fg || 'white' })), h('span', { class: 'trt' }, h('b', null, title), h('span', null, sub)), chev());
+  return h('div', { class: 'etools' },
+    h('div', { class: 'axhead', style: `background:${w.c}` }, backBtn('/tools', 'ארגז הכלים'), h('span', { class: 'axic', style: `background:${w.a}` }, ic(w.i, { size: 32, tone: 'white' })), h('h2', null, f.t), h('p', null, w.line)),
+    h('div', { class: 'tlist' }, w.tools.map((to) => row(to, TOOL_INFO[to].i, TOOL_INFO[to].t, TOOL_INFO[to].d, w.c)),
+      row('/tools/cards/type/' + id, 'idea', 'קלפי שיח לציר הזה', `${axisCards(id)} קלפים, במסך מלא`, w.a),
+      extra.map((t) => h('a', { class: 'trow', href: t.url || '#', target: t.url ? '_blank' : null, rel: 'noopener' }, h('span', { class: 'tric', style: `background:${w.c}` }, ic('book', { size: 28, tone: 'white' })), h('span', { class: 'trt' }, h('b', null, t.title), h('span', null, t.desc)), chev()))),
+    isAdmin() ? h('div', null, link('/admin/tools', 'הוספה ועריכה של כלים', 'btn soft sm')) : null);
+}
+
+/* ---------- להקשיב לכוחות: לפני השיחה, לשקף כוח, שיחה לדוגמה ---------- */
+const LT = { tab: 'before', flip: new Set(), ex: null, n: 0, word: '', ask: false, mine: null };
+function listenTool() {
+  const D = window.ZMAN_LISTEN, root = h('div', { class: 'etools' });
+  if (!LT.ex) LT.ex = D.examples[0].id;
+  const lookOf = ['compass', 'care', 'team', 'idea'], colOf = [BRAND.blue, BRAND.purple, BRAND.deep, BRAND.sky];
+  const reflInner = (r, i, f) => [h('span', { class: 'rn' }, String(i + 1)), h('b', null, r.title), h('span', { class: 'rm' }, r.micro),
+    f ? [h('span', { class: 'rlb ok' }, 'אפשר לומר'), h('span', { class: 'rq' }, r.tryThis), h('span', { class: 'rins' }, r.instruction)]
+      : [h('span', { class: 'rlb' }, 'נוטים לומר'), h('span', { class: 'rq no' }, r.insteadOf), h('span', { class: 'rtap' }, 'להפוך')]];
+  const chat = (e) => {
+    const shown = e.lines.slice(0, LT.n), end = LT.n >= e.lines.length;
+    return [h('div', { class: 'chat', 'aria-live': 'polite' }, shown.map((l) => h('div', { class: 'bub2 ' + (l.who === 'student' ? 's' : 't') }, h('span', null, l.who === 'student' ? 'תלמיד/ה' : 'מחנך/ת'), l.text)),
+      end ? h('div', { class: 'hints' }, h('span', null, e.hintLabel || 'כוחות אפשריים'), e.hints.map((x) => h('i', null, x))) : null, end && e.note ? h('p', { class: 'exnote' }, e.note) : null),
+    end ? null : h('button', { class: 'cta', type: 'button', onclick: () => { LT.n++; paint(); root.querySelector('.chat')?.lastElementChild?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } }, LT.n ? 'המשך השיחה' : 'להתחיל את השיחה')];
+  };
+  const mine = () => {
+    if (LT.mine) return [h('p', { class: 'small muted' }, `המילה: ${LT.word} · `, h('button', { class: 'linkbtn', type: 'button', onclick: () => { LT.mine = null; LT.word = ''; LT.n = 0; paint(); } }, 'מילה אחרת')), ...chat(LT.mine),
+      h('p', { class: 'small muted' }, 'הדוגמה נבנית אוטומטית סביב המילה, ואינה שיחה אמיתית.')];
+    if (LT.ask) return [h('h3', null, 'איך התלמיד/ה מדבר/ת על זה?'), h('p', { class: 'small muted' }, 'אותה מילה יכולה להיות סיפור הצלחה או סיפור כאב.'),
+      ...[['good', 'בהתלהבות או בגאווה'], ['hard', 'בקושי: מתקשה, נכשל/ה, או רוצה להתרחק'], ['unsure', 'עוד לא ברור']].map(([m, t]) => h('button', { class: 'cta ghostc', type: 'button', onclick: () => { LT.mine = D.exampleForTopic(LT.word, m); LT.ask = false; LT.n = 0; paint(); } }, t))];
+    const inp = h('input', { class: 'input', maxlength: '30', placeholder: 'מילה אחת, למשל: גיימינג', 'aria-label': 'מילה על הנושא', value: LT.word });
+    const goWord = (w) => { w = String(w).replace(/["״׳']/g, '').trim(); if (w.length < 2) return; LT.word = w; LT.ask = true; paint(); };
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') goWord(inp.value); });
+    return [h('h3', null, 'על מה התלמיד/ה מספר/ת?'), h('div', { class: 'addrow' }, inp, h('button', { class: 'cta', type: 'button', onclick: () => goWord(inp.value) }, 'להמשך')),
+      h('div', { class: 'chips' }, D.topicSuggestions.map((s) => h('button', { class: 'zpick', type: 'button', onclick: () => goWord(s) }, s))),
+      h('p', { class: 'small muted' }, 'בלי שמות של תלמידים. הטקסט נשאר על המסך ולא נשמר.')];
+  };
+  function body() {
+    if (LT.tab === 'reflect') return [h('p', { class: 'tagline' }, 'לשקף כוח בארבעה צעדים'), h('p', { class: 'qs' }, 'על כל קלף: מה נוטים לומר. בצד השני: מה אפשר לומר במקום.'),
+      h('div', { class: 'rgrid' }, D.reflect.map((r, i) => h('button', { class: 'rcard' + (LT.flip.has(i) ? ' f' : ''), type: 'button', 'aria-pressed': String(LT.flip.has(i)), onclick: (e) => {
+        const el = e.currentTarget, on = !LT.flip.has(i); on ? LT.flip.add(i) : LT.flip.delete(i);
+        el.classList.toggle('f', on); el.setAttribute('aria-pressed', String(on)); clear(el); add(el, reflInner(r, i, on)); el.classList.remove('anim'); void el.offsetWidth; el.classList.add('anim');
+      } }, reflInner(r, i, LT.flip.has(i)))))];
+    if (LT.tab === 'example') {
+      const cur = D.examples.find((x) => x.id === LT.ex);
+      return [h('div', { class: 'chips' }, [...D.examples.map((x) => [x.id, x.category]), ['mine', '+ המקרה שלי']].map(([v, t]) => h('button', { class: 'zpick' + (LT.ex === v ? ' on' : ''), type: 'button', onclick: () => { LT.ex = v; LT.n = 0; paint(); } }, t))),
+        ...(LT.ex === 'mine' ? mine() : chat(cur)), h('p', { class: 'small muted' }, 'חוזקות מוצגות כהשערות ולא כאבחנות: התלמיד/ה יכול/ה לדייק או לדחות.')];
+    }
+    return [h('p', { class: 'tagline' }, 'ארבע שאלות לראש'), h('p', { class: 'qs' }, 'דקה לפני השיחה. בשיחה עצמה: להקשיב, ולשים לב לאחת מהן.'),
+      h('div', { class: 'pocket' }, D.lenses.map((l, i) => h('div', { class: 'pk', style: `--lc:${colOf[i]}` }, h('span', { class: 'lic', style: `background:${colOf[i]}` }, ic(lookOf[i], { size: 20, tone: 'white' })), h('b', null, l.title), h('span', null, `"${l.examples[0]}"`)))),
+      h('details', { class: 'more' }, h('summary', null, 'עוד דגשים להקשבה'), h('ul', { class: 'plain' }, D.principles.map((p) => h('li', null, p))))];
+  }
+  function paint() {
+    clear(root);
+    add(root, [toolTop('/tools/identity/listen'), segTabs([['before', 'לפני השיחה'], ['reflect', 'לשקף כוח'], ['example', 'שיחה לדוגמה']], LT.tab, (v) => { LT.tab = v; paint(); }), h('div', { class: 'tbody' }, body())]);
+  }
+  paint();
+  return root;
+}
+
+/* ---------- יש בי יותר ממה שרואים: קובץ להדפסה בלבד, לשיחה האישית ---------- */
+function identityCards() {
+  const pdf = 'assets/pdf/kalfei-sicha.pdf';
+  return h('div', { class: 'etools' }, toolTop('/tools/identity/cards'),
+    h('div', { class: 'tbody' }, h('p', { class: 'tagline' }, 'קלפי סיפור להדפסה'), h('p', { class: 'qs' }, 'לשיחה האישית: להדפיס, לגזור ולפרוש על השולחן.'),
+      h('div', { class: 'preview' }, h('div', { class: 'pvwrap' }, h('img', { src: 'assets/preview/cards-guide-1.jpg', alt: 'עמוד ההסבר של קלפי יש בי יותר ממה שרואים', loading: 'lazy' }),
+        h('img', { class: 'lg1', src: 'assets/logo/ort-logo.png', alt: '' }), h('img', { class: 'lg2', src: 'assets/logo/zman-logo.svg', alt: '' }))),
+      h('div', { class: 'facts' }, h('span', null, '7 עמודי A4'), h('span', null, 'קלפים לגזירה'), h('span', null, 'לשיחה אחד על אחד')),
+      h('a', { class: 'cta', href: pdf, download: 'kalfei-sicha-hotam.pdf' }, 'הורדה והדפסה של הקלפים')));
+}
+
+/* ---------- המסע שלי: למחנכת, ומדף של דפים להדפסה ---------- */
+const JR = { tab: 'teach', q: 0, sel: new Set(), half: 0 };
+function pageArt(id, c) {
+  const l = (y, w = 70) => `<rect x="15" y="${y}" width="${w}" height="4" rx="2" fill="#dcdcdc"/>`;
+  const A = {
+    swot: `<rect x="12" y="30" width="36" height="34" rx="5" fill="${c}"/><rect x="52" y="30" width="36" height="34" rx="5" fill="#e8efff"/><rect x="12" y="68" width="36" height="34" rx="5" fill="#e8efff"/><rect x="52" y="68" width="36" height="34" rx="5" fill="${c}" opacity=".5"/>`,
+    smart: [0, 1, 2, 3, 4].map((i) => `<circle cx="82" cy="${36 + i * 15}" r="5" fill="${c}"/>` + l(34 + i * 15, 55)).join(''),
+    ideas: [15, 42, 69].map((x) => `<rect x="${x}" y="30" width="20" height="8" rx="3" fill="${c}"/>` + [46, 56, 66, 76].map((y) => `<rect x="${x}" y="${y}" width="20" height="4" rx="2" fill="#dcdcdc"/>`).join('')).join(''),
+    plan: [0, 1, 2].map((i) => `<rect x="60" y="${32 + i * 24}" width="28" height="16" rx="4" fill="${c}"/><path d="M55 ${40 + i * 24}h-8" stroke="${c}" stroke-width="3"/>` + l(38 + i * 24, 30)).join(''),
+    stop: `<circle cx="50" cy="52" r="20" fill="none" stroke="${c}" stroke-width="6"/><rect x="44" y="44" width="4" height="16" rx="2" fill="${c}"/><rect x="52" y="44" width="4" height="16" rx="2" fill="${c}"/>` + l(84) + l(94, 50),
+    talks: [0, 1, 2].map((i) => `<rect x="12" y="${30 + i * 25}" width="76" height="20" rx="5" fill="none" stroke="${c}" stroke-width="2.5"/>`).join(''),
+    before: [0, 1, 2, 3, 4].map((i) => `<path d="M84 ${32 + i * 15}l2 4 4 .5-3 3 1 4-4-2-4 2 1-4-3-3 4-.5z" fill="${i < 3 ? c : '#dcdcdc'}"/>` + l(35 + i * 15, 55)).join(''),
+    after: `<rect x="12" y="30" width="60" height="26" rx="10" fill="${c}"/><rect x="28" y="62" width="60" height="26" rx="10" fill="#e8efff"/>` + l(96, 50),
+    cert: `<circle cx="50" cy="62" r="30" fill="#e8efff"/><path d="M50 62V32A30 30 0 0 1 80 62z" fill="${c}"/><circle cx="50" cy="62" r="12" fill="${c}" opacity=".6"/><path d="M20 62h60M50 32v60" stroke="#f0f0f0" stroke-width="2"/>`,
+    celebrate: `<path d="M50 28l7 15 16 2-12 11 3 16-14-8-14 8 3-16-12-11 16-2z" fill="${c}"/><circle cx="20" cy="34" r="3" fill="#23d7cd"/><circle cx="82" cy="80" r="3" fill="#0046ff"/>` + l(88) + l(98, 48),
+  };
+  return `<svg viewBox="0 0 100 112">${A[id] || l(40) + l(52) + l(64, 50)}</svg>`;
+}
+function blobDownload(blob, name) {
+  const url = URL.createObjectURL(blob), a = h('a', { href: url, download: name });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+// כמה דפים בבת אחת: מאחדים את קובצי ה-PDF בדפדפן לקובץ אחד, ואז הורדה אחת
+let pdfLibLoading = null;
+const loadPdfLib = () => pdfLibLoading || (pdfLibLoading = new Promise((ok, bad) => { if (window.PDFLib) return ok(window.PDFLib); const s = h('script', { src: '/js/vendor/pdf-lib.min.js' }); s.onload = () => ok(window.PDFLib); s.onerror = () => { pdfLibLoading = null; bad(new Error('x')); }; document.head.append(s); }));
+async function mergePdfs(files) {
+  const { PDFDocument } = await loadPdfLib();
+  const out = await PDFDocument.create();
+  for (const f of files) {
+    const src = await PDFDocument.load(await (await fetch(f)).arrayBuffer());
+    (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
+  }
+  return new Blob([await out.save()], { type: 'application/pdf' });
+}
+function journeyTool() {
+  const G = window.ZMAN_GOALS, root = h('div', { class: 'etools' });
+  const COLS = [BRAND.turq, BRAND.sky, BRAND.purple];
+  const teach = () => {
+    const q = G.questions[JR.q];
+    return [h('div', { class: 'quote' }, h('span', null, 'הכלל'), h('b', null, 'עשר דקות ושאלה אחת טובה. לא צריך תכנית שלמה.')),
+      h('h3', { class: 'sub2' }, 'שלושה רגעים בשנה'),
+      h('div', { class: 'moments' }, G.moments.map((m) => h('div', { class: 'moment' }, h('span', { class: 'mn' }, String(m.n)), h('b', null, m.t), h('span', null, m.when),
+        h('span', { class: 'mp' }, m.pages.replace(/^דפים?:\s*/, '').split(/,\s*/).map((p) => h('i', null, p)))))),
+      h('h3', { class: 'sub2' }, 'שאלות שעוזרות לשיחה'),
+      h('div', { class: 'chips' }, G.questions.map((x, i) => h('button', { class: 'zpick' + (JR.q === i ? ' on' : ''), type: 'button', onclick: () => { JR.q = i; paint(); } }, x.t))),
+      h('div', { class: 'qstack' }, q.q.map((x, i) => h('div', { class: 'qbub', style: `animation-delay:${i * 70}ms` }, x))),
+      h('h3', { class: 'sub2' }, 'שלושה דגשים'),
+      h('div', { class: 'tips3' }, [['ear', 'הכול מתחיל מהתלמיד/ה', 'לשאול, ולתת לתלמיד/ה לנסח'], ['target', 'מטרה אחת קטנה', 'עדיפה על שלוש כלליות'], ['empower', 'המטרה שלו/ה', 'אפשר להציע, ההחלטה אצלו/ה']]
+        .map(([i, b, t]) => h('span', null, ic(i === 'ear' ? 'eye' : i, { size: 22 }), h('b', null, b), t))),
+      h('div', { class: 'oc2' }, h('div', { class: 'quote' }, h('span', null, 'לפתוח'), h('b', null, G.open)), h('div', { class: 'quote v' }, h('span', null, 'לסגור'), h('b', null, G.close)))];
+  };
+  const fileOf = (item) => G.files.dir + (item.f[Math.min(JR.half, item.f.length - 1)] || item.f[0])[0];
+  const printTab = () => {
+    const chosen = G.pageGroups.flatMap((g) => g.items).filter((it) => JR.sel.has(it.id));
+    const bar = h('div', { class: 'printbar' + (chosen.length ? ' on' : '') }, h('span', null, chosen.length ? `${chosen.length} ${chosen.length === 1 ? 'דף נבחר' : 'דפים נבחרו'}` : 'עוד לא נבחרו דפים'),
+      h('button', { class: 'cta', type: 'button', disabled: !chosen.length, onclick: async (e) => {
+        const b = e.currentTarget, label = b.textContent; b.disabled = true; b.textContent = 'מכינים…';
+        try { blobDownload(chosen.length === 1 ? await (await fetch(fileOf(chosen[0]))).blob() : await mergePdfs(chosen.map(fileOf)), chosen.length === 1 ? fileOf(chosen[0]).split('/').pop() : 'yoman-dapim.pdf'); toast('הקובץ ירד למכשיר'); }
+        catch { toast('לא הצלחנו להכין את הקובץ. אפשר לנסות שוב.'); } finally { b.disabled = false; b.textContent = label; }
+      } }, 'הדפסה'));
+    return [h('div', { class: 'book' }, h('div', { class: 'fan', 'aria-hidden': 'true' }, h('i', { style: `background:${BRAND.turq}` }), h('i', { style: `background:${BRAND.sky}` }), h('i', { style: `background:${BRAND.purple}` }, h('b', null, 'המסע', h('br'), 'שלי'))),
+        h('div', { class: 'bookt' }, h('b', null, 'החוברת המלאה'), h('span', null, '20 עמודים לכל השנה'),
+          h('div', { class: 'addrow' }, h('a', { class: 'cta light', href: G.files.print, download: 'yoman-hamasa-a4.pdf' }, 'A4'), h('a', { class: 'cta clear', href: G.files.a5, download: 'yoman-hamasa-a5.pdf' }, 'A5 חוברת')))),
+      h('p', { class: 'tagline', style: 'font-size:19px' }, 'או רק מה שצריך לשיחה הבאה'),
+      h('div', { class: 'row between' }, h('p', { class: 'qs', style: 'margin:0' }, 'נגיעה בדף בוחרת אותו'), segTabs([[0, 'מחצית א׳'], [1, 'מחצית ב׳']], JR.half, (v) => { JR.half = v; paint(); })),
+      G.pageGroups.map((g, gi) => h('div', { class: 'shelf' }, h('h4', null, h('span', { style: `background:${COLS[gi]}` }, String(gi + 1)), g.t),
+        h('div', { class: 'pages2' }, g.items.map((it) => { const on = JR.sel.has(it.id); return h('button', { class: 'pg2' + (on ? ' on' : ''), type: 'button', 'aria-pressed': String(on), onclick: () => { on ? JR.sel.delete(it.id) : JR.sel.add(it.id); paint(); } },
+          h('span', { class: 'sheet2', style: `--pc:${COLS[gi]}` }, h('i', { class: 'top' }), svgSpan(pageArt(it.id, COLS[gi]), 'art'), h('span', { class: 'ok2' }, ic('check', { size: 14, tone: 'white' }))),
+          h('b', null, it.t), h('span', null, [it.tag, it.time].filter(Boolean).join(' · '))); })))),
+      bar];
+  };
+  function paint() {
+    const y = window.scrollY; clear(root);
+    add(root, [toolTop('/tools/goals/journal'), segTabs([['teach', 'למחנכת'], ['print', 'להדפסה']], JR.tab, (v) => { JR.tab = v; paint(); window.scrollTo(0, 0); }), h('div', { class: 'tbody' }, JR.tab === 'print' ? printTab() : teach())]);
+    window.scrollTo(0, y);
+  }
+  paint();
+  return root;
+}
+
+/* ---------- שותפות תלמידים: בשיחה האישית, סולם השותפות, בכיתה ---------- */
+const AGS = { tab: 'talk', q: 0, rung: 2, roles: new Set(), names: {} };
+function partnershipTool() {
+  const D = AG(), root = h('div', { class: 'etools' });
+  const RUNG = [BRAND.sky, BRAND.turq, BRAND.deep, BRAND.blue, BRAND.purple, BRAND.purple];
+  const talk = () => [h('p', { class: 'qs' }, 'לכל תלמיד/ה יש תפקיד בכיתה. בשיחה האישית אפשר לשאול עליו, וכך לדבר על השפעה ועל קול.'),
+    h('div', { class: 'bigq' }, ic('empower', { size: 36, tone: 'white' }), h('h3', null, D.questions[AGS.q]), h('span', { class: 'dots' }, D.questions.map((_, i) => h('i', { class: i === AGS.q ? 'on' : '' })))),
+    h('div', { class: 'addrow' }, h('button', { class: 'cta ghostc', type: 'button', onclick: () => { AGS.q = (AGS.q + D.questions.length - 1) % D.questions.length; paint(); } }, 'הקודמת'),
+      h('button', { class: 'cta violet', type: 'button', onclick: () => { AGS.q = (AGS.q + 1) % D.questions.length; paint(); } }, 'השאלה הבאה')),
+    h('p', { class: 'small muted' }, 'אחרי השיחה, במבט השבועי, מסמנים את הציר אייג\'נסי.'), goA('/tools/cards/type/agency', 'linkbtn', 'קלפי שיח לאייג\'נסי')];
+  const ladder = () => {
+    const r = D.ladder[AGS.rung];
+    return [h('p', { class: 'qs' }, 'על מה הכיתה מחליטה, ובאיזה שלב? אין שלב נכון אחד. נגיעה בשלב מראה דוגמה.'),
+      h('div', { class: 'ladder' }, D.ladder.map((_, i) => i).reverse().map((i) => h('button', { class: 'rung' + (AGS.rung === i ? ' on' : ''), type: 'button', style: `width:${55 + i * 9}%;background:${RUNG[i]};color:${i < 2 ? 'var(--ink)' : '#fff'}`, onclick: () => { AGS.rung = i; paint(); } }, h('span', null, String(i + 1)), D.ladder[i].t))),
+      h('div', { class: 'depthread' }, h('b', null, `${AGS.rung + 1} · ${r.t}`), h('span', null, r.d), h('span', { style: 'color:var(--ink)' }, `לדוגמה: ${r.ex}`)), h('p', { class: 'micro muted' }, D.ladderSource)];
+  };
+  const cls = () => {
+    const chosen = [...AGS.roles];
+    return [h('p', { class: 'tagline' }, 'הכיתה שלנו מנהלת'), h('p', { class: 'qs' }, 'בשיעור חינוך: כל תלמיד/ה בוחר/ת תפקיד, והכרזה נתלית בכיתה. אחר כך התפקיד עולה בשיחה האישית.'),
+      h('ol', { class: 'how3' }, D.steps.map((s) => h('li', null, h('b', null, String(s.n)), `${s.t} · ${s.time}`))),
+      h('h3', { class: 'sub2' }, 'בחירת תפקידים לכרזה'),
+      D.roleGroups.map((g) => h('div', { class: 'stack', style: 'gap:8px' }, h('h4', { class: 'small muted' }, g.t),
+        h('div', { class: 'chips' }, g.items.map((r) => h('button', { class: 'zpick' + (AGS.roles.has(r) ? ' on' : ''), type: 'button', 'aria-pressed': String(AGS.roles.has(r)), onclick: () => { AGS.roles.has(r) ? AGS.roles.delete(r) : AGS.roles.add(r); paint(); } }, r))))),
+      chosen.length ? h('div', { class: 'stack', style: 'gap:8px' }, h('h4', { class: 'small muted' }, 'שמות (לא חובה, אפשר גם לכתוב ביד על הכרזה)'),
+        chosen.map((r) => h('label', { class: 'rolename' }, h('span', null, r), h('input', { class: 'input', value: AGS.names[r] || '', maxlength: '60', placeholder: 'שמות', oninput: (e) => { AGS.names[r] = e.target.value; } })))) : null,
+      h('button', { class: 'cta violet', type: 'button', onclick: printPoster }, chosen.length ? `הדפסת הכרזה (${chosen.length} תפקידים)` : 'הדפסת כרזה ריקה'),
+      h('p', { class: 'small muted' }, 'הבחירה והשמות נשארים על המסך בלבד, ולא נשמרים ולא נשלחים.'),
+      h('a', { class: 'linkbtn', href: D.files.pdf, download: 'shutfut-talmidim.pdf' }, 'החוברת המלאה להדפסה (7 עמודים)')];
+  };
+  function paint() {
+    const y = window.scrollY; clear(root);
+    add(root, [toolTop('/tools/agency/partnership'), segTabs([['talk', 'בשיחה האישית'], ['ladder', 'סולם השותפות'], ['class', 'בכיתה']], AGS.tab, (v) => { AGS.tab = v; paint(); }),
+      h('div', { class: 'tbody' }, ({ talk, ladder, class: cls })[AGS.tab]())]);
+    window.scrollTo(0, y);
+  }
+  paint();
+  return root;
+}
+// כרזה לקיר הכיתה: דף שמופיע רק בהדפסה, ונעלם אחריה
+function printPoster() {
+  const chosen = [...AGS.roles], cols = [BRAND.blue, BRAND.purple, BRAND.deep, BRAND.turq, BRAND.sky];
+  const cells = chosen.length ? chosen : Array.from({ length: 8 }, () => '');
+  const sheet = h('div', { id: 'printsheet', dir: 'rtl' },
+    h('div', { class: 'ps-head' }, h('img', { src: 'assets/logo/hotam-logo.png', alt: 'חותם' }), h('img', { src: 'assets/logo/ort-logo.png', alt: 'רשת אורט' }), h('img', { src: 'assets/logo/zman-logo.svg', alt: 'זמן לחינוך' })),
+    h('div', { class: 'ps-hero' }, h('b', null, 'הכיתה שלנו מנהלת'), h('span', null, 'כל אחד ואחת אחראים על משהו')),
+    h('div', { class: 'ps-grid' }, cells.map((r, i) => h('div', { class: 'ps-role', style: `border-color:${cols[i % 5]}` }, h('span', { class: 'ps-t', style: `color:${cols[i % 5]}` }, r || 'תפקיד:'), h('span', { class: 'ps-n' }, AGS.names[r] || '')))),
+    h('p', { class: 'ps-foot' }, 'זמן לחינוך · שותפות תלמידים'));
+  document.body.append(sheet);
+  const done = () => { sheet.remove(); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(() => window.print(), 50);
+}
+
+/* ---------- קלפי שיח: רגע לפני השיחה (פעם אחת בכל כניסה) ---------- */
+let focusShown = false;
+function focusPrompt() {
+  if (focusShown) return; focusShown = true;
+  bottomSheet((close) => h('div', { class: 'stack' }, h('h3', null, 'רגע לפני השיחה'),
+    h('ol', { class: 'how3' }, h('li', null, h('b', null, '1'), h('span', null, 'כדאי להפעיל "נא לא להפריע", כדי שהודעות לא יקפצו על הקלף.', h('small', null, 'iPhone: מרכז הבקרה ← מיקוד · Android: משיכה מלמעלה ← נא לא להפריע'))),
+      h('li', null, h('b', null, '2'), 'המסך נשאר דלוק כל עוד הקלפים פתוחים.')),
+    h('button', { class: 'cta', type: 'button', onclick: close }, 'אפשר להתחיל')));
 }
 
 async function boot() {
