@@ -189,3 +189,33 @@ test('מי השתמשה במיפוי: רק מנהלת התכנית רואה, ו�
   assert.ok(!('mapping' in (await lead.get(`/api/lead/educators/${id}`)).json.educator));
   await m.put('/api/admin/settings', { leadSeesNames: false });
 });
+
+test('מחנכת שהוסרה: אי אפשר להירשם מחדש לחשבון שלה ולרשת את המבטים, גם עם קוד ההצטרפות', async () => {
+  // בוחרים מחנכת עם מבטים (מבית ספר שלא נבדק אחרי כן), מסירים אותה, ומנסים "להשתלט" עליה
+  // בהרשמה מחדש עם קוד ההצטרפות של בית הספר
+  const victim = await db.get(
+    `SELECT u.id, u.name, s.slug FROM users u JOIN schools s ON s.id = u.school_id
+       JOIN reports r ON r.educator_id = u.id
+      WHERE u.role = 'educator' AND u.active = 1 AND s.slug <> 'naomi-shemer'
+      GROUP BY u.id, u.name, s.slug HAVING COUNT(r.id) > 0 LIMIT 1`);
+  const beforeReports = (await db.get('SELECT COUNT(*)::int AS n FROM reports WHERE educator_id = ?', [victim.id])).n;
+  assert.ok(beforeReports > 0);
+
+  const m = await manager();
+  assert.equal((await m.post(`/api/admin/educators/${victim.id}/remove`)).status, 200);
+
+  const join = (await app.joinCodes())[victim.slug].educator;
+  const outsider = app.client();
+  const reg = await outsider.post('/api/auth/educator/register', { school: victim.slug, name: victim.name, joinCode: join, code: '9191' });
+
+  if (reg.status === 200) {
+    // אם מתאפשרת הרשמה, זה חייב להיות חשבון חדש וריק — לא החשבון שהוסר ולא המבטים שלו
+    assert.notEqual(reg.json.user.id, victim.id, 'קיבל בחזרה את מזהה החשבון שהוסר');
+    const mine = await outsider.get('/api/me');
+    assert.equal(mine.json.reports.length, 0, 'ירש מבטים של חשבון שהוסר');
+  } else {
+    assert.ok(reg.status === 403 || reg.status === 409, `סטטוס לא צפוי ${reg.status}`);
+  }
+  // המבטים של החשבון שהוסר נשמרים במסד (לייצוא ולסטטיסטיקה), מקושרים למזהה הישן בלבד
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM reports WHERE educator_id = ?', [victim.id])).n, beforeReports);
+});

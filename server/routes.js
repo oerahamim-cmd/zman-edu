@@ -314,7 +314,9 @@ route('POST', '/api/admin/educators/:id/reset-code', ['manager'], async (ctx) =>
 });
 route('POST', '/api/admin/educators/:id/remove', ['manager'], async (ctx) => {
   const u = await personInManagerScope(ctx.params.id, 'educator');
-  await db.run('UPDATE users SET active = 0, secret_hash = NULL WHERE id = ?', [u.id]);
+  // הסרה היא סופית: מלבד איפוס הקוד, פורשים את מפתח השם כך שאי אפשר להירשם מחדש לאותו חשבון
+  // (ולרשת את המבטים שלו) עם קוד ההצטרפות. אדם חדש עם אותו שם מקבל חשבון חדש וריק.
+  await db.run("UPDATE users SET active = 0, secret_hash = NULL, name_key = 'removed:' || id::text || ':' || name_key WHERE id = ?", [u.id]);
   await auth.destroyUserSessions(u.id);
   await audit(ctx.user, 'remove_educator', u.id);
 });
@@ -326,7 +328,8 @@ route('POST', '/api/admin/leads/:id/reset-code', ['manager'], async (ctx) => {
 });
 route('POST', '/api/admin/leads/:id/remove', ['manager'], async (ctx) => {
   const u = await personInManagerScope(ctx.params.id, 'lead');
-  await db.run('UPDATE users SET active = 0, secret_hash = NULL WHERE id = ?', [u.id]);
+  // כמו במחנכת: הסרה סופית שפורשת את מפתח השם, כדי שאי אפשר יהיה להירשם מחדש לאותו חשבון
+  await db.run("UPDATE users SET active = 0, secret_hash = NULL, name_key = 'removed:' || id::text || ':' || name_key WHERE id = ?", [u.id]);
   await auth.destroyUserSessions(u.id);
   await audit(ctx.user, 'remove_lead', u.id);
 });
