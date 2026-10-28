@@ -974,6 +974,115 @@ body:not(.has-bn) .printbar { bottom: 10px; }
 .mail2 .snip { color: var(--ink2); }
 .onb .remb { text-align: start; }
 
+/* ---------- קלפי שיח (עיצוב אוקטובר 2026): ארבע דרכים צבעוניות, קלף בצבע הנושא ---------- */
+.chome { display: flex; flex-direction: column; gap: 14px; }
+.cways { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cway { border: 0; border-radius: 22px; background: var(--wc); color: #fff; padding: 18px 10px 16px; display: grid; justify-items: center; gap: 6px; font: 700 16px/1.2 var(--font); cursor: pointer; transition: transform .15s; }
+.cway:active { transform: scale(.97); }
+.cway.on { outline: 3px solid var(--ink); outline-offset: 2px; }
+.cwayopts { display: flex; flex-wrap: wrap; gap: 8px; animation: rise .3s ease both; }
+.cwayopts.cdeps { display: grid; }
+.cwayopts p { margin: 4px 2px 0; }
+.cchip { border: 0; border-radius: 999px; background: var(--wc); color: #fff; padding: 10px 16px; font: 700 15px/1.2 var(--font); cursor: pointer; }
+.cdepopt { border: 0; background: #fff; border-radius: 16px; padding: 13px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 400 14px/1.3 var(--font); color: var(--ink2); cursor: pointer; text-align: start; }
+.cdepopt b { font-size: 17px; color: var(--deep); }
+.ctoggle { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 16px; padding: 12px 16px; cursor: pointer; }
+.ctoggle input { width: 22px; height: 22px; flex: none; accent-color: var(--lead); }
+.ctoggle span { display: flex; flex-direction: column; }
+.ctoggle small { color: var(--ink2); font-size: 13.5px; }
+.cmore .ctoggle { background: var(--page); }
+.ctop { display: flex; align-items: center; gap: 10px; }
+.ctitle { flex: 1; min-width: 0; }
+.ctitle h2 { font-size: 22px; }
+.ctitle p { font-size: 14px; color: var(--ink2); }
+.cxbtn { flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #fff; color: var(--ink); font: 700 20px/1 var(--font); display: grid; place-items: center; cursor: pointer; }
+.qface { background: var(--cc, var(--lead)); border: 0; gap: 14px; }
+.qface::before { border-color: rgba(255, 255, 255, .55); }
+.qface .cardq { color: #fff; font-weight: 700; }
+.qface .cardcat { position: static; inset: auto; text-align: center; background: #fff; color: var(--cc, var(--lead)); border-radius: 999px; padding: 5px 14px; font-size: 13px; }
+.cthumb { width: 34%; max-width: 210px; aspect-ratio: 1; object-fit: cover; border-radius: 22px; border: 5px solid rgba(255, 255, 255, .92); pointer-events: none; }
+.cardsview:not(.full) .cthumb { display: none; }
+.cnav { gap: 16px; align-items: center; }
+.cnb { width: 60px; height: 60px; border-radius: 50%; border: 0; background: #fff; color: var(--lead); display: grid; place-items: center; cursor: pointer; font: 700 16px/1 var(--font); box-shadow: 0 2px 10px rgba(0, 0, 0, .12); }
+.cnb.wide { white-space: nowrap; width: auto; border-radius: 999px; padding: 0 22px; }
+.cardsview:not(.full) .cnb { background: var(--page); box-shadow: none; }
+.cardsview.full .ctop { position: fixed; top: 10px; left: 10px; right: 10px; inset-inline-start: 10px; width: auto; background: none; padding: 0; z-index: 30; }
+.cardsview.full .ctop .ctitle { visibility: hidden; }
+.cardsview.full .cxbtn { background: rgba(255, 255, 255, .24); color: #fff; backdrop-filter: blur(6px); }
+.cardsview.full .cardcount { top: 20px; left: 50%; inset-inline-start: auto; transform: translateX(-50%); background: rgba(255, 255, 255, .24); color: #fff; font-weight: 700; }
+.cardsview.full .cardbtns.cnav { background: none; padding: 0; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); gap: 18px; }
+.cardsview.full .qface { padding: 76px 9vmin 120px; }
+.cardsview.full .cardq { font-size: clamp(26px, 7vmin, 72px); }
+.cardsview.full .cardcat { bottom: auto; font-size: clamp(13px, 2.6vmin, 22px); }
+.cardsview.full .cardnote { bottom: 98px; }
+.cardsview.full.nochrome .qface { padding: 6vmin 8vmin; }
+.cardsview .cardcover { background: var(--deep); }
+
+/* ---------- דף הפתיחה ומסכי הכניסה (בלי חיבור) ---------- */
+.wrap.gate { max-width: 520px; }
+.land, .gate-in { display: flex; flex-direction: column; gap: 16px; }
+.llogos { display: flex; align-items: center; justify-content: center; gap: 14px; background: #fff; border-radius: 20px; padding: 12px 16px; }
+.llogos img { display: block; width: auto; }
+.llogos .l-hotam { height: 30px; } .llogos .l-ort { height: 26px; } .llogos .l-zman { height: 42px; }
+.lhero, .ghead { background: var(--lead); color: #fff; border-radius: 28px; padding: 22px 20px 20px; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.lhero > *, .ghead > * { position: relative; }
+.sh + .lfeat { margin-top: 2px; }
+.lhero .blob, .ghead .blob { position: absolute; border-radius: 50%; background: var(--deep); }
+.lhero .b1, .ghead .b1 { width: 240px; height: 240px; left: -90px; top: -100px; }
+.lhero .b2, .ghead .b2 { width: 110px; height: 110px; right: -30px; bottom: -50px; background: var(--violet); }
+.lhero h1 { font-size: 36px; line-height: 1.05; }
+.lhero p { font-size: 16.5px; opacity: .95; }
+.lart { height: 150px; margin-bottom: 4px; }
+.lbub { position: absolute; display: flex; align-items: center; justify-content: center; animation: rise .6s ease both, bob 3.2s ease-in-out infinite; }
+.lbub.b1 { right: 4%; top: 12px; width: 58%; height: 84px; background: #fff; border-radius: 24px 24px 6px 24px; flex-direction: column; align-items: flex-start; gap: 9px; padding: 16px 18px; transform: rotate(-3deg); }
+.lbub.b1 i { display: block; height: 9px; border-radius: 5px; background: var(--turq); width: 90%; }
+.lbub.b1 i:nth-child(2) { width: 70%; background: var(--sky); } .lbub.b1 i:nth-child(3) { width: 45%; background: var(--lead); opacity: .35; }
+.lbub.b2 { left: 24%; top: 62px; width: 84px; height: 84px; background: var(--violet); border-radius: 26px 26px 26px 6px; transform: rotate(6deg); animation-delay: .1s, .8s; }
+.lbub.b3 { left: 6%; top: 0; width: 44px; height: 44px; background: var(--turq); border-radius: 50%; animation-delay: .2s, 1.5s; }
+.ldots { position: absolute; right: 10%; bottom: 0; display: flex; gap: 7px; }
+.ldots i { width: 14px; height: 14px; border-radius: 50%; animation: pop 2.6s ease-in-out infinite; }
+.ldots i:nth-child(2) { animation-delay: .3s; } .ldots i:nth-child(3) { animation-delay: .6s; } .ldots i:nth-child(4) { animation-delay: .9s; }
+.lcta { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.lfeats { display: flex; flex-direction: column; gap: 10px; }
+.lfeat { background: #fff; border-radius: 22px; padding: 16px; display: flex; gap: 14px; align-items: center; }
+.lfeat > div { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.lfeat h3 { font-size: 18px; }
+.lfeat p { font-size: 14.5px; color: var(--ink2); line-height: 1.45; }
+.lfic { flex: none; width: 54px; height: 54px; border-radius: 18px; display: grid; place-items: center; }
+.lmini { flex: none; width: 38px; height: 38px; display: flex; gap: 4px; }
+.lmini.bars { align-items: flex-end; }
+.lmini.bars i { display: block; flex: 1; background: var(--turq); border-radius: 4px 4px 2px 2px; animation: grow .8s ease both; transform-origin: bottom; }
+.lmini.dots { flex-wrap: wrap; align-content: center; gap: 5px; }
+.lmini.dots i { display: block; width: 9px; height: 9px; border-radius: 50%; }
+.lopens { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lopen { background: #fff; border-radius: 18px; padding: 14px; display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 700; }
+.lopen > span:last-child { flex: 1; white-space: nowrap; font-size: 15.5px; }
+.lfic.sm { width: 40px; height: 40px; border-radius: 13px; background: var(--lead); }
+.lprivacy { background: #fff; border-radius: 18px; padding: 14px 16px; font-size: 15px; }
+.lprivacy summary { display: flex; align-items: center; gap: 8px; font-weight: 700; cursor: pointer; }
+.lprivacy ul { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; color: var(--ink2); }
+.gstaff { align-self: center; font-size: 14.5px; }
+.gtop { display: flex; align-items: center; justify-content: space-between; }
+.gtop img { height: 44px; width: auto; display: block; }
+.gback .ic { transform: scaleX(-1); }
+.gback { width: 44px; height: 44px; border: 0; border-radius: 50%; background: #fff; display: grid; place-items: center; cursor: pointer; }
+.ghead { align-items: center; text-align: center; padding: 22px 20px; }
+.ghead.staff { background: var(--violet); }
+.ghead.staff .blob { background: var(--deep); }
+.ghead h2 { font-size: 30px; }
+.ghead p { font-size: 15.5px; opacity: .95; }
+.gbadge { width: 64px; height: 64px; border-radius: 22px; background: rgba(255, 255, 255, .18); display: grid; place-items: center; animation: wig 2.8s ease-in-out 1s infinite; }
+.gcard { background: #fff; border-radius: 24px; padding: 20px 18px; }
+.gcard form { gap: 22px !important; }
+.gcard .input { width: 100%; border-radius: 14px; }
+.gcard .input.pin { max-width: none; }
+.gcard .chips { flex-direction: column; gap: 8px; }
+.gcard .chip span { width: 100%; border-radius: 14px; justify-content: flex-start; min-height: 50px; }
+.gstep { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--lead); color: #fff; font-size: 14px; margin-inline-end: 8px; vertical-align: 2px; }
+.gkeep { color: var(--ink2); flex-wrap: nowrap !important; align-items: center; }
+.gkeep input { width: 20px; height: 20px; flex: none; accent-color: var(--lead); }
+@media (prefers-reduced-motion: reduce) { .wrap.gate * { animation: none !important; } }
+
 @media (prefers-reduced-motion: reduce) { .wrap.edu *, .wrap.inflow *, .heartpop { animation: none !important; transition: none !important; } }
 
 /* טבלת תפקידים להדפסה: מופיעה רק בזמן הדפסה */

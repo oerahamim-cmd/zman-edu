@@ -108,7 +108,7 @@ async function loginPerson(ctx, role) {
   if (u && u.active && u.secret_hash) ok = await auth.verifySecret(str(ctx.body.code, 20), u.secret_hash); else await auth.burn();
   if (!ok) {
     await auth.failed(ipKey);
-    throw new HttpError(401, 'השם או הקוד לא תואמים. אם הקוד אופס, בחרו "זו הפעם הראשונה שלי" ובחרו קוד חדש.', 'bad_login');
+    throw new HttpError(401, 'השם או הקוד לא תואמים. אם הקוד אופס, אפשר לבחור "פעם ראשונה כאן" ולבחור קוד חדש.', 'bad_login');
   }
   await auth.clear(acctKey);
   return startSession(ctx, u.id, ctx.body.remember);

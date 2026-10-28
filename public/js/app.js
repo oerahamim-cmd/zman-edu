@@ -364,9 +364,11 @@ function render() {
   clear(app);
   // מחנכת מחוברת: סרגל ניווט תחתון במקום התפריט העליון. במבט השבועי המסך כולו לשאלות, בלי סרגלים
   const edu = !!me() && state.area !== 'admin', inflow = edu && (p.startsWith('/me/report/') || p.startsWith('/welcome') || (p.startsWith('/tools/cards/') && CARDS_IMMERSIVE(p.slice('/tools/cards/'.length))));
-  app.className = 'wrap' + (state.area === 'admin' ? ' admin' : '') + (edu ? ' edu' : '') + (inflow ? ' inflow' : '');
+  // דף הפתיחה ומסכי הכניסה (בלי חיבור): עמודה צרה, בלי התפריט העליון
+  const gate = !session && !!view && !!view.classList && view.classList.contains('gatev');
+  app.className = 'wrap' + (gate ? ' gate' : state.area === 'admin' ? ' admin' : '') + (edu ? ' edu' : '') + (inflow ? ' inflow' : '');
   document.body.classList.toggle('has-bn', edu && !inflow);
-  add(app, inflow ? [view] : [header(), edu ? null : sessionBar(), view, h('p', { class: 'footer-note' }, 'זמן לחינוך · חותם ורשת אורט'), edu ? eduNav() : null]);
+  add(app, inflow || gate ? [view] : [header(), edu ? null : sessionBar(), view, h('p', { class: 'footer-note' }, 'זמן לחינוך · חותם ורשת אורט'), edu ? eduNav() : null]);
   window.scrollTo(0, same ? y0 : 0);
 }
 function resolve(p) {
@@ -417,7 +419,49 @@ const link = (to, text, cls = 'btn') => h('a', { class: cls, href: '#' + to, onc
    בית
    ===================================================================== */
 
+// דף הפתיחה למי שעוד לא נכנסה: מה יש בפנים, וכפתור כניסה גדול
+function viewLanding() {
+  const back = !!lsGet(RETURN_KEY);
+  const enterAs = (tab) => { enterPick = tab; go('/enter'); };
+  const hero = h('section', { class: 'lhero rise' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
+    h('div', { class: 'lart', 'aria-hidden': 'true' },
+      h('span', { class: 'lbub b1' }, h('i'), h('i'), h('i')),
+      h('span', { class: 'lbub b2' }, ic('care', { size: 56, tone: 'white' })),
+      h('span', { class: 'lbub b3' }, ic('idea', { size: 40, tone: 'white' })),
+      h('span', { class: 'ldots' }, ['#fff', BRAND.turq, BRAND.sky, BRAND.purple].map((c) => h('i', { style: `background:${c}` })))),
+    h('h1', null, 'הזמן שלך לשיחות אישיות'),
+    h('p', null, 'מקום אחד לספר על השיחות עם התלמידים, לראות את הכיתה, ולמצוא כלים לשיחה הבאה.'),
+    h('div', { class: 'lcta' },
+      h('button', { class: 'cta light', type: 'button', onclick: () => enterAs(back ? 'back' : 'new') }, back ? 'כניסה' : 'פעם ראשונה כאן · הרשמה'),
+      h('button', { class: 'cta clear', type: 'button', onclick: () => enterAs(back ? 'new' : 'back') }, back ? 'פעם ראשונה כאן' : 'כבר יש לי קוד')));
+  const feat = (icon, color, title, line, art) => h('div', { class: 'lfeat rise' }, h('span', { class: 'lfic', style: `background:${color}` }, ic(icon, { size: 44, tone: 'white' })),
+    h('div', null, h('h3', null, title), h('p', null, line)), art);
+  const feats = h('section', { class: 'lfeats' }, h('h3', { class: 'sh' }, 'מה מחכה בפנים'),
+    feat('calendar', BRAND.blue, 'המבט השבועי', 'שתי דקות בשבוע: כמה שיחות היו, ואיך הן הרגישו.',
+      h('span', { class: 'lmini bars', 'aria-hidden': 'true' }, [30, 55, 40, 80].map((v) => h('i', { style: `height:${v}%` })))),
+    feat('compass', BRAND.purple, 'מיפוי הכיתה', 'מי כבר דיבר איתך, ומי עוד מחכה לשיחה. השמות נשארים בטלפון שלך.',
+      h('span', { class: 'lmini dots', 'aria-hidden': 'true' }, ROUND_LOOK.concat(ROUND_LOOK).slice(0, 8).map((L) => h('i', { style: `background:${L.c}` })))),
+    feat('idea', BRAND.deep, 'ארגז כלים', 'קלפי שיח, תרגול הקשבה וכלים לשיחה הבאה, לפי צירי ההכשרה.', null));
+  const open = (to, icon, t) => h('a', { class: 'lopen', href: '#' + to, onclick: (e) => { e.preventDefault(); go(to); } }, h('span', { class: 'lfic sm' }, ic(icon, { size: 34, tone: 'white' })), h('span', null, t));
+  const peek = h('section', { class: 'esec' }, h('h3', { class: 'sh' }, 'אפשר להציץ גם בלי להיכנס'), h('div', { class: 'lopens' }, open('/tools/cards', 'idea', 'קלפי שיח'), open('/tools', 'book', 'ארגז הכלים')));
+  const who = pub.leadSeesNames ? 'מנהלת התכנית רואה את כל המבטים. מובילת בית הספר רואה רק את בית הספר שלה, כולל שמות והערות.' : 'מנהלת התכנית רואה את כל המבטים. מובילת בית הספר רואה רק נתונים מצטברים של בית הספר שלה, בלי שמות.';
+  const privacy = h('section', { class: 'lprivacy' }, h('details', null, h('summary', null, ic('lock', { size: 20 }), 'מה נשמר, ומי רואה?'),
+    h('ul', { class: 'plain' },
+      h('li', null, 'לא נשמרים שמות תלמידים ולא תיעוד על ילד או ילדה.'),
+      h('li', null, 'בכל שבוע נשמר מספר השיחות, ולכל שיחה כמה בחירות קצרות והערה חופשית.'),
+      h('li', null, 'שמות התלמידים במיפוי הכיתה נשארים במכשיר שלך. לשרת עולה רק כמה תלמידים בכל סבב, בלי שמות.'), h('li', null, 'אם בחרת תזכורת במייל, הכתובת נשמרת רק בשביל התזכורת.'),
+      h('li', null, who))));
+  return h('div', { class: 'land gatev' },
+    h('div', { class: 'llogos' }, h('img', { class: 'l-hotam', src: 'assets/logo/hotam-logo.png', alt: 'חותם' }), h('span', { class: 'sep', 'aria-hidden': 'true' }),
+      h('img', { class: 'l-ort', src: 'assets/logo/ort-logo.png', alt: 'רשת אורט' }), h('span', { class: 'sep', 'aria-hidden': 'true' }),
+      h('img', { class: 'l-zman', src: 'assets/logo/zman-logo.svg', alt: 'זמן לחינוך' })),
+    hero, feats, peek, privacy,
+    h('button', { class: 'linkbtn gstaff', type: 'button', onclick: () => go('/lead') }, 'מובילה או מנהלת התכנית? כניסת צוות'),
+    h('p', { class: 'footer-note' }, 'זמן לחינוך · חותם ורשת אורט'));
+}
+
 function viewHome() {
+  if (!session) return viewLanding();
   const staff = leadUser() || isAdmin();
   const hello = session ? `שלום ${firstName(session.name)}` : null;
   const actions = !session ? [link('/me', 'כניסה למחנכות', 'btn'), link('/tools', 'לארגז הכלים', 'btn soft')]
@@ -481,11 +525,8 @@ function cardsApply() { // מעדכן את המסך הנוכחי בלי לבנו
   document.querySelectorAll('.fitbtn').forEach((b) => { b.textContent = cardsContain ? 'תמונה ממלאת' : 'תמונה שלמה'; });
 }
 function cardsSetChrome(show) { cardsChromeOff = !show; cardsApply(); }
-// הקשה על הקלף במסך מלא: הסרגלים נעלמים ונשאר רק הקלף. כשהם מוסתרים, הקשה הופכת את הקלף, ונקודה קטנה בפינה מחזירה אותם.
-function cardTap(flip) {
-  const v = document.querySelector('.cardsview.full');
-  if (v && !cardsChromeOff) cardsSetChrome(false); else flip();
-}
+// הקשה על הקלף הופכת אותו. את הסרגלים מסתירים מכפתור האפשרויות, ונקודה קטנה בפינה מחזירה אותם.
+function cardTap(flip) { flip(); }
 function cardsNative(on) { // מסך מלא של הדפדפן (מסתיר סרגלים). לא נתמך בכל מכשיר, ואז נשארים עם מסך מלא בתוך האתר
   try {
     if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
@@ -510,16 +551,15 @@ function cardsLeave() {
   cardsNative(false); cardsUnlockRot();
   if (cardsWakeLock) cardsSetWake(false);
 }
-const cardsFsButton = () => h('button', { class: 'btn soft sm fsbtn', type: 'button', onclick: () => cardsSetFull(!cardsFull) }, cardsFull ? 'יציאה ממסך מלא' : 'מסך מלא');
-const cardsHideButton = () => h('button', { class: 'btn soft sm hidebtn', type: 'button', onclick: () => cardsSetChrome(false) }, 'הסתרת סרגל');
-const cardsRotButton = () => h('button', { class: 'btn soft sm rotbtn', type: 'button', onclick: cardsToggleRot }, cardsRot || cardsLocked ? 'חזרה לאורך' : 'סיבוב לרוחב');
-const cardsFitButton = () => h('button', { class: 'btn soft sm fitbtn', type: 'button', onclick: () => { cardsContain = !cardsContain; cardsApply(); } }, cardsContain ? 'תמונה ממלאת' : 'תמונה שלמה');
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && cardsFull && document.body.classList.contains('cards-full')) { cardsFull = false; cardsUnlockRot(); cardsApply(); } });
 const cardsData = () => window.ZMAN_CARDS || { categories: [], cards: [] };
 const cPad = (n) => String(n).padStart(2, '0');
 const cImg = (c) => `cards/c${cPad(c.p || c.n)}.webp`;
 const cThumb = (c) => `cards/t${cPad(c.p || c.n)}.webp`;
 const cCat = (id) => (cardsData().categories.find((x) => x.id === id) || {}).t || '';
+// צבע הקלף לפי הנושא (כמו בהדמיה)
+const cColor = (id) => ({ study: BRAND.blue, heart: BRAND.purple, people: BRAND.deep, home: '#0a7fb8', values: BRAND.purple, life: BRAND.blue, honest: BRAND.deep })[id] || BRAND.blue;
+const cArrow = (next) => svgSpan(`<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="${next ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'}"/></svg>`);
 const cShuffle = (a) => { const r = a.slice(); for (let k = r.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [r[k], r[j]] = [r[j], r[k]]; } return r; };
 const DEPTHS = [
   { n: 1, t: 'היכרות קלילה', d: 'לשיחות ראשונות ולקשר שרק מתחיל. שאלות קלות, בלי לחץ.', link: 'קשר 1 · כמעט לא מכירים' },
@@ -539,13 +579,14 @@ document.addEventListener('visibilitychange', () => { if (cardsWakeWanted && doc
 // קלף אחד שמסתובב: שאלה בצד אחד, תמונה בצד השני. covered = גב סגור שצריך להקיש כדי למשוך את הקלף.
 function cFlipper() {
   const front = h('div', { class: 'cardface qface' }), back = h('div', { class: 'cardface imgface' });
-  const cover = h('div', { class: 'cardcover', hidden: true }, h('span', { class: 'covermark' }, 'זמן לחינוך'), h('span', null, 'הקישו כדי למשוך קלף'));
+  const cover = h('div', { class: 'cardcover', hidden: true }, h('span', { class: 'covermark' }, 'זמן לחינוך'), h('span', null, 'נגיעה מושכת קלף'));
   const el = h('div', { class: 'cardflipper', role: 'button', tabindex: '0', 'aria-label': 'הפיכת הקלף' }, h('div', { class: 'cardinner' }, front, back), cover);
   const api = {
     el, flipped: false, covered: false,
     set(c, flipped, covered = false) {
       clear(front); clear(back);
-      front.append(h('p', { class: 'cardq' }, c.q), h('span', { class: 'cardcat' }, cCat(c.cat)));
+      front.style.setProperty('--cc', cColor(c.cat));
+      front.append(h('img', { class: 'cthumb', src: cThumb(c), alt: '', draggable: 'false' }), h('p', { class: 'cardq' }, c.q), h('span', { class: 'cardcat' }, cCat(c.cat)));
       back.append(h('img', { src: cImg(c), alt: 'תמונה לשיחה', draggable: 'false' }));
       api.flipped = flipped; api.covered = covered;
       el.classList.toggle('flipped', flipped); cover.hidden = !covered;
@@ -562,15 +603,30 @@ function cFlipper() {
 }
 // הערה למצב הדדי, מסך דלוק ומסך מלא: משותפים לכל הדרכים
 function cardsExtras(stage) {
-  const note = h('p', { class: 'cardnote', hidden: !cardsMutual }, 'עונים שניכם: קודם התלמיד/ה, ואחר כך המחנך/ת.');
-  const row = h('div', { class: 'row cardextras' },
-    h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsMutual, onchange: (e) => { cardsMutual = e.target.checked; note.hidden = !cardsMutual; } }), 'שיחה הדדית: גם המחנך/ת עונה'),
-    navigator.wakeLock && navigator.wakeLock.request ? h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsWakeWanted, onchange: (e) => { cardsWakeWanted = e.target.checked; cardsSetWake(cardsWakeWanted); } }), 'לא לכבות את המסך') : null,
-    null);
-  return [note, row];
+  return [h('p', { class: 'cardnote', hidden: !cardsMutual }, 'עונים שניכם: קודם התלמיד/ה, ואחר כך המחנך/ת.')];
 }
+const mutualToggle = () => h('label', { class: 'ctoggle' }, h('input', { type: 'checkbox', checked: cardsMutual, onchange: (e) => { cardsMutual = e.target.checked; document.querySelectorAll('.cardnote').forEach((n) => { n.hidden = !cardsMutual; }); } }),
+  h('span', null, h('b', null, 'שיחה הדדית'), h('small', null, 'גם לך יש תור לענות על השאלה')));
+// סרגל עליון של הקלפים: סגירה, שם, וכפתור אפשרויות. כל מה שלא צריך כל הזמן נמצא באפשרויות
 function cardsHeader(title, sub, back = ['/tools/cards', 'בחירת דרך אחרת']) {
-  return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, title), h('div', { class: 'row' }, cardsHideButton(), cardsFsButton(), cardsRotButton(), cardsFitButton(), link(back[0], back[1], 'btn ghost sm'))), sub ? h('p', { class: 'muted small', style: 'max-width:62ch' }, sub) : null);
+  return h('section', { class: 'cardhead ctop' },
+    h('button', { class: 'cxbtn', type: 'button', 'aria-label': back[1], onclick: () => go(back[0]) }, '✕'),
+    h('div', { class: 'ctitle' }, h('h2', null, title), sub ? h('p', null, sub) : null),
+    h('button', { class: 'cxbtn', type: 'button', 'aria-label': 'אפשרויות', onclick: () => cardsMore(back) }, '⋯'));
+}
+function cardsMore(back) {
+  const v = document.querySelector('.cardsview'), imm = !!(v && v.classList.contains('imm')), full = !!(v && v.classList.contains('full'));
+  bottomSheet((close) => {
+    const b = (t, fn) => h('button', { class: 'cta ghostc', type: 'button', onclick: () => { close(); fn(); } }, t);
+    return h('div', { class: 'stack cmore' }, h('h3', null, 'אפשרויות'),
+      mutualToggle(),
+      navigator.wakeLock && navigator.wakeLock.request ? h('label', { class: 'ctoggle' }, h('input', { type: 'checkbox', checked: cardsWakeWanted, onchange: (e) => { cardsWakeWanted = e.target.checked; cardsSetWake(cardsWakeWanted); } }), h('span', null, h('b', null, 'המסך נשאר דלוק'), h('small', null, 'כל עוד הקלפים פתוחים'))) : null,
+      imm ? b(cardsFull ? 'יציאה ממסך מלא' : 'מסך מלא', () => cardsSetFull(!cardsFull)) : null,
+      full ? b(cardsRot || cardsLocked ? 'חזרה לאורך' : 'סיבוב לרוחב', cardsToggleRot) : null,
+      full ? b(cardsContain ? 'תמונה שממלאת את המסך' : 'תמונה שלמה', () => { cardsContain = !cardsContain; cardsApply(); }) : null,
+      full ? b('הסתרת הסרגלים', () => cardsSetChrome(false)) : null,
+      b(back[1], () => go(back[0])));
+  });
 }
 
 // חפיסה שמחליקים בה: ימינה = הקלף הבא (כמו דפדוף בעברית), הקשה = הפיכה
@@ -611,40 +667,45 @@ function cardDeck({ list, first = 'q', cover = false, start = 0, label = '', onI
     if (e.key === 'ArrowLeft') go(1); else if (e.key === 'ArrowRight') go(-1);
   };
   document.addEventListener('keydown', onKey);
+  // ערבוב בתוך אותה רשימה, כדי שמי שמחזיק אותה (הדפדוף) יראה את הסדר החדש
+  const shuffle = () => { list.splice(0, n, ...cShuffle(list)); i = 0; render(1); toast('הקלפים עורבבו'); };
   const stage = h('section', { class: 'frame cardstage' }, slider, counter,
-    h('div', { class: 'row cardbtns' },
-      h('button', { class: 'btn soft', type: 'button', onclick: () => go(-1) }, 'הקודם →'),
-      h('button', { class: 'btn', type: 'button', onclick: () => fl.flip() }, cover ? 'משיכה והפיכה' : 'הפיכת הקלף'),
-      h('button', { class: 'btn soft', type: 'button', onclick: () => go(1) }, '← הבא')),
-    h('p', { class: 'micro muted' }, 'החליקו ימינה לקלף הבא ושמאלה לקודם. הקישו על הקלף כדי להפוך אותו.'));
+    h('div', { class: 'row cardbtns cnav' },
+      h('button', { class: 'cnb', type: 'button', 'aria-label': 'הקלף הקודם', onclick: () => go(-1) }, cArrow(false)),
+      h('button', { class: 'cnb wide', type: 'button', onclick: shuffle }, 'ערבוב'),
+      h('button', { class: 'cnb', type: 'button', 'aria-label': 'הקלף הבא', onclick: () => go(1) }, cArrow(true))),
+    h('p', { class: 'micro muted' }, cover ? 'נגיעה בקלף מושכת אותו, ונגיעה נוספת הופכת אותו לתמונה.' : 'נגיעה בקלף הופכת אותו לתמונה. אפשר גם להחליק לקלף הבא.'));
   add(stage, cardsExtras(stage));
   render(0);
   return stage;
 }
 
 /* ---------- מסך הפתיחה: בוחרים דרך ---------- */
+let cardsWay = null; // איזו דרך פתוחה במסך הפתיחה (נושא או עומק)
 function cardsHome() {
   const D = cardsData();
-  const mode = (to, icon, title, desc, tag) => h('a', { class: 'frame cardmode', href: '#' + to, onclick: (e) => { e.preventDefault(); go(to); } },
-    ic(icon, { size: 40, tone: 'blue' }), h('div', { class: 'stack', style: 'gap:6px' }, h('div', { class: 'row' }, h('h3', null, title), tag ? h('span', { class: 'tag lead' }, tag) : null), h('p', { class: 'muted' }, desc)));
-  return h('div', { class: 'stack', style: 'gap:var(--gap)' },
-    h('section', { class: 'frame cardshero' }, h('div', { class: 'stack' }, h('div', null, link('/tools', 'ארגז כלים', 'btn ghost sm')), h('h2', null, 'קלפי שיח וקשר אישי'),
-      h('p', { style: 'max-width:56ch;font-size:18px' }, `${D.cards.length} קלפים לשיחה אישית: בצד אחד שאלה, ובצד השני תמונה. אפשר לפתוח את הטלפון בשיחה ולעבוד איתו כמו עם קלפים אמיתיים. איך נעבוד היום?`)),
-      h('img', { src: 'cards/t05.webp', alt: '', loading: 'lazy' })),
-    h('div', { class: 'grid cardmodes' },
-      mode('/tools/cards/topics', 'checklist', 'לפי נושא', 'התלמיד/ה בוחר/ת נושא, ומשם מקבלים שאלות שקשורות אליו.'),
-      mode('/tools/cards/pictures', 'eye', 'דרך תמונה', 'ארבע תמונות על המסך. התלמיד/ה בוחר/ת תמונה אחת, והקלף מסתובב לשאלה.'),
-      mode('/tools/cards/random', 'idea', 'קלף מעורבב', 'כל השאלות מעורבבות, ומושכים קלף אחד. אפשר להפוך אותו לתמונה.'),
-      mode('/tools/cards/depth', 'steps', 'לפי עומק וסוג השיחה', 'עומק: קליל, להעמיק או מעמיק, בהתאם לרמת הקשר. סוג: זהות וחוזקות, יעדים ומטרות, אייג\'נסי ושותפות. אפשר לשלב.', 'חדש')),
-    h('section', { class: 'frame' }, h('div', { class: 'row' },
-      h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsFull, onchange: (e) => { cardsFull = e.target.checked; } }), 'לפתוח את הקלפים במסך מלא (מומלץ בשיחה)'),
-      h('label', { class: 'row small', style: 'gap:8px' }, h('input', { type: 'checkbox', checked: cardsMutual, onchange: (e) => { cardsMutual = e.target.checked; } }), 'שיחה הדדית: גם המחנך/ת עונה'),
-      link('/tools/cards/browse', 'לדפדף בכל הקלפים', 'btn soft sm'))),
-    h('details', { class: 'frame' }, h('summary', { style: 'cursor:pointer;font-weight:700;color:var(--lead)' }, 'איך משתמשים בשיחה'),
-      h('div', { class: 'grid', style: 'margin-top:14px' },
-        h('div', { class: 'well' }, h('h4', null, 'מכינים'), h('p', { class: 'small' }, 'בוחרים דרך אחת, מוצאים מקום שקט, ופותחים את הטלפון. אפשר לסמן "לא לכבות את המסך" בתחתית הקלף.')),
-        h('div', { class: 'well' }, h('h4', null, 'משוחחים'), h('p', { class: 'small' }, 'התלמיד/ה בוחר/ת, ולא מחייבים לענות. אפשר תמיד להחליף קלף. אם רוצים, גם המחנך/ת עונה (סימון "שיחה הדדית").')),
-        h('div', { class: 'well' }, h('h4', null, 'ממשיכים'), h('p', { class: 'small' }, 'אחרי השיחה אפשר לעדכן את רמת הקשר ב"מיפוי הכיתה". העוזר לקשר מציע גם קלפים שמתאימים לרמה שיצאה.')))));
+  const root = h('div', { class: 'chome' });
+  function paint() {
+    clear(root);
+    const way = (id, icon, t, color, to) => h('button', { class: 'cway' + (cardsWay === id ? ' on' : ''), type: 'button', style: `--wc:${color}`, 'aria-expanded': to ? null : String(cardsWay === id),
+      onclick: () => { if (to) { go(to); return; } cardsWay = cardsWay === id ? null : id; paint(); } }, ic(icon, { size: 46, tone: 'white' }), h('b', null, t));
+    const opt = (to, t, s) => h('button', { class: 'cdepopt', type: 'button', onclick: () => go(to) }, h('b', null, t), h('span', null, s));
+    const opts = cardsWay === 'topic'
+      ? h('div', { class: 'cwayopts' }, D.categories.map((c) => h('button', { class: 'cchip', type: 'button', style: `--wc:${cColor(c.id)}`, onclick: () => go('/tools/cards/topic/' + c.id) }, c.t)))
+      : cardsWay === 'depth'
+        ? h('div', { class: 'cwayopts cdeps' }, h('p', { class: 'small muted' }, 'כמה עמוק, לפי רמת הקשר'), DEPTHS.map((dp) => opt('/tools/cards/depth/' + dp.n, dp.t, dp.link)),
+          h('p', { class: 'small muted' }, 'או לפי ציר השיחה'), CARD_TYPES.map((tp) => opt('/tools/cards/type/' + tp.id, tp.t, `${D.cards.filter((c) => c.a.includes(tp.id)).length} קלפים`)))
+        : null;
+    add(root, [
+      h('div', { class: 'ttop' }, backBtn('/tools', 'ארגז הכלים'), h('h2', null, 'קלפי שיח')),
+      h('p', { class: 'muted' }, `${D.cards.length} קלפים: בצד אחד שאלה, ובצד השני תמונה. איך להתחיל?`),
+      h('div', { class: 'cways' }, way('topic', 'checklist', 'לפי נושא', BRAND.blue), way('pic', 'eye', 'דרך תמונה', BRAND.purple, '/tools/cards/pictures'),
+        way('depth', 'steps', 'לפי עומק או ציר', BRAND.deep), way('random', 'idea', 'קלף מעורבב', '#0a7fb8', '/tools/cards/random')),
+      opts, mutualToggle(),
+      link('/tools/cards/browse', 'לדפדף בכל הקלפים', 'linkbtn')]);
+  }
+  paint();
+  return root;
 }
 
 /* ---------- 1. לפי נושא ---------- */
@@ -662,9 +723,10 @@ function cardsTopics() {
 function cardsTopic(id) {
   const D = cardsData();
   const cat = D.categories.find((c) => c.id === id);
-  if (!cat) return redirect('/tools/cards/topics');
+  if (!cat) return redirect('/tools/cards');
+  cardsWay = 'topic';
   return h('div', { class: 'stack', style: 'gap:var(--gap)' },
-    cardsHeader(cat.t, 'מחליקים בין השאלות בנושא, או חוזרים לבחור נושא אחר.', ['/tools/cards/topics', 'לנושאים']),
+    cardsHeader(cat.t, 'מחליקים בין השאלות בנושא, או חוזרים לבחור נושא אחר.', ['/tools/cards', 'לבחירת נושא אחר']),
     cardDeck({ list: cShuffle(D.cards.filter((c) => c.cat === id)) }));
 }
 
@@ -707,7 +769,7 @@ function cardsPictures() {
     setTimeout(() => { if (fl.el.isConnected) fl.flip(false); }, 650);
     fl.el.addEventListener('click', () => cardTap(() => fl.flip()));
     const stage = h('section', { class: 'frame cardstage' }, h('div', { class: 'cardslider' }, h('div', { class: 'cardanim in-next' }, fl.el)),
-      h('div', { class: 'row cardbtns' }, h('button', { class: 'btn', type: 'button', onclick: () => fl.flip() }, 'הפיכת הקלף'), h('button', { class: 'btn soft', type: 'button', onclick: pick }, 'לאותן ארבע תמונות'), h('button', { class: 'btn soft', type: 'button', onclick: () => { draw(); pick(); } }, 'ארבע תמונות חדשות')),
+      h('div', { class: 'row cardbtns cnav' }, h('button', { class: 'cnb wide', type: 'button', onclick: pick }, 'חזרה לתמונות'), h('button', { class: 'cnb wide', type: 'button', onclick: () => { draw(); pick(); } }, 'תמונות חדשות')),
       h('p', { class: 'micro muted' }, 'לא מתאימה השאלה? חוזרים לתמונות ובוחרים אחרת. התמונה והשאלה הם שני צדדים של אותו קלף.'));
     add(stage, cardsExtras(stage));
     add(root, [cardsHeader('הקלף שנבחר', null), stage]);
@@ -745,6 +807,7 @@ function cardsDepthHome() {
 function cardsFocus(init) {
   const D = cardsData();
   const st = { depth: init.depth || 0, axis: init.axis || 'all' };
+  cardsWay = 'depth';
   const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
   function paint() {
     clear(root);
@@ -753,7 +816,7 @@ function cardsFocus(init) {
     const sub = [dp ? `${dp.d} מתאים ל${dp.link}.` : null, tp ? tp.d : null].filter(Boolean).join(' ') || 'כל הקלפים, בלי סינון.';
     const depthChips = chipGroup({ options: [{ v: 0, t: 'כל הרמות' }, ...DEPTHS.map((x) => ({ v: x.n, t: x.t }))], value: st.depth, cls: 'sm', label: 'עומק השיחה', onChange: (v) => { st.depth = v; paint(); } });
     const typeChips = chipGroup({ options: [{ v: 'all', t: 'כל הסוגים' }, ...CARD_TYPES.map((x) => ({ v: x.id, t: x.t }))], value: st.axis, cls: 'sm', label: 'סוג השיחה', onChange: (v) => { st.axis = v; paint(); } });
-    add(root, [cardsHeader(dp && !tp ? dp.t : tp && !dp ? tp.t : 'שיחה מותאמת', sub, ['/tools/cards/depth', 'לעומק ולסוג']),
+    add(root, [cardsHeader(dp && !tp ? dp.t : tp && !dp ? tp.t : 'שיחה מותאמת', sub, ['/tools/cards', 'לבחירת עומק או ציר']),
       h('section', { class: 'frame' }, h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'עומק השיחה'), depthChips), h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'סוג השיחה'), typeChips), h('p', { class: 'micro muted' }, `${list.length} קלפים מתאימים. שאלה יכולה להתאים ליותר מסוג אחד.`)),
       list.length ? cardDeck({ list }) : h('section', { class: 'frame' }, h('p', { class: 'muted' }, 'אין קלפים בשילוב הזה. אפשר לבחור "כל הרמות" או "כל הסוגים".'))]);
   }
@@ -779,7 +842,7 @@ function cardsBrowse() {
   }
   function head() {
     const view = chipGroup({ options: [{ v: 'deck', t: 'חפיסה' }, { v: 'spread', t: 'פריסה' }], value: st.view, cls: 'sm', label: 'תצוגה', onChange: (v) => { st.view = v; st.filtersOpen = v === 'spread'; paint(); } });
-    return h('section', { class: 'frame cardhead' }, h('div', { class: 'row between' }, h('h2', null, 'כל הקלפים'), h('div', { class: 'row' }, cardsHideButton(), cardsFsButton(), cardsRotButton(), cardsFitButton(), link('/tools/cards', 'בחירת דרך אחרת', 'btn ghost sm'))), h('p', { class: 'muted small' }, 'מדפדפים בכל הקלפים, בחפיסה או בפריסה.'), view);
+    return h('div', { class: 'stack', style: 'gap:10px' }, cardsHeader('כל הקלפים', null), view);
   }
   function spread() {
     const picture = st.first === 'img';
@@ -806,7 +869,7 @@ function viewCards(p) {
   // הקלף נפתח במסך מלא. הבקשה למסך מלא של הדפדפן נעשית מתוך הלחיצה שהביאה אותנו לכאן.
   if (on) { cardsNative(true); if (!cardsWakeLock) cardsSetWake(true); } else if (!imm && sub !== 'browse') cardsLeave();
   if (imm) setTimeout(focusPrompt, 0);
-  if (on && !cardsChromeOff && !cardsHinted) { cardsHinted = true; setTimeout(() => toast('נגיעה בקלף מסתירה את הסרגל'), 700); }
+  if (on && !cardsChromeOff && !cardsHinted) { cardsHinted = true; setTimeout(() => toast('נגיעה בקלף הופכת אותו'), 700); }
   return h('div', { class: 'cardsview' + (imm ? ' imm' : '') + (on ? ' full' : '') + (on && cardsRot ? ' rot' : '') + (cardsContain ? ' contain' : '') + (on && cardsChromeOff ? ' nochrome' : '') }, cardsRoute(p),
     h('button', { class: 'chromehandle', type: 'button', 'aria-label': 'הצגת הסרגל', onclick: () => cardsSetChrome(true) }, '⋯'));
 }
@@ -892,14 +955,18 @@ const newStudent = (name = '') => ({ id: nid('s') + Math.random().toString(36).s
 /* =====================================================================
    כניסה והרשמה ראשונה (קוד אישי)
    ===================================================================== */
+let enterPick = null; // מדף הפתיחה: איזו לשונית לפתוח ("כניסה" או "פעם ראשונה")
 function viewEnter(mode, next = '/me') {
-  const root = h('div', { class: 'stack', style: 'gap:var(--gap)' });
-  let tab = mode === 'manager' ? 'manager' : mode === 'lead' ? 'lead' : lsGet(RETURN_KEY) ? 'back' : 'new';
+  const root = h('div', { class: 'gate-in gatev' });
+  let tab = mode === 'manager' ? 'manager' : mode === 'lead' ? 'lead' : enterPick || (lsGet(RETURN_KEY) ? 'back' : 'new');
+  enterPick = null;
   let school = (SCHOOLS.find((x) => x.id === lsGet(SCHOOL_KEY)) || {}).id || '';
   let leadFirst = false, managerReset = false;
   const pinInput = (label, auto) => h('input', { class: 'input pin', type: 'password', inputmode: 'numeric', maxlength: '4', autocomplete: auto, 'aria-label': label });
   const textInput = (label, extra = {}) => h('input', { class: 'input', 'aria-label': label, ...extra });
-  const schoolPick = () => h('div', { class: 'field' }, h('span', { class: 'qlabel' }, 'בית הספר'), chipGroup({ options: SCHOOLS.map((s) => ({ v: s.id, t: s.name })), value: school, label: 'בית ספר', onChange: (v) => { school = v; } }));
+  // מספר קטן ליד כל שדה בהרשמה, כדי שיהיה ברור כמה נשאר
+  const stepL = (n, t) => (n ? [h('b', { class: 'gstep', 'aria-hidden': 'true' }, String(n)), t] : t);
+  const schoolPick = (n) => h('div', { class: 'field' }, h('span', { class: 'qlabel' }, stepL(n, 'בית הספר')), chipGroup({ options: SCHOOLS.map((s) => ({ v: s.id, t: s.name })), value: school, label: 'בית ספר', onChange: (v) => { school = v; } }));
 
   // שליחה אל השרת: מנטרלת את הכפתור בזמן ההמתנה ומציגה את הודעת השגיאה של השרת כמו שהיא
   const submitter = (err, btn, run) => async (e) => {
@@ -917,12 +984,12 @@ function viewEnter(mode, next = '/me') {
   function paint() {
     clear(root);
     const staffTab = tab === 'lead' || tab === 'manager';
-    const tabs = h('div', { class: 'stack', style: 'gap:10px' }, chipGroup({ options: staffTab ? [{ v: 'lead', t: 'מובילה זמן לחינוך' }, { v: 'manager', t: 'מנהלת התכנית' }] : [{ v: 'new', t: 'זו הפעם הראשונה שלי' }, { v: 'back', t: 'כבר יש לי קוד' }], value: tab, label: 'סוג כניסה', onChange: (v) => { tab = v; paint(); } }),
-      h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { tab = staffTab ? (lsGet(RETURN_KEY) ? 'back' : 'new') : 'lead'; paint(); } }, staffTab ? 'חזרה לכניסת מחנכות' : 'מובילה או מנהלת התכנית? כניסת צוות')));
+    const tabs = segTabs(staffTab ? [['lead', 'מובילה'], ['manager', 'מנהלת התכנית']] : [['back', 'כבר יש לי קוד'], ['new', 'פעם ראשונה כאן']], tab, (v) => { tab = v; paint(); });
+    const switcher = h('button', { class: 'linkbtn gstaff', type: 'button', onclick: () => { tab = staffTab ? (lsGet(RETURN_KEY) ? 'back' : 'new') : 'lead'; paint(); } }, staffTab ? 'חזרה לכניסת מחנכות' : 'מובילה או מנהלת התכנית? כניסת צוות');
     const err = h('p', { class: 'err', role: 'alert' });
     const keep = h('input', { type: 'checkbox', id: 'keep' });
-    const keepRow = h('label', { class: 'row small', for: 'keep', style: 'gap:8px' }, keep, 'להישאר מחוברים במכשיר הזה (לא במחשב משותף)');
-    const submitBtn = (t) => h('button', { class: 'btn', type: 'submit' }, t);
+    const keepRow = h('label', { class: 'row small gkeep', for: 'keep', style: 'gap:8px' }, keep, 'להישאר מחוברים בטלפון הזה (לא במחשב משותף)');
+    const submitBtn = (t) => h('button', { class: 'cta', type: 'submit' }, t);
     let form;
 
     if (tab === 'new' || (tab === 'lead' && leadFirst)) {
@@ -939,10 +1006,10 @@ function viewEnter(mode, next = '/me') {
         submitter(err, btn, async () => done(await api('POST', `/api/auth/${role}/register`, { school, name: name.value, joinCode: join.value, code: pin.value, remember: keep.checked }), role === 'lead' ? (next.startsWith('/lead') ? next : '/lead') : next, true))(e);
       } },
       tab === 'lead' ? h('p', { class: 'muted' }, 'זו הכניסה הראשונה שלך כמובילה. מזינים את קוד ההצטרפות של המובילות, שמקבלים ממנהלת התכנית, ובוחרים קוד אישי בן ארבע ספרות.') : null,
-      schoolPick(),
-      field('שם מלא', name, 'כך הכניסה בפעמים הבאות, ולכן כדאי לכתוב אותו כמו שהוא נכתב תמיד.'),
-      field(role === 'lead' ? 'קוד הצטרפות של המובילות' : 'קוד הצטרפות של בית הספר', join, role === 'lead' ? 'את הקוד מקבלת המובילה ממנהלת התכנית.' : 'את הקוד מקבלים ממנהלת התכנית (למשל במפגש הליווי). הוא מוודא שרק מחנכות של התכנית נרשמות.'),
-      h('div', { class: 'grid' }, field('בחירת קוד אישי', pin, 'ארבע ספרות שקל לך לזכור.'), field('אימות הקוד', pin2)),
+      schoolPick(1),
+      field(stepL(2, 'השם המלא שלך'), name, 'כך הכניסה בפעמים הבאות, ולכן כדאי לכתוב אותו כמו שהוא נכתב תמיד.'),
+      field(stepL(3, role === 'lead' ? 'קוד הצטרפות של המובילות' : 'קוד הצטרפות של בית הספר'), join, role === 'lead' ? 'את הקוד מקבלת המובילה ממנהלת התכנית.' : 'את הקוד מקבלים ממנהלת התכנית (למשל במפגש הליווי). הוא מוודא שרק מחנכות של התכנית נרשמות.'),
+      field(stepL(4, 'בחירת קוד אישי'), pin, 'ארבע ספרות שקל לך לזכור.'), field('עוד פעם, לאימות', pin2),
       tab === 'lead' ? h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { leadFirst = false; paint(); } }, 'כבר יש לי קוד')) : null,
       keepRow, err, h('div', null, btn));
     } else if (tab === 'back' || tab === 'lead') {
@@ -991,13 +1058,17 @@ function viewEnter(mode, next = '/me') {
         h('div', { class: 'row' }, btn, h('button', { class: 'btn ghost', type: 'button', onclick: () => { managerReset = true; paint(); } }, 'שכחתי סיסמה')));
     }
 
-    const leadCtx = tab === 'lead' || next.startsWith('/lead');
-    const ctxTitle = leadCtx ? 'כניסה למובילות זמן לחינוך' : tab === 'manager' ? 'כניסה למנהלת התכנית' : next.startsWith('/mapping') ? 'כניסה למיפוי הכיתה' : 'כניסה לשיחות אישיות';
-    const ctxText = leadCtx ? 'נכנסים בשם ובקוד אישי. בפעם הראשונה נרשמים עם קוד ההצטרפות של המובילות.'
-      : tab === 'manager' ? 'כניסה בדואל ובסיסמה.'
-        : tab === 'back' ? 'נכנסים עם בית ספר, שם והקוד האישי.'
-          : 'בוחרים בית ספר, מזינים את קוד ההצטרפות מהתכנית ובוחרים קוד אישי בן ארבע ספרות.';
-    add(root, [h('section', { class: 'frame' }, h('h2', null, ctxTitle), h('p', { class: 'muted', style: 'max-width:56ch' }, ctxText), tabs), h('section', { class: 'frame' }, form)]);
+    const leadCtx = tab === 'lead' || (next.startsWith('/lead') && tab !== 'manager');
+    const look = leadCtx ? ['team', 'כניסת מובילות', 'נכנסים בשם ובקוד אישי. בפעם הראשונה נרשמים עם קוד ההצטרפות של המובילות.']
+      : tab === 'manager' ? ['gear', 'כניסת מנהלת התכנית', 'כניסה בדואל ובסיסמה.']
+        : tab === 'back' ? ['care', 'שוב שלום', 'בית הספר, השם והקוד האישי, וזהו.']
+          : ['plant', 'נעים להכיר', 'ארבעה פרטים קצרים, ובפעמים הבאות רק השם והקוד.'];
+    add(root, [
+      h('div', { class: 'gtop' }, h('button', { class: 'gback', type: 'button', 'aria-label': 'חזרה לדף הפתיחה', onclick: () => go('/') }, ic('chev', { size: 22, tone: 'blue' })),
+        h('img', { src: 'assets/logo/zman-logo.svg', alt: 'זמן לחינוך' })),
+      h('section', { class: 'ghead rise' + (staffTab ? ' staff' : '') }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
+        h('span', { class: 'gbadge' }, ic(look[0], { size: 50, tone: 'white' })), h('h2', null, look[1]), h('p', null, look[2])),
+      tabs, h('section', { class: 'gcard rise' }, form), switcher]);
   }
   paint();
   return root;
@@ -1263,7 +1334,7 @@ function adminLeads() {
     const codeRow = (s, which, label, code) => {
       const host = h('div', { class: 'stack' });
       const invite = which === 'educator'
-        ? `שלום, זמן לחינוך · מבט שבועי עולה לאוויר. נכנסים ל-${location.origin}, לשונית "שיחות אישיות", ובוחרים "זו הפעם הראשונה שלי". בית הספר: ${s.name}. קוד ההצטרפות: ${code}. אחר כך בוחרים קוד אישי בן ארבע ספרות. תודה!`
+        ? `שלום, זמן לחינוך · מבט שבועי עולה לאוויר. נכנסים ל-${location.origin} ובוחרים "פעם ראשונה כאן · הרשמה". בית הספר: ${s.name}. קוד ההצטרפות: ${code}. אחר כך בוחרים קוד אישי בן ארבע ספרות. תודה!`
         : `שלום, כמובילה של זמן לחינוך ב${s.name}: נכנסים לקישור ${location.origin}/#/lead ובוחרים "זו הכניסה הראשונה שלי כמובילה". קוד ההצטרפות של המובילות: ${code}.`;
       return h('div', { class: 'stack', style: 'gap:10px' }, h('div', { class: 'row between' }, h('span', { class: 'qlabel' }, label), h('div', { class: 'row' }, h('code', { class: 'joincode', dir: 'ltr' }, code),
         h('button', { class: 'btn soft sm', onclick: () => copyText(code, 'הקוד הועתק') }, 'העתקת הקוד'), h('button', { class: 'btn soft sm', onclick: () => copyText(invite, 'נוסח ההודעה הועתק') }, 'העתקת נוסח הודעה'),
