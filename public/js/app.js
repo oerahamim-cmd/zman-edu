@@ -1134,7 +1134,7 @@ function eduMe(e, weeks, done, convs) {
   const hero = h('section', { class: 'mehero rise' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
     h('span', { class: 'mebig', 'aria-hidden': 'true' }, firstName(e.name).slice(0, 1)),
     h('h2', null, e.name), h('p', null, e.schoolName),
-    h('div', { class: 'mestats' }, stat(`${done}/${weeks.length}`, 'שבועות שסופרו'), stat(String(convs), 'שיחות אישיות'), stat(String(streak), 'שבועות ברצף')));
+    h('div', { class: 'mestats' }, stat(`${done}/${weeks.length}`, 'שבועות שנשלחו'), stat(String(convs), 'שיחות אישיות'), stat(String(streak), 'שבועות ברצף')));
   const row = (w) => {
     const r = myReport(w), now = w === CUR_WEEK;
     return h('a', { class: 'wkr' + (now ? ' now' : '') + (r ? ' ok' : ''), href: `#/me/report/${w}`, onclick: (ev) => { ev.preventDefault(); go(`/me/report/${w}`); } },
@@ -1594,8 +1594,9 @@ function eduHome() {
   const streak = streakWeeks();
   const hero = h('section', { class: 'ehero rise' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
     h('span', { class: 'eyebrow' }, `שבוע ${weekNo(CUR_WEEK)} · ${weekLabel(CUR_WEEK)}`),
-    h('h2', null, cur ? 'השבוע סופר. תודה' : 'המבט השבועי'),
-    h('p', null, cur ? (n ? `${nConv(n)} נכנסו לסיפור של השנה. אפשר לעדכן עד סוף השבוע.` : 'שבוע בלי שיחות נשמר. אפשר לעדכן עד סוף השבוע.') : 'שתי דקות על השיחות של השבוע. כל שיחה ממלאת את העמודה.'),
+    h('h2', null, cur ? (n ? 'השיחות שלך נכנסו לתמונה' : 'השבוע נכנס לתמונה') : 'מה קרה השבוע בשיחות שלך?'),
+    h('p', null, cur ? (n ? `${nConv(n)} נוספו לסיפור של השנה. כך רואים, שבוע אחרי שבוע, מה השיחות האישיות עושות. אפשר לעדכן עד סוף השבוע.` : 'גם שבוע בלי שיחות חשוב לדעת. אפשר לעדכן עד סוף השבוע.')
+      : 'שתי דקות שמראות מה השיחות האישיות עושות, לך ולתלמידים. כל שיחה ממלאת את העמודה.'),
     bars,
     link(`/me/report/${CUR_WEEK}`, cur ? 'לעדכן את השבוע' : 'לספר על השבוע', 'cta light'),
     h('small', null, [streak > 1 ? `${streak} שבועות ברצף · ` : '', h('a', { href: '#/me', onclick: (ev) => { ev.preventDefault(); go('/me'); } }, 'כל השבועות שלי')]));
