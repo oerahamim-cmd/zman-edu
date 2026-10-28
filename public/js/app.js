@@ -1105,6 +1105,7 @@ function viewMe() {
     const done = weeks.filter((w) => myReport(w)).length;
     const convs = myReports.reduce((n, r) => n + r.convs.length, 0);
     const cur = myReport(CUR_WEEK);
+    if (me()) return eduMe(e, weeks, done, convs);
     const root = [];
     if (justRegistered) { justRegistered = false; root.push(h('div', { class: 'frame' }, h('div', { class: 'row' }, ic('check', { size: 30 }), h('h4', null, 'הקוד נשמר')), h('p', null, 'בפעם הבאה נכנסים עם בית ספר, שם והקוד שנבחר.'))); }
     root.push(h('section', { class: 'frame lead' }, h('p', { class: 'small muted' }, e.schoolName),
@@ -1122,6 +1123,55 @@ function viewMe() {
     root.push(h('section', { class: 'frame' }, h('h3', null, 'החשבון שלי'), h('p', { class: 'muted' }, `${e.name} · ${e.schoolName}`),
       h('div', { class: 'row' }, link('/tools', 'לארגז הכלים', 'btn soft sm'), link('/mapping', 'למיפוי הכיתה', 'btn soft sm'), h('button', { class: 'btn soft sm', onclick: cc.open }, 'החלפת קוד'), h('button', { class: 'btn soft sm', onclick: () => go('/reminder') }, 'תזכורת שבועית'), h('button', { class: 'btn soft sm', onclick: () => { WEL.step = 0; go('/welcome'); } }, 'הכניסה הראשונה, שוב'), h('button', { class: 'btn soft sm', onclick: logout }, 'יציאה')), cc.box));
     return root;
+  });
+}
+
+// השבועות והחשבון של המחנכת (נפתח מהעיגול עם האות ליד השם)
+function eduMe(e, weeks, done, convs) {
+  if (justRegistered) { justRegistered = false; setTimeout(() => toast('הקוד נשמר. בפעם הבאה: בית הספר, השם והקוד.'), 50); }
+  const streak = streakWeeks();
+  const stat = (v, l) => h('div', { class: 'mestat' }, h('b', { class: 'num' }, v), h('span', null, l));
+  const hero = h('section', { class: 'mehero rise' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
+    h('span', { class: 'mebig', 'aria-hidden': 'true' }, firstName(e.name).slice(0, 1)),
+    h('h2', null, e.name), h('p', null, e.schoolName),
+    h('div', { class: 'mestats' }, stat(`${done}/${weeks.length}`, 'שבועות שסופרו'), stat(String(convs), 'שיחות אישיות'), stat(String(streak), 'שבועות ברצף')));
+  const row = (w) => {
+    const r = myReport(w), now = w === CUR_WEEK;
+    return h('a', { class: 'wkr' + (now ? ' now' : '') + (r ? ' ok' : ''), href: `#/me/report/${w}`, onclick: (ev) => { ev.preventDefault(); go(`/me/report/${w}`); } },
+      h('span', { class: 'wkdot', 'aria-hidden': 'true' }, r ? ic('check', { size: 36, tone: 'white' }) : String(weekNo(w))),
+      h('span', { class: 'wkl' }, h('b', null, now ? 'השבוע' : `שבוע ${weekNo(w)}`), h('small', null, weekLabel(w))),
+      h('span', { class: 'wkgo' }, r ? (r.convs.length ? nConv(r.convs.length) : 'שבוע בלי שיחות') : now ? 'לספר על השבוע' : 'אפשר להשלים'));
+  };
+  const setRow = (icon, t, sub, fn, cls = '') => h('button', { class: 'setr ' + cls, type: 'button', onclick: fn }, h('span', { class: 'setl' }, ic(icon, { size: 30, tone: cls === 'out' ? 'purple' : 'blue' })),
+    h('span', { class: 'wkl' }, h('b', null, t), sub ? h('small', null, sub) : null));
+  const remSub = h('small', null, REM ? remLabel() : '');
+  if (!REM) loadReminder().then(() => { if (document.body.contains(remSub)) remSub.textContent = remLabel(); }, () => {});
+  const remRow = setRow('calendar', 'תזכורת שבועית', null, () => go('/reminder'));
+  remRow.querySelector('.wkl').append(remSub);
+  return h('div', { class: 'eme' },
+    h('div', { class: 'ttop' }, backBtn('/', 'לדף הבית'), h('h2', null, 'השבועות שלי')),
+    hero,
+    h('section', { class: 'esec' }, h('h3', { class: 'sh' }, 'כל השבועות'), h('div', { class: 'wklist' }, weeks.map(row))),
+    h('section', { class: 'esec' }, h('h3', { class: 'sh' }, 'החשבון שלי'),
+      h('div', { class: 'setlist' }, remRow,
+        setRow('lock', 'החלפת הקוד האישי', 'ארבע ספרות. מכשירים אחרים יתנתקו', codeSheet),
+        setRow('idea', 'הכניסה הראשונה, שוב', 'הסבר קצר ותרגול שלא נשמר', () => { WEL.step = 0; go('/welcome'); }),
+        setRow('send', 'יציאה', 'מהטלפון הזה', logout, 'out'))));
+}
+// החלפת קוד בחלונית מלמטה
+function codeSheet() {
+  bottomSheet((close) => {
+    const pin = (label, auto) => h('input', { class: 'input pin', type: 'password', inputmode: 'numeric', maxlength: '4', autocomplete: auto, 'aria-label': label });
+    const cur = pin('הקוד הנוכחי', 'current-password'), n1 = pin('קוד חדש', 'new-password');
+    const err = h('p', { class: 'err', role: 'alert' });
+    const btn = h('button', { class: 'cta', type: 'submit' }, 'החלפת הקוד');
+    return h('form', { class: 'stack', onsubmit: async (ev) => {
+      ev.preventDefault(); err.textContent = '';
+      if (!/^[0-9]{4}$/.test(n1.value)) return void (err.textContent = 'הקוד החדש הוא ארבע ספרות.');
+      btn.disabled = true;
+      try { await api('POST', '/api/me/code', { current: cur.value, next: n1.value }); close(); toast('הקוד הוחלף. מכשירים אחרים נותקו.'); } catch (ex) { err.textContent = ex.message; btn.disabled = false; }
+    } }, h('h3', null, 'החלפת הקוד האישי'), field('הקוד הנוכחי', cur), field('קוד חדש', n1), err, btn,
+      h('button', { class: 'linkbtn', type: 'button', style: 'align-self:center', onclick: close }, 'ביטול'));
   });
 }
 
