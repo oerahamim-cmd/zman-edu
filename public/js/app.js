@@ -2299,7 +2299,7 @@ function finishWelcome() { const e = me(); if (e) lsSet(ONBOARD_KEY + '.' + e.id
 function eduWelcome() {
   const dots = (n) => h('div', { class: 'odots', 'aria-hidden': 'true' }, [0, 1, 2, 3].map((i) => h('i', { class: i === n ? 'on' : '' })));
   if (WEL.step === 2) {
-    return h('div', { class: 'onb' }, h('span', { class: 'obadge' }, ic('calendar', { size: 34, tone: 'white' })), h('h2', null, 'מתי נוח לקבל תזכורת?'), h('p', null, 'פעם בשבוע, בזמן שמתאים לך.'),
+    return h('div', { class: 'onb' }, h('span', { class: 'obadge' }, ic('calendar', { size: 34, tone: 'white' })), h('h2', null, 'רגע שבועי לשיחות שלך'), h('p', null, REM_WHY),
       reminderPanel(() => { WEL.step = 3; render(); }, 'המשך'),
       h('button', { class: 'linkbtn', type: 'button', style: 'align-self:center', onclick: () => { WEL.step = 3; render(); } }, 'בלי תזכורת בינתיים'), dots(2));
   }
@@ -2333,6 +2333,8 @@ function eduWelcome() {
 /* ---------- תזכורת שבועית: יום, שעה, התראה בטלפון ו/או מייל ----------
    ההגדרות נשמרות בשרת. מייל נשמר רק אם בוחרים תזכורת במייל. נגיעה בתזכורת פותחת ישר את המבט לשבוע הזה. */
 const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+// בשביל מה התזכורת: לשתף כמה שיחות היו ובמה עסקו (כמו במבט עצמו), לא "לדווח"
+const REM_WHY = 'פעם בשבוע, בזמן שמתאים לך, תגיע תזכורת קטנה לשתף כמה שיחות אישיות היו לך עם תלמידים ובמה הן עסקו. כמה נגיעות, וכל שיחה שלך נכנסת לתמונה.';
 let REM = null;
 async function loadReminder(force) { if (!REM || force) REM = await api('GET', '/api/me/reminder'); return REM; }
 const remOn = () => !!(REM && REM.reminder && (REM.reminder.push || REM.reminder.mail));
@@ -2391,9 +2393,9 @@ function reminderPanel(onSaved, saveLabel = 'שמירה') {
       D.mail ? [h('input', { class: 'input remmail', type: 'email', value: D.email, placeholder: 'כתובת המייל שלך', 'aria-label': 'כתובת המייל לתזכורת', autocomplete: 'email', oninput: (e) => { D.email = e.target.value; } }),
         h('p', { class: 'small muted' }, 'הכתובת נשמרת רק בשביל התזכורת, ונמחקת כשמכבים את המייל.'), REM.mailReady ? null : h('p', { class: 'small muted' }, 'המייל עוד לא הופעל באפליקציה. ההגדרה תישמר ותעבוד ברגע שיופעל.')] : null,
       D.push ? h('div', { class: 'lock' }, h('span', { class: 'lktime num' }, `${D.hour}:00`), h('span', { class: 'lkday' }, `יום ${DAYS_HE[D.day]}`),
-        h('span', { class: 'ncard' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('span', null, h('b', null, 'המבט השבועי'), 'שתי דקות על השיחות של השבוע?'), h('small', null, 'עכשיו'))) : null,
-      D.mail ? h('div', { class: 'mail2' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('span', null, h('b', null, 'זמן לחינוך'), h('span', { class: 'subj' }, 'המבט השבועי · שתי דקות'), h('span', { class: 'snip' }, `יום ${DAYS_HE[D.day]}, ${D.hour}:00 · כפתור אחד שפותח את המבט`))) : null,
-      D.push || D.mail ? h('p', { class: 'small muted', style: 'text-align:center' }, 'נגיעה בתזכורת פותחת ישר את השאלה הראשונה. אם המבט כבר נשלח, לא תגיע תזכורת.') : null,
+        h('span', { class: 'ncard' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('span', null, h('b', null, 'השיחות שלך השבוע'), 'כמה שיחות אישיות היו לך השבוע, ועל מה דיברתם? רגע לשתף, בכמה נגיעות.'), h('small', null, 'עכשיו'))) : null,
+      D.mail ? h('div', { class: 'mail2' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('span', null, h('b', null, 'זמן לחינוך'), h('span', { class: 'subj' }, 'השיחות האישיות שלך השבוע'), h('span', { class: 'snip' }, `יום ${DAYS_HE[D.day]}, ${D.hour}:00 · כמה שיחות היו ועל מה דיברתם? כפתור אחד, ישר לשיתוף`))) : null,
+      D.push || D.mail ? h('p', { class: 'small muted', style: 'text-align:center' }, 'נגיעה בתזכורת פותחת ישר את השאלה הראשונה על השיחות שלך. אם כבר שיתפת השבוע, לא תגיע תזכורת.') : null,
       remOn() || D.push || D.mail ? h('button', { class: 'cta ' + (D.skipWeek ? 'violet' : 'ghostc'), type: 'button', onclick: () => { D.skipWeek = !D.skipWeek; paint(); } }, D.skipWeek ? 'בלי תזכורת השבוע · לביטול' : 'השבוע חג או חופשה? דילוג על תזכורת אחת') : null,
       h('button', { class: 'cta', type: 'button', onclick: async (e) => {
         if (D.mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(D.email.trim())) { toast('כדאי לבדוק את כתובת המייל'); return; }
@@ -2411,7 +2413,7 @@ function reminderPanel(onSaved, saveLabel = 'שמירה') {
 }
 function eduReminder() {
   return h('div', { class: 'etools' }, h('div', { class: 'ttop' }, backBtn('/', 'בית'), h('h2', null, 'תזכורת שבועית')),
-    h('p', { class: 'qs' }, 'פעם בשבוע, בזמן שמתאים לך.'), reminderPanel(null));
+    h('p', { class: 'qs' }, REM_WHY), reminderPanel(null));
 }
 
 async function boot() {

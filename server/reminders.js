@@ -33,8 +33,8 @@ function hourInIsrael(date) {
 }
 
 const message = (week) => ({
-  title: 'המבט השבועי',
-  body: 'שתי דקות על השיחות של השבוע?',
+  title: 'השיחות שלך השבוע',
+  body: 'כמה שיחות אישיות היו לך השבוע, ועל מה דיברתם? רגע לשתף, בכמה נגיעות.',
   url: `/#/me/report/${week}`,
 });
 
@@ -56,9 +56,9 @@ async function sendPush(userId, payload) {
 async function sendMail(to, payload) {
   const link = appUrl() + payload.url;
   const msg = {
-    from: env('MAIL_FROM'), to, subject: 'המבט השבועי · שתי דקות',
+    from: env('MAIL_FROM'), to, subject: 'השיחות האישיות שלך השבוע',
     text: `שלום,\n\n${payload.body}\n${link}\n\nזמן לחינוך · אפשר לשנות או לכבות את התזכורת באפליקציה.`,
-    html: `<div dir="rtl" style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6">שלום,<br><br>${payload.body}<br><a href="${link}" style="display:inline-block;margin:12px 0;padding:12px 20px;background:#0046ff;color:#fff;border-radius:12px;text-decoration:none;font-weight:bold">למבט השבועי</a><br><span style="color:#55585f;font-size:13px">זמן לחינוך · אפשר לשנות או לכבות את התזכורת באפליקציה.</span></div>`,
+    html: `<div dir="rtl" style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6">שלום,<br><br>${payload.body}<br><a href="${link}" style="display:inline-block;margin:12px 0;padding:12px 20px;background:#0046ff;color:#fff;border-radius:12px;text-decoration:none;font-weight:bold">לשתף את השיחות</a><br><span style="color:#55585f;font-size:13px">זמן לחינוך · אפשר לשנות או לכבות את התזכורת באפליקציה.</span></div>`,
   };
   if (sink) { sink({ channel: 'mail', to, payload }); return 1; }
   await mail().sendMail(msg);

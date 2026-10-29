@@ -8,8 +8,8 @@ self.addEventListener('fetch', () => {});
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { /* לא JSON */ }
-  e.waitUntil(self.registration.showNotification(d.title || 'המבט השבועי', {
-    body: d.body || 'שתי דקות על השיחות של השבוע?', icon: '/icons/icon-192.png', badge: '/icons/icon-192.png',
+  e.waitUntil(self.registration.showNotification(d.title || 'השיחות שלך השבוע', {
+    body: d.body || 'כמה שיחות אישיות היו לך השבוע, ועל מה דיברתם? רגע לשתף, בכמה נגיעות.', icon: '/icons/icon-192.png', badge: '/icons/icon-192.png',
     dir: 'rtl', lang: 'he', tag: 'weekly', data: { url: d.url || '/' },
   }));
 });
