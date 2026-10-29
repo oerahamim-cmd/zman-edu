@@ -81,6 +81,8 @@ async function sendTo(userId, week) {
 async function run(now = new Date()) {
   const today = config.FAKE_TODAY || weeks.dateInIsrael(now);
   const day = weeks.fromYmd(today).getUTCDay(), hour = hourInIsrael(now), wk = weeks.weekStart(today);
+  // לפני תחילת התכנית אין מבט פתוח, ולכן אין תזכורות
+  if (wk < (await db.programStart())) return { due: 0, sent: 0, alreadyDone: 0, failed: 0 };
   const rows = await db.all(`SELECT r.user_id FROM reminders r JOIN users u ON u.id = r.user_id
     WHERE u.active = 1 AND u.role = 'educator' AND r.day = ? AND r.hour = ? AND (r.push = 1 OR r.mail = 1)
       AND (r.skip_week IS NULL OR r.skip_week <> ?) AND (r.last_sent IS NULL OR r.last_sent <> ?)`, [day, hour, wk, today]);

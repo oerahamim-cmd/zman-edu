@@ -247,6 +247,9 @@ function weekLabel(ws) {
 const shortDate = (s) => { const d = fromYmd(s.slice(0, 10)); return `${d.getDate()}.${d.getMonth() + 1}`; };
 const weekNo = (ws) => Math.round((fromYmd(ws) - fromYmd(PROGRAM_START)) / (7 * 86400000)) + 1;
 const weeksBetween = (from, to) => { const out = []; for (let w = from; w <= to; w = addDays(w, 7)) out.push(w); return out; };
+// לפני תחילת התכנית: עוד אין שבוע פתוח למבט
+const beforeStart = () => CUR_WEEK < PROGRAM_START;
+const startLabel = () => { const d = fromYmd(PROGRAM_START); return `${d.getDate()} ב${MONTHS[d.getMonth()]}`; };
 
 /* ---------- זיהוי שמות בטקסט חופשי (התראה עדינה) ---------- */
 const NAME_LIST = `אבישי אברהם אהרון אהוד אוהד אופיר אוריאל אורי אחמד אילון אילן איתי איתן אלעד אלון אליהו אליעד אלירן אמיר אמנון אסף אפרים ארז אריאל אריק בועז בנימין ברק גבריאל גד גדי גיא גידי גלעד דביר דוד דורון דן דני דניאל דקל הלל חגי חנן יאיר יגאל ידידיה יהב יהודה יהונתן יואב יובל יוסי יוסף יונתן יוני יותם יעקב יצחק ירון ישי ישראל כפיר לביא ליאור לירון ליאם לידור מאור מתן מיכאל מיקי מנחם מקס משה מרדכי נבו נדב ניב ניסים נסים נתנאל סהר סער עדי עידו עילי עידן עומר עופר עמוס עמיחי עמיר עמנואל פלג צחי צבי קובי רועי רון רן רפאל רונן שגיא שהם שלומי שמעון שמואל שלמה שאול תומר תמיר
@@ -1592,7 +1595,12 @@ function eduHome() {
     return h('div', { class: 'wbar' }, h('i', { style: `height:${Math.max(4, (v / max) * 82)}px;animation-delay:${i * 60}ms` }), h('b', null, String(weekNo(w))));
   }));
   const streak = streakWeeks();
-  const hero = h('section', { class: 'ehero rise' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
+  const hero = beforeStart() ? h('section', { class: 'ehero rise' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
+    h('span', { class: 'eyebrow' }, `מתחילים ב-${startLabel()}`),
+    h('h2', null, `המבט הראשון נפתח ביום ראשון, ${startLabel()}`),
+    h('p', null, 'עד אז אפשר להכיר: לתרגל מבט שלא נשמר, למפות את הכיתה ולהציץ בכלים.'),
+    link('/welcome/practice', 'לתרגל עכשיו · דקה אחת', 'cta light'))
+  : h('section', { class: 'ehero rise' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
     h('span', { class: 'eyebrow' }, `שבוע ${weekNo(CUR_WEEK)} · ${weekLabel(CUR_WEEK)}`),
     h('h2', null, cur ? (n ? 'השיחות שלך נכנסו לתמונה' : 'השבוע נכנס לתמונה') : 'מה קרה השבוע בשיחות שלך?'),
     h('p', null, cur ? (n ? `${nConv(n)} נוספו לסיפור של השנה. כך רואים, שבוע אחרי שבוע, מה השיחות האישיות עושות. אפשר לעדכן עד סוף השבוע.` : 'גם שבוע בלי שיחות חשוב לדעת. אפשר לעדכן עד סוף השבוע.')
@@ -1698,7 +1706,9 @@ function diveSlider({ value, onChange }) {
 const STEPS = ['axis', 'kind', 'depth', 'talk', 'feel'];
 function eduWeek(week, opts = {}) {
   const practice = !!opts.practice;
-  if (week > CUR_WEEK || week < joinWeek()) return h('section', { class: 'frame' }, h('h2', null, 'השבוע הזה לא פתוח למבט'), link('/', 'חזרה לבית'));
+  if (!practice && beforeStart()) return h('section', { class: 'frame' }, h('h2', null, `המבט הראשון נפתח ביום ראשון, ${startLabel()}`), h('p', { class: 'muted' }, 'בינתיים אפשר לתרגל מבט שלא נשמר.'),
+    h('div', { class: 'row' }, link('/welcome/practice', 'לתרגל עכשיו', 'btn'), link('/', 'חזרה לבית', 'btn soft')));
+  if (!practice && (week > CUR_WEEK || week < joinWeek())) return h('section', { class: 'frame' }, h('h2', null, 'השבוע הזה לא פתוח למבט'), link('/', 'חזרה לבית'));
   const e = session, existing = myReport(week);
   // טיוטה של מבט שעוד לא נשלח נשמרת רק במכשיר הזה, ונמחקת כשהמבט נשלח
   const dkey = `${DRAFT_KEY}.${e.id}.${week}`;
@@ -1783,7 +1793,7 @@ function eduWeek(week, opts = {}) {
       const plus = h('button', { class: 'cbtn plus', type: 'button', 'aria-label': 'עוד שיחה', onclick: () => { draft.convs.push(newConv()); touch(); paintCount(); out.classList.remove('pop'); void out.offsetWidth; out.classList.add('pop'); celebrate(draft.convs.length); } }, '+');
       next.onclick = () => { F.ci = 0; go2(draft.convs.length ? 'axis' : 'zero'); };
       paintCount();
-      return q(`המבט השבועי · שבוע ${weekNo(week)}`, week === CUR_WEEK ? 'כמה שיחות אישיות היו לך השבוע?' : `כמה שיחות אישיות היו לך בשבוע ${weekNo(week)}?`, 'שיחה אישית היא רגע אחד על אחד עם תלמיד/ה, גם קצר.',
+      return q(practice ? 'תרגול · לא נשמר' : `המבט השבועי · שבוע ${weekNo(week)}`, week === CUR_WEEK ? 'כמה שיחות אישיות היו לך השבוע?' : `כמה שיחות אישיות היו לך בשבוע ${weekNo(week)}?`, 'שיחה אישית היא רגע אחד על אחד עם תלמיד/ה, גם קצר.',
         existing ? h('p', { class: 'tag', style: 'align-self:flex-start' }, week === CUR_WEEK ? 'המבט לשבוע הזה כבר נשלח. אפשר לעדכן אותו.' : `המבט לשבוע ${weekNo(week)} כבר נשלח. אפשר לעדכן אותו.`) : null,
         h('div', { class: 'counter' }, minus, out, plus), tokens, msg, next);
     }

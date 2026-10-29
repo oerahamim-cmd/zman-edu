@@ -10,7 +10,8 @@ const pad = (n) => String(n).padStart(2, '0');
 const d0 = new Date();
 d0.setHours(12, 0, 0, 0);
 d0.setDate(d0.getDate() - d0.getDay() - 35);
-process.env.PROGRAM_START = `${d0.getFullYear()}-${pad(d0.getMonth() + 1)}-${pad(d0.getDate())}`;
+// DEMO_START: לבדוק מה רואים לפני שהתכנית התחילה (למשל DEMO_START=2026-11-01)
+process.env.PROGRAM_START = process.env.DEMO_START || `${d0.getFullYear()}-${pad(d0.getMonth() + 1)}-${pad(d0.getDate())}`;
 
 const { start } = require('../server/app');
 const { seedDemo, DEMO_MANAGER } = require('../server/seed');

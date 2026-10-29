@@ -32,8 +32,8 @@ module.exports = {
   // מוגדר במשתני הסביבה של הפרויקט ב-Vercel, ולכן רק מי שמנהלת את הפרויקט מכירה אותו.
   SETUP_CODE: process.env.SETUP_CODE || '',
 
-  // יום ראשון שבו מתחיל השבוע הראשון של המבט השבועי. אם לא הוגדר: השבוע הראשון שבו האפליקציה הופעלה.
-  PROGRAM_START: process.env.PROGRAM_START || '',
+  // יום ראשון שבו מתחיל השבוע הראשון של המבט השבועי: השבוע הראשון של נובמבר 2026. אפשר לשנות במשתנה סביבה.
+  PROGRAM_START: process.env.PROGRAM_START || '2026-11-01',
   // בדיקות בלבד: מקבע את "היום" (YYYY-MM-DD)
   FAKE_TODAY: process.env.FAKE_TODAY || '',
   TIMEZONE: 'Asia/Jerusalem',

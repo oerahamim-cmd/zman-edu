@@ -66,7 +66,8 @@ function talkAverage(allConvs, mask) {
 
 async function overview(scope, { week, school } = {}) {
   const start = await db.programStart();
-  const cur = weeks.curWeek();
+  // לפני שהתכנית התחילה, הסקירה מציגה את השבוע הראשון (עוד ריק)
+  const cur = weeks.curWeek() < start ? start : weeks.curWeek();
   let w = cur;
   if (week !== undefined) {
     if (!weeks.isWeekStart(week) || week < start || week > cur) throw new HttpError(400, 'השבוע לא תקין.');
