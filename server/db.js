@@ -164,6 +164,8 @@ async function init() {
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       day INTEGER NOT NULL CHECK (day BETWEEN 0 AND 5), hour INTEGER NOT NULL CHECK (hour BETWEEN 6 AND 22),
       push INTEGER NOT NULL DEFAULT 0, mail INTEGER NOT NULL DEFAULT 0, email TEXT, skip_week TEXT, last_sent TEXT, updated_at TEXT NOT NULL)`);
+    // דקות בתוך השעה (למשל 10:15, כשההפסקה בעשר ורבע)
+    await run('ALTER TABLE reminders ADD COLUMN IF NOT EXISTS minute INTEGER NOT NULL DEFAULT 0');
     // מנוי להתראות בטלפון: הכתובת והמפתחות שהדפדפן נותן. בלי שום תוכן אחר.
     await run(`CREATE TABLE IF NOT EXISTS push_subscriptions (
       id ${ID}, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -22,11 +22,11 @@ const conv = { axes: ['identity'], kinds: ['intro'], depth: 2, talkPct: 50, feel
 test('הגדרת תזכורת: ערכים לא תקינים נדחים, ומייל נשמר רק כשבוחרים מייל', async () => {
   const c = await newEducator('תזכורת אחת');
   assert.equal((await c.get('/api/me/reminder')).json.reminder, null);
-  for (const bad of [{ day: 6, hour: 17 }, { day: 2, hour: 23 }, { day: 2, hour: 17, mail: true }, { day: 2, hour: 17, mail: true, email: 'לא מייל' }, { day: '2', hour: 17 }]) {
+  for (const bad of [{ day: 6, hour: 17 }, { day: 2, hour: 23 }, { day: 2, hour: 10, minute: 60 }, { day: 2, hour: 10, minute: '15' }, { day: 2, hour: 17, mail: true }, { day: 2, hour: 17, mail: true, email: 'לא מייל' }, { day: '2', hour: 17 }]) {
     assert.equal((await c.put('/api/me/reminder', bad)).status, 400, JSON.stringify(bad));
   }
   assert.equal((await c.put('/api/me/reminder', { day: 4, hour: 17, push: true, mail: true, email: 'a@b.org' })).status, 200);
-  assert.deepEqual((await c.get('/api/me/reminder')).json.reminder, { day: 4, hour: 17, push: true, mail: true, email: 'a@b.org', skipWeek: false });
+  assert.deepEqual((await c.get('/api/me/reminder')).json.reminder, { day: 4, hour: 17, minute: 0, push: true, mail: true, email: 'a@b.org', skipWeek: false });
   await c.put('/api/me/reminder', { day: 4, hour: 17, push: true, mail: false, email: 'a@b.org' });
   assert.equal((await c.get('/api/me/reminder')).json.reminder.email, '');
   // מובילה ומנהלת לא מגדירות תזכורת
@@ -59,6 +59,20 @@ test('ריצה שעתית: רק ביום ובשעה שנבחרו, פעם אחת,
   sent.length = 0;
   assert.equal((await reminders.run(NOW)).sent, 0); // לא פעמיים באותו יום
   assert.equal(sent.length, 0);
+});
+
+test('שעה עם דקות: יוצאת בריצה הראשונה אחרי השעה, ולא אחרי שעה שלמה', async () => {
+  const f = await newEducator('תזכורת שבע'), g = await newEducator('תזכורת שמונה'), k = await newEducator('תזכורת תשע');
+  await f.put('/api/me/reminder', { day: 3, hour: 17, minute: 5, mail: true, email: 'seven@example.org' });
+  await g.put('/api/me/reminder', { day: 3, hour: 17, minute: 30, mail: true, email: 'eight@example.org' });
+  await k.put('/api/me/reminder', { day: 3, hour: 15, minute: 45, mail: true, email: 'nine@example.org' });
+  assert.equal((await g.get('/api/me/reminder')).json.reminder.minute, 30);
+  sent.length = 0;
+  await reminders.run(NOW); // 17:10
+  assert.deepEqual(sent.map((m) => m.to), ['seven@example.org']);
+  sent.length = 0;
+  await reminders.run(new Date(NOW.getTime() + 30 * 60000)); // 17:40
+  assert.deepEqual(sent.map((m) => m.to), ['eight@example.org']);
 });
 
 test('הנתיב השעתי מוגן בסוד', async () => {

@@ -16,12 +16,12 @@ const AXES = [
   { v: 'other', t: `אחר` },
 ];
 const KINDS = [
-  { v: 'intro', t: `שיחת היכרות` },
-  { v: 'notebook', t: `שיחה מחברת` },
-  { v: 'complex', t: `שיחה מורכבת` },
-  { v: 'grades', t: `הערכה לקראת תעודות` },
-  { v: 'parents', t: `לקראת יום הורים` },
-  { v: 'other', t: `אחר` },
+  { v: 'intro', t: `שיחת היכרות`, d: `להכיר את התלמיד/ה, לרוב בתחילת השנה` },
+  { v: 'notebook', t: `שיחה מַחברת`, d: `המודל של פרופ' מיכל ראזר: הקשבה עמוקה, חוסן וקשר אישי` },
+  { v: 'complex', t: `שיחה מורכבת`, d: `על קושי, משבר או מצב רגיש` },
+  { v: 'grades', t: `הערכה לקראת תעודות`, d: `שיחה לפני התעודה: לימודי, רגשי, חברתי` },
+  { v: 'parents', t: `לקראת יום הורים`, d: `הכנה יחד לפגישה עם ההורים` },
+  { v: 'other', t: `אחר`, d: `סוג אחר, במילים שלך` },
 ];
 // עומק השיחה: חמישה שלבים, ממידע מעשי ועד עולם פנימי (נשמרים כ-1 עד 5). חלוקת הדיבור: פס שגוררים, ונשמר כאחוז הדיבור של התלמיד/ה.
 const DEPTH_LEVELS = [
@@ -37,7 +37,7 @@ const scaleOpts = (s) => s.labels.map((t, i) => ({ v: i + 1, t: `${i + 1} · ${t
 // חמישה טווחים שווים של דיבור התלמיד/ה (תואם לשרת): 1 הכי הרבה דיבור שלי ... 5 הכי הרבה דיבור שלהם
 const talkBucket = (pct) => Math.min(5, Math.floor(Math.max(0, pct - 1) / 20) + 1);
 const FEELINGS = [
-  { v: 'inspired', e: '🤩', t: `מעורר השראה` },
+  { v: 'inspired', e: '🤩', t: `עם השראה` },
   { v: 'good', e: '😊', t: `טוב ומספק` },
   { v: 'neutral', e: '😐', t: `רגיל` },
   { v: 'thoughtful', e: '🤔', t: `מעורר מחשבות` },
@@ -1159,6 +1159,7 @@ function eduMe(e, weeks, done, convs) {
       h('div', { class: 'setlist' }, remRow,
         setRow('lock', 'החלפת הקוד האישי', 'ארבע ספרות. מכשירים אחרים יתנתקו', codeSheet),
         setRow('idea', 'הכניסה הראשונה, שוב', 'הסבר קצר ותרגול שלא נשמר', () => { WEL.step = 0; go('/welcome'); }),
+        setRow('compass', 'סיור קצר בדף הבית', 'מה יש באפליקציה, ואיפה', () => { const e = me(); if (e) lsDel(TOUR_KEY + '.' + e.id); go('/'); }),
         setRow('send', 'יציאה', 'מהטלפון הזה', logout, 'out'))));
 }
 // החלפת קוד בחלונית מלמטה
@@ -1604,9 +1605,9 @@ function eduHome() {
     h('span', { class: 'eyebrow' }, `שבוע ${weekNo(CUR_WEEK)} · ${weekLabel(CUR_WEEK)}`),
     h('h2', null, cur ? (n ? 'השיחות שלך נכנסו לתמונה' : 'השבוע נכנס לתמונה') : 'מה קרה השבוע בשיחות שלך?'),
     h('p', null, cur ? (n ? `${nConv(n)} נוספו לסיפור של השנה. כך רואים, שבוע אחרי שבוע, מה השיחות האישיות עושות. אפשר לעדכן עד סוף השבוע.` : 'גם שבוע בלי שיחות חשוב לדעת. אפשר לעדכן עד סוף השבוע.')
-      : 'שתי דקות שמראות מה השיחות האישיות עושות, לך ולתלמידים. כל שיחה ממלאת את העמודה.'),
+      : 'הצעד הבא: לספר על השיחות האישיות שהיו לך השבוע עם תלמידים. כמה היו, ועל מה דיברתם. כמה נגיעות, בערך שתי דקות.'),
     bars,
-    link(`/me/report/${CUR_WEEK}`, cur ? 'לעדכן את השבוע' : 'לספר על השבוע', 'cta light'),
+    link(`/me/report/${CUR_WEEK}`, cur ? 'לעדכן את השבוע' : 'לספר על השיחות של השבוע ←', 'cta light' + (cur ? '' : ' nudge')),
     h('small', null, [streak > 1 ? `${streak} שבועות ברצף · ` : '', h('a', { href: '#/me', onclick: (ev) => { ev.preventDefault(); go('/me'); } }, 'כל השבועות שלי')]));
   const list = allConvs(), deep = list.filter((c) => c.depth >= 4).length, talk = avgTalk(list);
   const stat = (v, l, c) => h('div', { class: 'stat' }, h('span', { class: 'sdot', style: `background:${c}` }), h('span', { class: 'sv num' }, v), h('span', { class: 'sl' }, l));
@@ -1619,9 +1620,11 @@ function eduHome() {
       ? [h('div', { class: 'mini', 'aria-hidden': 'true' }, map.students.slice(0, 40).map((s) => h('i', { style: `background:${ROUND_LOOK[roundOf(s)].c}` }))),
         h('div', { class: 'row between' }, h('div', null, h('b', { class: 'big' }, `${waiting} תלמידים`), h('div', { class: 'small muted' }, 'עוד מחכים לשיחה ראשונה')), link('/mapping', 'לבחור 3 להשבוע', 'btn sm'))]
       : h('div', { class: 'row between' }, h('div', null, h('b', null, 'עוד לא הוספת את הכיתה'), h('div', { class: 'small muted' }, 'שמות פרטיים בלבד, נשמרים רק במכשיר שלך')), link('/mapping', 'להוספת הכיתה', 'btn sm'))));
+  // כלים לשיחה הבאה: קלפי השיח גדולים למעלה, ושאר הכלים בשתי עמודות, כל אחד עם הזמנה לפתוח
+  const toolCard = (t, big) => h('a', { class: 'tcard2' + (big ? ' big' : ''), style: `background:${t.c}`, href: '#' + t.to, onclick: (ev) => { ev.preventDefault(); go(t.to); } },
+    h('span', { class: 'tci' }, ic(t.i, { size: big ? 40 : 30, tone: 'white' })), h('b', null, t.t), h('span', { class: 'tcd' }, t.d), h('span', { class: 'tcgo' }, big ? 'לשלוף קלף ←' : 'לפתוח ←'));
   const tools = h('section', { class: 'esec rise' }, h('h3', { class: 'sh' }, 'כלים לשיחה הבאה', link('/tools', 'לכל הכלים', 'shl')),
-    h('div', { class: 'hs' }, HOME_TOOLS.map((t) => h('a', { class: 'tcard', style: `background:${t.c}`, href: '#' + t.to, onclick: (ev) => { ev.preventDefault(); go(t.to); } },
-      ic(t.i, { size: 34, tone: 'white' }), h('span', null, h('b', null, t.t), h('span', null, t.d))))));
+    h('div', { class: 'tgrid2' }, HOME_TOOLS.map((t, i) => toolCard(t, i === 0))));
   const who = pub.leadSeesNames ? 'מנהלת התכנית רואה את כל המבטים. המובילה בבית הספר רואה רק את בית הספר שלה, כולל שמות והערות.' : 'מנהלת התכנית רואה את כל המבטים. המובילה בבית הספר רואה רק נתונים מצטברים של בית הספר שלה, בלי שמות.';
   const privacy = h('section', { class: 'frame quiet' }, h('details', null, h('summary', null, ic('lock', { size: 20 }), 'מה נשמר, ומי רואה?'),
     h('ul', { class: 'plain' }, h('li', null, 'לא נשמרים שמות תלמידים ולא תיעוד על ילד או ילדה.'), h('li', null, 'בכל שבוע נשמר מספר השיחות, ולכל שיחה כמה בחירות קצרות והערה חופשית.'),
@@ -1631,7 +1634,54 @@ function eduHome() {
   const tg = togetherBox(h('div'));
   const root = h('div', { class: 'ehome' }, top, hero, remChip(), journey, klass, tools, tg, privacy);
   if (justRegistered) { justRegistered = false; toast('הקוד נשמר. בפעם הבאה נכנסים עם בית ספר, שם והקוד.'); }
+  if (!lsGet(TOUR_KEY + '.' + e.id)) setTimeout(() => { if (document.body.contains(root)) homeTour(); }, 900);
   return root;
+}
+
+/* ---------- סיור קצר בדף הבית: בכניסה הראשונה, חץ שמראה מה עוד יש באפליקציה ----------
+   פעם אחת בכל מכשיר. אפשר לראות אותו שוב מ"השבועות שלי". */
+const TOUR_KEY = 'zmw.toured';
+const TOUR = [
+  ['.ehero', 'כאן, פעם בשבוע', 'לספר על השיחות האישיות שלך: כמה היו ועל מה דיברתם. כמה נגיעות, בערך שתי דקות.'],
+  ['.bottomnav .bn.mid', 'המבט השבועי, מכל מסך', 'הכפתור הכחול באמצע פותח את השאלות על השבוע, בכל רגע.'],
+  ['.bottomnav a[href="#/mapping"]', 'הכיתה שלי', 'מיפוי הכיתה: מי כבר קיבלו שיחה אישית ומי עוד מחכים. השמות נשארים רק במכשיר שלך.'],
+  ['.bottomnav a[href="#/tools"]', 'ארגז הכלים', 'כלים לשיחה הבאה לפי צירי ההכשרה: זהות וחוזקות, יעדים ומטרות, אייג\'נסי.'],
+  ['.bottomnav a[href="#/tools/cards"]', 'קלפי שיח', 'שאלות ותמונות שעוזרות לפתוח שיחה אישית.'],
+  ['.etop .avatar', 'השבועות שלי', 'כל השבועות שלך, התזכורת השבועית והחשבון.'],
+];
+function homeTour() {
+  document.querySelector('.tourx')?.remove();
+  const e = me(); if (e) lsSet(TOUR_KEY + '.' + e.id, '1');
+  window.scrollTo(0, 0);
+  let i = 0;
+  const spot = h('div', { class: 'tspot' }), arrow = h('i', { class: 'tarrow' });
+  const bub = h('div', { class: 'tbub', role: 'dialog', 'aria-modal': 'true', 'aria-live': 'polite' });
+  const wrap = h('div', { class: 'tourx' }, spot, bub);
+  const end = () => { wrap.remove(); removeEventListener('resize', place); removeEventListener('hashchange', end); };
+  function place() {
+    const el = document.querySelector(TOUR[i][0]);
+    if (!el) { if (++i < TOUR.length) place(); else end(); return; }
+    const r = el.getBoundingClientRect(), pad = 6, vw = innerWidth, vh = innerHeight;
+    Object.assign(spot.style, { top: `${r.top - pad}px`, left: `${r.left - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
+    const below = r.top + r.height / 2 < vh / 2, w = Math.min(330, vw - 32), cx = r.left + r.width / 2;
+    const left = Math.max(16, Math.min(vw - w - 16, cx - w / 2));
+    bub.style.width = `${w}px`; bub.style.left = `${left}px`;
+    bub.style.top = below ? `${Math.min(r.bottom + pad + 16, vh - 220)}px` : ''; bub.style.bottom = below ? '' : `${vh - r.top + pad + 16}px`;
+    bub.classList.toggle('up', below);
+    arrow.style.left = `${Math.max(18, Math.min(w - 18, cx - left))}px`;
+  }
+  function paint() {
+    const [, t, d] = TOUR[i], last = i === TOUR.length - 1;
+    clear(bub);
+    add(bub, [arrow, h('span', { class: 'tcount' }, `${i + 1} מתוך ${TOUR.length}`), h('b', null, t), h('p', null, d),
+      h('div', { class: 'row between' }, last ? h('span') : h('button', { class: 'linkbtn', type: 'button', onclick: end }, 'לדלג'),
+        h('button', { class: 'btn', type: 'button', onclick: () => { if (last) { end(); return; } i++; paint(); } }, last ? 'הבנתי, אפשר להתחיל' : 'הבא'))]);
+    place();
+    bub.querySelector('.btn').focus();
+  }
+  document.body.append(wrap);
+  addEventListener('resize', place); addEventListener('hashchange', end);
+  paint();
 }
 
 /* ---------- איורים: סוגי שיחה, צוללן ופרצופים ---------- */
@@ -1727,6 +1777,8 @@ function eduWeek(week, opts = {}) {
   const touch = () => { clearTimeout(t); t = setTimeout(persist, 400); };
   const root = h('div', { class: 'wflow' });
   const cur = () => draft.convs[F.ci];
+  // בתרגול אפשר לבחור כל מספר שיחות, אבל ממלאים רק את הראשונה, ואז התרגול נגמר
+  const total = () => (practice ? Math.min(1, draft.convs.length) : draft.convs.length);
   const nameWarn = (texts) => { const names = findNames(texts.join(' ')); return names.length ? `נראה שמופיע שם (${names.join(', ')}). המבט לא צריך שמות תלמידים: אפשר לכתוב "התלמיד/ה".` : ''; };
   const canNext = () => {
     const c = cur();
@@ -1752,21 +1804,23 @@ function eduWeek(week, opts = {}) {
   };
   const close = () => { persist(); if (practice) { WEL.step = 2; go('/welcome'); } else go('/'); };
 
+  // פס התקדמות: קטע לשאלת הכמה, וקטע לכל שיחה שמתמלא שאלה אחרי שאלה, עד סוף המבט
   function progress() {
-    const n = Math.max(1, draft.convs.length);
-    if (F.step === 'count' || F.step === 'zero') return h('div', { class: 'prog' }, h('i', { class: 'c' }), Array.from({ length: n }, () => h('i')));
-    return h('div', { class: 'prog' }, h('i', { class: 'd' }), Array.from({ length: n }, (_, k) => h('i', { class: F.step === 'done' || k < F.ci ? 'd' : k === F.ci ? 'c' : '' })));
+    const n = Math.max(1, total()), s = F.step, counting = s === 'count' || s === 'zero';
+    const fill = (k) => (s === 'done' || k < F.ci ? 1 : k === F.ci && STEPS.includes(s) ? (STEPS.indexOf(s) + 1) / (STEPS.length + 1) : 0);
+    const seg = (f) => h('i', { class: f >= 1 ? 'd' : '' }, f > 0 && f < 1 ? h('b', { style: `width:${Math.round(f * 100)}%` }) : null);
+    return h('div', { class: 'prog', 'aria-hidden': 'true' }, seg(s === 'count' ? 0.5 : s === 'zero' ? 0.75 : 1), Array.from({ length: n }, (_, k) => seg(counting ? 0 : fill(k))));
   }
   function head() {
     return h('div', { class: 'wtop' },
-      F.step !== 'count' && F.step !== 'done' ? h('button', { class: 'fbtn', type: 'button', 'aria-label': 'חזרה לשאלה הקודמת', onclick: back }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>')) : null,
+      F.step !== 'count' && F.step !== 'done' ? h('button', { class: 'fbtn fback', type: 'button', 'aria-label': 'חזרה לשאלה הקודמת', onclick: back }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'), h('span', null, 'חזרה')) : null,
       progress(),
       F.step !== 'done' ? h('button', { class: 'fbtn', type: 'button', 'aria-label': practice ? 'סיום התרגול' : 'סגירה. הטיוטה נשמרת במכשיר', onclick: close }, svgSpan('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>')) : null);
   }
   const q = (kicker, title, sub, ...body) => h('div', { class: 'qwrap' }, kicker ? h('span', { class: 'qk' }, kicker) : null, h('h2', { class: 'qt' }, title), sub ? h('p', { class: 'qs' }, sub) : null, ...body);
   const nextButton = (label, onclick, cls = 'cta') => { nextBtn = h('button', { class: cls, type: 'button', onclick }, label); upd(); return nextBtn; };
-  const convKick = () => `שיחה ${F.ci + 1} מתוך ${draft.convs.length}${week < CUR_WEEK ? ` · שבוע ${weekNo(week)}` : ''}`;
-  const tile = (on, art, label, onclick) => h('button', { class: 'qtile' + (on ? ' on' : ''), type: 'button', 'aria-pressed': String(on), onclick }, art, h('span', null, label));
+  const convKick = () => practice ? 'שיחה לדוגמה' : `שיחה ${F.ci + 1} מתוך ${draft.convs.length}${week < CUR_WEEK ? ` · שבוע ${weekNo(week)}` : ''}`;
+  const tile = (on, art, label, onclick, desc) => h('button', { class: 'qtile' + (on ? ' on' : ''), type: 'button', 'aria-pressed': String(on), onclick }, art, h('span', null, label), desc ? h('small', { class: 'qtdesc' }, desc) : null);
   const otherInput = (val, ph, onInput) => {
     const warn = h('p', { class: 'warn-note', hidden: true });
     const inp = h('input', { class: 'input othin', value: val, placeholder: ph, maxlength: '120', 'aria-label': ph, oninput: (ev) => { onInput(ev.target.value); const w = nameWarn([ev.target.value]); warn.hidden = !w; warn.textContent = w; upd(); } });
@@ -1793,7 +1847,7 @@ function eduWeek(week, opts = {}) {
       const plus = h('button', { class: 'cbtn plus', type: 'button', 'aria-label': 'עוד שיחה', onclick: () => { draft.convs.push(newConv()); touch(); paintCount(); out.classList.remove('pop'); void out.offsetWidth; out.classList.add('pop'); celebrate(draft.convs.length); } }, '+');
       next.onclick = () => { F.ci = 0; go2(draft.convs.length ? 'axis' : 'zero'); };
       paintCount();
-      return q(practice ? 'תרגול · לא נשמר' : `המבט השבועי · שבוע ${weekNo(week)}`, week === CUR_WEEK ? 'כמה שיחות אישיות היו לך השבוע?' : `כמה שיחות אישיות היו לך בשבוע ${weekNo(week)}?`, 'שיחה אישית היא רגע אחד על אחד עם תלמיד/ה, גם קצר.',
+      return q(practice ? null : `המבט השבועי · שבוע ${weekNo(week)}`, week === CUR_WEEK ? 'כמה שיחות אישיות היו לך השבוע?' : `כמה שיחות אישיות היו לך בשבוע ${weekNo(week)}?`, 'שיחה אישית היא רגע אחד על אחד עם תלמיד/ה, גם קצר.',
         existing ? h('p', { class: 'tag', style: 'align-self:flex-start' }, week === CUR_WEEK ? 'המבט לשבוע הזה כבר נשלח. אפשר לעדכן אותו.' : `המבט לשבוע ${weekNo(week)} כבר נשלח. אפשר לעדכן אותו.`) : null,
         h('div', { class: 'counter' }, minus, out, plus), tokens, msg, next);
     }
@@ -1813,12 +1867,12 @@ function eduWeek(week, opts = {}) {
     }
     if (s === 'kind') {
       const [inp, warn] = otherInput(c.kindOther, 'איזו שיחה? כמה מילים', (v) => { c.kindOther = v; touch(); });
-      return q(convKick(), 'איזו שיחה זו הייתה?', 'אפשר לבחור יותר מאחת',
+      return q(convKick(), 'איזה סוג שיחה זו הייתה?', 'אפשר לבחור יותר מאחד',
         h('div', { class: 'qtiles' }, KINDS.map((k) => {
           const b = tile(c.kinds.includes(k.v), svgSpan(KIND_ART[k.v], 'ill'), k.t, () => {
             const on = !c.kinds.includes(k.v); c.kinds = on ? [...c.kinds, k.v] : c.kinds.filter((x) => x !== k.v); touch(); if (on) burstFrom(b, 18); paint();
             if (k.v === 'other' && on) root.querySelector('.othin')?.focus();
-          });
+          }, k.d);
           return b;
         })),
         c.kinds.includes('other') ? [inp, warn] : null, nextButton('המשך', () => go2('depth')));
@@ -1833,15 +1887,15 @@ function eduWeek(week, opts = {}) {
     }
     if (s === 'feel') {
       const warn = h('p', { class: 'warn-note', hidden: true });
-      const note = h('textarea', { class: 'textarea', rows: '2', placeholder: 'מילה אחת לזכור (בלי שמות)', maxlength: '1000', 'aria-label': 'מילה אחת לזכור, לא חובה', oninput: (ev) => { c.note = ev.target.value; touch(); const w = nameWarn([c.note]); warn.hidden = !w; warn.textContent = w; } });
+      const note = h('textarea', { class: 'textarea', rows: '2', placeholder: 'עוד משהו שחשוב לי לזכור מהשיחה?', maxlength: '1000', 'aria-label': 'עוד משהו שחשוב לי לזכור מהשיחה? לא חובה, בלי שמות', oninput: (ev) => { c.note = ev.target.value; touch(); const w = nameWarn([c.note]); warn.hidden = !w; warn.textContent = w; } });
       note.value = c.note;
-      const last = F.ci >= draft.convs.length - 1;
+      const last = F.ci >= total() - 1;
       const who = pub.leadSeesNames ? 'רק לך, למובילה בבית הספר ולצוות התכנית יש גישה לזה' : 'רק לך ולצוות התכנית יש גישה לזה';
       return q(convKick(), 'איך יצאת מהשיחה?', null,
         h('div', { class: 'faces', role: 'radiogroup', 'aria-label': 'איך יצאת מהשיחה' }, FEELINGS.map((f) => h('button', { class: 'face' + (c.feeling === f.v ? ' on' : ''), type: 'button', role: 'radio', 'aria-checked': String(c.feeling === f.v), onclick: () => { c.feeling = f.v; touch(); paint(); } },
           svgSpan(faceSvg(FACE_LOOK[f.v]), 'fsvg'), h('span', null, f.t)))),
         note, warn, h('p', { class: 'lockline' }, ic('lock', { size: 16 }), who),
-        nextButton(last ? (F.sending ? 'שולחים…' : 'שליחת המבט') : 'שמירת השיחה', () => { if (last) submit(); else { F.ci++; go2('saved'); confetti(25, 0.5); } }),
+        nextButton(last ? (practice ? 'סיום התרגול' : F.sending ? 'שולחים…' : 'שליחת המבט') : 'שמירת השיחה', () => { if (last) submit(); else { F.ci++; go2('saved'); confetti(25, 0.5); } }),
         F.err ? h('p', { class: 'err', role: 'alert' }, F.err) : null);
     }
     if (s === 'saved') {
@@ -1888,7 +1942,7 @@ function eduWeek(week, opts = {}) {
         h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => closeSheet() }, 'לחזור ולתקן'), h('button', { class: 'btn soft', type: 'button', onclick: () => { closeSheet(); doSubmit(); } }, 'לשלוח בכל זאת'))));
     } else doSubmit();
   }
-  function paint() { clear(root); add(root, [head(), practice && PRACTICE_TIPS[F.step] ? h('div', { class: 'ptip' }, ic('idea', { size: 18, tone: 'white' }), PRACTICE_TIPS[F.step]) : null, body()]); }
+  function paint() { clear(root); add(root, [head(), practice && F.step !== 'done' ? h('div', { class: 'pbanner' }, h('b', null, 'איך זה עובד? מבט זריז'), h('span', null, 'תרגול · שום דבר לא נשמר')) : null, practice && PRACTICE_TIPS[F.step] ? h('div', { class: 'ptip' }, ic('idea', { size: 18, tone: 'white' }), PRACTICE_TIPS[F.step]) : null, body()]); }
   paint();
   return root;
 }
@@ -2295,7 +2349,7 @@ function focusPrompt() {
 const ONBOARD_KEY = 'zmw.onboarded';
 const WEL = { step: 0, os: null };
 const PRACTICE_TIPS = {
-  count: 'תרגול: אפשר לבחור כל מספר. שום דבר לא נשמר.', zero: 'גם שבוע בלי שיחות נשלח בשתי נגיעות.',
+  count: 'אפשר לבחור כל מספר. אחר כך יש שאלות על שיחה אחת בלבד, לדוגמה.', zero: 'גם שבוע בלי שיחות נשלח בשתי נגיעות.',
   axis: 'אלה הצירים מההכשרה. אפשר לבחור כמה.', kind: 'ואיזו שיחה זו הייתה.', depth: 'גרירה של הצוללן, או נגיעה בעומק.',
   talk: 'כמה מקום היה לקול של התלמיד/ה.', feel: 'ואיך השיחה הייתה בשבילך.', saved: 'כשהשיחות דומות, כפתור אחד שומר את כולן.',
 };
@@ -2342,13 +2396,14 @@ function eduWelcome() {
 
 /* ---------- תזכורת שבועית: יום, שעה, התראה בטלפון ו/או מייל ----------
    ההגדרות נשמרות בשרת. מייל נשמר רק אם בוחרים תזכורת במייל. נגיעה בתזכורת פותחת ישר את המבט לשבוע הזה. */
+const hhmm = (hh, mm) => `${hh}:${String(mm || 0).padStart(2, '0')}`;
 const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
 // בשביל מה התזכורת: לשתף כמה שיחות היו ובמה עסקו (כמו במבט עצמו), לא "לדווח"
 const REM_WHY = 'פעם בשבוע, בזמן שמתאים לך, תגיע תזכורת קטנה לשתף כמה שיחות אישיות היו לך עם תלמידים ובמה הן עסקו. כמה נגיעות, וכל שיחה שלך נכנסת לתמונה.';
 let REM = null;
 async function loadReminder(force) { if (!REM || force) REM = await api('GET', '/api/me/reminder'); return REM; }
 const remOn = () => !!(REM && REM.reminder && (REM.reminder.push || REM.reminder.mail));
-const remLabel = () => (!remOn() ? 'להגדרת תזכורת שבועית' : REM.reminder.skipWeek ? 'בלי תזכורת השבוע' : `תזכורת בימי ${DAYS_HE[REM.reminder.day]} · ${REM.reminder.hour}:00`);
+const remLabel = () => (!remOn() ? 'להגדרת תזכורת שבועית' : REM.reminder.skipWeek ? 'בלי תזכורת השבוע' : `תזכורת בימי ${DAYS_HE[REM.reminder.day]} · ${hhmm(REM.reminder.hour, REM.reminder.minute)}`);
 function remChip() {
   const chip = h('a', { class: 'remchip', href: '#/reminder', onclick: (e) => { e.preventDefault(); go('/reminder'); } }, ic('calendar', { size: 18 }), h('span', null, REM ? remLabel() : 'תזכורת שבועית'));
   if (!REM) loadReminder().then(() => { if (document.body.contains(chip)) chip.lastChild.textContent = remLabel(); }, () => {});
@@ -2387,9 +2442,14 @@ function reminderPanel(onSaved, saveLabel = 'שמירה') {
       h('h3', { class: 'sub2' }, 'באיזה יום?'),
       h('div', { class: 'days' }, DAYS_HE.map((d, i) => h('button', { class: 'day' + (D.day === i ? ' on' : ''), type: 'button', 'aria-pressed': String(D.day === i), 'aria-label': d, onclick: () => { D.day = i; paint(); } }, 'אבגדהו'[i] + '׳'))),
       h('h3', { class: 'sub2' }, 'באיזו שעה?'),
-      h('div', { class: 'chips' }, hourOpts.map((x) => h('button', { class: 'zpick' + (D.hour === x ? ' on' : ''), type: 'button', onclick: () => { D.hour = x; paint(); } }, `${x}:00`)),
-        h('select', { class: 'select hoursel', 'aria-label': 'שעה אחרת', onchange: (e) => { D.hour = Number(e.target.value); paint(); } },
-          Array.from({ length: 17 }, (_, k) => k + 6).map((x) => h('option', { value: String(x), selected: D.hour === x }, hourOpts.includes(x) ? `${x}:00` : `שעה אחרת · ${x}:00`)))),
+      h('div', { class: 'chips' }, hourOpts.map((x) => h('button', { class: 'zpick' + (D.hour === x && !D.minute ? ' on' : ''), type: 'button', onclick: () => { D.hour = x; D.minute = 0; paint(); } }, `${x}:00`)),
+        // כל השעות העגולות, ואם נבחרה שעה עם דקות היא מופיעה ברשימה כמו שהיא
+        h('select', { class: 'select hoursel', 'aria-label': 'כל השעות', onchange: (e) => { D.hour = Number(e.target.value); D.minute = 0; paint(); } },
+          D.minute ? h('option', { value: String(D.hour), selected: true }, hhmm(D.hour, D.minute)) : null,
+          Array.from({ length: 17 }, (_, k) => k + 6).map((x) => h('option', { value: String(x), selected: !D.minute && D.hour === x }, `${x}:00`)))),
+      h('label', { class: 'owntime' }, h('span', null, 'או שעה מדויקת, למשל 10:15 בהפסקה'),
+        h('input', { class: 'input', type: 'time', min: '06:00', max: '22:59', value: `${String(D.hour).padStart(2, '0')}:${String(D.minute).padStart(2, '0')}`, 'aria-label': 'שעה מדויקת לתזכורת',
+          onchange: (e) => { const [hh, mm] = e.target.value.split(':').map(Number); if (!(hh >= 6 && hh <= 22) || !(mm >= 0 && mm <= 59)) { toast('אפשר לבחור שעה בין 6:00 ל-22:59'); paint(); return; } D.hour = hh; D.minute = mm; paint(); } })),
       h('h3', { class: 'sub2' }, 'איך? אפשר את שתיהן'),
       h('div', { class: 'chtog' },
         h('button', { class: D.push ? 'on' : '', type: 'button', 'aria-pressed': String(D.push), onclick: async () => {
@@ -2402,22 +2462,22 @@ function reminderPanel(onSaved, saveLabel = 'שמירה') {
       note ? h('p', { class: 'warn-note' }, note) : null,
       D.mail ? [h('input', { class: 'input remmail', type: 'email', value: D.email, placeholder: 'כתובת המייל שלך', 'aria-label': 'כתובת המייל לתזכורת', autocomplete: 'email', oninput: (e) => { D.email = e.target.value; } }),
         h('p', { class: 'small muted' }, 'הכתובת נשמרת רק בשביל התזכורת, ונמחקת כשמכבים את המייל.'), REM.mailReady ? null : h('p', { class: 'small muted' }, 'המייל עוד לא הופעל באפליקציה. ההגדרה תישמר ותעבוד ברגע שיופעל.')] : null,
-      D.push ? h('div', { class: 'lock' }, h('span', { class: 'lktime num' }, `${D.hour}:00`), h('span', { class: 'lkday' }, `יום ${DAYS_HE[D.day]}`),
+      D.push ? h('div', { class: 'lock' }, h('span', { class: 'lktime num' }, hhmm(D.hour, D.minute)), h('span', { class: 'lkday' }, `יום ${DAYS_HE[D.day]}`),
         h('span', { class: 'ncard' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('span', null, h('b', null, 'השיחות שלך השבוע'), 'כמה שיחות אישיות היו לך השבוע, ועל מה דיברתם? רגע לשתף, בכמה נגיעות.'), h('small', null, 'עכשיו'))) : null,
-      D.mail ? h('div', { class: 'mail2' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('span', null, h('b', null, 'זמן לחינוך'), h('span', { class: 'subj' }, 'השיחות האישיות שלך השבוע'), h('span', { class: 'snip' }, `יום ${DAYS_HE[D.day]}, ${D.hour}:00 · כמה שיחות היו ועל מה דיברתם? כפתור אחד, ישר לשיתוף`))) : null,
+      D.mail ? h('div', { class: 'mail2' }, h('img', { src: '/icons/icon-192.png', alt: '' }), h('span', null, h('b', null, 'זמן לחינוך'), h('span', { class: 'subj' }, 'השיחות האישיות שלך השבוע'), h('span', { class: 'snip' }, `יום ${DAYS_HE[D.day]}, ${hhmm(D.hour, D.minute)} · כמה שיחות היו ועל מה דיברתם? כפתור אחד, ישר לשיתוף`))) : null,
       D.push || D.mail ? h('p', { class: 'small muted', style: 'text-align:center' }, 'נגיעה בתזכורת פותחת ישר את השאלה הראשונה על השיחות שלך. אם כבר שיתפת השבוע, לא תגיע תזכורת.') : null,
       remOn() || D.push || D.mail ? h('button', { class: 'cta ' + (D.skipWeek ? 'violet' : 'ghostc'), type: 'button', onclick: () => { D.skipWeek = !D.skipWeek; paint(); } }, D.skipWeek ? 'בלי תזכורת השבוע · לביטול' : 'השבוע חג או חופשה? דילוג על תזכורת אחת') : null,
       h('button', { class: 'cta', type: 'button', onclick: async (e) => {
         if (D.mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(D.email.trim())) { toast('כדאי לבדוק את כתובת המייל'); return; }
         const b = e.currentTarget; b.disabled = true;
-        try { await api('PUT', '/api/me/reminder', { day: D.day, hour: D.hour, push: D.push, mail: D.mail, email: D.email.trim(), skipWeek: D.skipWeek }); await loadReminder(true); toast(D.push || D.mail ? 'התזכורת נשמרה' : 'התזכורת כבויה'); if (onSaved) onSaved(); else paint(); }
+        try { await api('PUT', '/api/me/reminder', { day: D.day, hour: D.hour, minute: D.minute, push: D.push, mail: D.mail, email: D.email.trim(), skipWeek: D.skipWeek }); await loadReminder(true); toast(D.push || D.mail ? 'התזכורת נשמרה' : 'התזכורת כבויה'); if (onSaved) onSaved(); else paint(); }
         catch (ex) { toast(ex.message); b.disabled = false; }
       } }, saveLabel),
       remOn() && !onSaved ? h('button', { class: 'linkbtn', type: 'button', style: 'align-self:center', onclick: async () => {
         try { const r = (await api('POST', '/api/me/reminder/test')).sent; toast(r.failed && r.failed.length ? `לא נשלח ${r.failed.includes('mail') ? 'מייל' : 'התראה'}. כדאי לבדוק את ההגדרות ולנסות שוב.` : r.push || r.mail ? `נשלחה תזכורת לניסיון${r.push ? ' לטלפון' : ''}${r.push && r.mail ? ' ו' : ''}${r.mail ? 'למייל' : ''}` : 'לא נשלח: הערוצים עוד לא פעילים באפליקציה'); } catch (ex) { toast(ex.message); }
       } }, 'שליחת תזכורת לניסיון') : null]);
   };
-  loadReminder(true).then(() => { const r = REM.reminder || {}; D = { day: r.day ?? 4, hour: r.hour ?? 17, push: !!r.push, mail: !!r.mail, email: r.email || '', skipWeek: !!r.skipWeek }; paint(); },
+  loadReminder(true).then(() => { const r = REM.reminder || {}; D = { day: r.day ?? 4, hour: r.hour ?? 17, minute: r.minute || 0, push: !!r.push, mail: !!r.mail, email: r.email || '', skipWeek: !!r.skipWeek }; paint(); },
     (ex) => { clear(host); add(host, [h('p', { class: 'err' }, ex.message)]); });
   return host;
 }

@@ -240,10 +240,10 @@ route('PUT', '/api/me/class-rounds', ['educator'], async (ctx) => {
 const reminders = require('./reminders');
 const isEmail = (s) => typeof s === 'string' && s.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 route('GET', '/api/me/reminder', ['educator'], async (ctx) => {
-  const r = await db.get('SELECT day, hour, push, mail, email, skip_week FROM reminders WHERE user_id = ?', [ctx.user.id]);
+  const r = await db.get('SELECT day, hour, minute, push, mail, email, skip_week FROM reminders WHERE user_id = ?', [ctx.user.id]);
   const subs = (await db.get('SELECT COUNT(*)::int AS n FROM push_subscriptions WHERE user_id = ?', [ctx.user.id])).n;
   return {
-    reminder: r ? { day: r.day, hour: r.hour, push: !!r.push, mail: !!r.mail, email: r.email || '', skipWeek: r.skip_week === weeks.curWeek() } : null,
+    reminder: r ? { day: r.day, hour: r.hour, minute: r.minute || 0, push: !!r.push, mail: !!r.mail, email: r.email || '', skipWeek: r.skip_week === weeks.curWeek() } : null,
     pushReady: reminders.pushReady(), mailReady: reminders.mailReady(), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '', devices: subs,
   };
 });
@@ -251,14 +251,16 @@ route('PUT', '/api/me/reminder', ['educator'], async (ctx) => {
   const b = ctx.body || {};
   if (!Number.isInteger(b.day) || b.day < 0 || b.day > 5) throw new HttpError(400, 'היום לא תקין.');
   if (!Number.isInteger(b.hour) || b.hour < 6 || b.hour > 22) throw new HttpError(400, 'השעה לא תקינה.');
+  const minute = b.minute === undefined ? 0 : b.minute;
+  if (!Number.isInteger(minute) || minute < 0 || minute > 59) throw new HttpError(400, 'השעה לא תקינה.');
   const push = b.push === true, mail = b.mail === true;
   const email = mail ? str(b.email, 120).trim() : '';
   if (mail && !isEmail(email)) throw new HttpError(400, 'כתובת המייל לא תקינה.');
   const skip = b.skipWeek === true ? weeks.curWeek() : null;
   // מייל נשמר רק כשבחרו תזכורת במייל. כיבוי המייל מוחק את הכתובת.
-  await db.run(`INSERT INTO reminders (user_id, day, hour, push, mail, email, skip_week, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (user_id) DO UPDATE SET day = excluded.day, hour = excluded.hour, push = excluded.push, mail = excluded.mail, email = excluded.email, skip_week = excluded.skip_week, updated_at = excluded.updated_at`,
-  [ctx.user.id, b.day, b.hour, push ? 1 : 0, mail ? 1 : 0, email || null, skip, nowIso()]);
+  await db.run(`INSERT INTO reminders (user_id, day, hour, minute, push, mail, email, skip_week, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (user_id) DO UPDATE SET day = excluded.day, hour = excluded.hour, minute = excluded.minute, push = excluded.push, mail = excluded.mail, email = excluded.email, skip_week = excluded.skip_week, updated_at = excluded.updated_at`,
+  [ctx.user.id, b.day, b.hour, minute, push ? 1 : 0, mail ? 1 : 0, email || null, skip, nowIso()]);
   if (!push) await db.run('DELETE FROM push_subscriptions WHERE user_id = ?', [ctx.user.id]);
   return { ok: true };
 });

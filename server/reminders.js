@@ -31,6 +31,11 @@ function hourInIsrael(date) {
   const h = new Intl.DateTimeFormat('en-GB', { timeZone: config.TIMEZONE, hour: '2-digit', hourCycle: 'h23' }).format(date);
   return Number(h);
 }
+// הדקה ביום (0 עד 1439) לפי שעון ישראל
+function minuteOfDayInIsrael(date) {
+  const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: config.TIMEZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date).split(':').map(Number);
+  return h * 60 + m;
+}
 
 const message = (week) => ({
   title: 'השיחות שלך השבוע',
@@ -77,15 +82,16 @@ async function sendTo(userId, week) {
   return out;
 }
 
-// ריצה שעתית: מי שבחרה את היום והשעה האלה, ועוד לא שלחה מבט לשבוע הזה
+// ריצה כל רבע שעה (או כל שעה): מי שבחרה את היום הזה, ששעת התזכורת שלה הגיעה בשעה האחרונה, ועוד לא שלחה מבט לשבוע הזה.
+// החלון של שעה שומר שגם תזמון שעתי שולח (תזכורת ל-10:15 יוצאת ב-11:00), ותזמון כל רבע שעה שולח בזמן.
 async function run(now = new Date()) {
   const today = config.FAKE_TODAY || weeks.dateInIsrael(now);
-  const day = weeks.fromYmd(today).getUTCDay(), hour = hourInIsrael(now), wk = weeks.weekStart(today);
+  const day = weeks.fromYmd(today).getUTCDay(), mod = minuteOfDayInIsrael(now), wk = weeks.weekStart(today);
   // לפני תחילת התכנית אין מבט פתוח, ולכן אין תזכורות
   if (wk < (await db.programStart())) return { due: 0, sent: 0, alreadyDone: 0, failed: 0 };
   const rows = await db.all(`SELECT r.user_id FROM reminders r JOIN users u ON u.id = r.user_id
-    WHERE u.active = 1 AND u.role = 'educator' AND r.day = ? AND r.hour = ? AND (r.push = 1 OR r.mail = 1)
-      AND (r.skip_week IS NULL OR r.skip_week <> ?) AND (r.last_sent IS NULL OR r.last_sent <> ?)`, [day, hour, wk, today]);
+    WHERE u.active = 1 AND u.role = 'educator' AND r.day = ? AND r.hour * 60 + r.minute <= ? AND r.hour * 60 + r.minute > ? AND (r.push = 1 OR r.mail = 1)
+      AND (r.skip_week IS NULL OR r.skip_week <> ?) AND (r.last_sent IS NULL OR r.last_sent <> ?)`, [day, mod, mod - 60, wk, today]);
   const result = { due: rows.length, sent: 0, alreadyDone: 0, failed: 0 };
   for (const { user_id: id } of rows) {
     if (await db.get('SELECT 1 AS x FROM reports WHERE educator_id = ? AND week = ?', [id, wk])) { result.alreadyDone++; continue; }
