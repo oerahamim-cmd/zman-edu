@@ -11,7 +11,7 @@ let SCHOOLS = []; // בתי הספר (מגיעים מהשרת)
 const ROUNDS = [{ v: 1, t: `סבב ראשון` }, { v: 2, t: `סבב שני` }, { v: 3, t: `סבב שלישי` }];
 const AXES = [
   { v: 'identity', t: `זהות וחוזקות` },
-  { v: 'goals', t: `יעדים ומטרות` },
+  { v: 'goals', t: `מומחיות ומטרות` },
   { v: 'agency', t: `אייג'נסי` },
   { v: 'other', t: `אחר` },
 ];
@@ -47,7 +47,7 @@ const FEELINGS = [
 const NONE_REASONS = [{ v: 'holiday', t: `חג או חופשה` }, { v: 'sick', t: `היעדרות` }, { v: 'load', t: `עומס` }, { v: 'other', t: `אחר` }];
 const FOLDERS = [
   { id: 'identity', t: `זהות וחוזקות`, icon: 'reflect', d: `שיחות שמזהות חוזקות ובונות תחושת זהות.` },
-  { id: 'goals', t: `יעדים ומטרות`, icon: 'target', d: `שיחות על מומחיות, יעדים ומטרות אישיות.` },
+  { id: 'goals', t: `מומחיות ומטרות`, icon: 'target', d: `שיחות על מומחיות ומטרות אישיות.` },
   { id: 'agency', t: `אייג'נסי`, icon: 'empower', d: `יצירתיות, שותפות ויכולת לפעול ולהשפיע.` },
 ];
 const ICON = { check: 0, chev: 1, calendar: 2, checklist: 3, write: 4, reflect: 5, question: 6, insight: 7, idea: 8, community: 9, school: 10, data: 11, send: 12, secure: 13, person: 14, hourglass: 15, form: 17, team: 18, circle: 19, plan: 20, plant: 21, steps: 22, target: 23, empower: 24, compass: 25, book: 26, note: 27, practice: 28, id: 29, eye: 30, care: 31, alert: 32, gear: 33, trend: 34, pencil: 35, brain: 36, lock: 38, timer: 39, ballot: 40 };
@@ -792,7 +792,7 @@ function cardsRandom() {
 /* ---------- 4. לפי עומק השיחה ולפי סוג השיחה (אפשר גם לשלב) ---------- */
 const CARD_TYPES = [
   { id: 'identity', t: 'זהות וחוזקות', d: 'שאלות על מי שאני: חוזקות, רגשות, מה מרגש ומה חשוב לי.' },
-  { id: 'goals', t: 'יעדים ומטרות', d: 'שאלות על חלומות, על מה שרוצים להשיג ועל ההחלטות הבאות.' },
+  { id: 'goals', t: 'מומחיות ומטרות', d: 'שאלות על חלומות, על מה שרוצים להשיג ועל ההחלטות הבאות.' },
   { id: 'agency', t: "אייג'נסי ושותפות", d: 'שאלות על היכולת לפעול ולהשפיע, ועל מי ואיך אפשר להיעזר.' },
 ];
 function cardsDepthHome() {
@@ -1635,7 +1635,40 @@ function eduHome() {
   const root = h('div', { class: 'ehome' }, top, hero, remChip(), journey, klass, tools, tg, privacy);
   if (justRegistered) { justRegistered = false; toast('הקוד נשמר. בפעם הבאה נכנסים עם בית ספר, שם והקוד.'); }
   if (!lsGet(TOUR_KEY + '.' + e.id)) setTimeout(() => { if (document.body.contains(root)) homeTour(); }, 900);
+  else if (trainingDue(e.id)) setTimeout(() => { if (document.body.contains(root)) trainingPopup(e.id); }, 700);
   return root;
+}
+
+/* ---------- הזמנה ליום ההכשרה (30.11.2026) ----------
+   קופצת בדף הבית עד יום לפני המפגש. "כבר נרשמתי" סוגר לתמיד במכשיר הזה; "אחר כך" סוגר עד מחר. */
+const TRAINING = { date: '2026-11-30', label: 'יום שני, 30.11', url: 'https://ma-hakesher.netlify.app', key: 'zmw.training1130' };
+function trainingDue(id) {
+  const today = new Date(); const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  if (iso >= TRAINING.date) return false;
+  const v = lsGet(TRAINING.key + '.' + id);
+  return !(v === 'done' || v === iso);
+}
+function trainingPopup(id) {
+  if (document.querySelector('.tdov')) return;
+  const today = new Date(); const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const close = () => ov.remove();
+  const later = () => { lsSet(TRAINING.key + '.' + id, iso); close(); };
+  const box = h('div', { class: 'tdbox', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'tdh' },
+    h('div', { class: 'tdtop' }, h('span', { class: 'blob b1' }), h('span', { class: 'blob b2' }),
+      ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'].map((c) => h('i', { class: 'tdconf ' + c, 'aria-hidden': 'true' })),
+      h('button', { class: 'tdx', 'aria-label': 'סגירה', onclick: later }, '×'),
+      h('span', { class: 'tdcal' }, h('b', null, '30'), h('small', null, 'נובמבר')),
+      h('span', { class: 'eyebrow' }, `${TRAINING.label} · נרשמים עכשיו`),
+      h('h2', { id: 'tdh' }, 'יום ההכשרה', h('br'), 'של זמן לחינוך')),
+    h('div', { class: 'tdbody' },
+      h('a', { class: 'tdimg', href: TRAINING.url, target: '_blank', rel: 'noopener', onclick: later },
+        h('img', { src: '/assets/events/ma-hakesher.jpg', alt: 'מה הקשר? יום למידה למחנכות ולמחנכים. יום שני, כ\' כסלו, 30.11, 14:30–19:30, לוד', width: '1200', height: '630' })),
+      h('p', { class: 'tdnote' }, 'ההרשמה פתוחה עכשיו, ולוקחת דקה.'),
+      h('a', { class: 'btn tdgo', href: TRAINING.url, target: '_blank', rel: 'noopener', onclick: later }, 'להרשמה ליום ההכשרה ←'),
+      h('button', { class: 'btn soft tddone', onclick: () => { lsSet(TRAINING.key + '.' + id, 'done'); close(); toast('איזה יופי. ניפגש ב-30.11!'); } }, 'כבר נרשמתי, ניפגש!'),
+      h('button', { class: 'tdlater', onclick: later }, 'להזכיר לי מחר')));
+  const ov = h('div', { class: 'tdov', onclick: (ev) => { if (ev.target === ov) later(); } }, box);
+  document.body.append(ov);
 }
 
 /* ---------- סיור קצר בדף הבית: בכניסה הראשונה, חץ שמראה מה עוד יש באפליקציה ----------
@@ -1645,7 +1678,7 @@ const TOUR = [
   ['.ehero', 'כאן, פעם בשבוע', 'לספר על השיחות האישיות שלך: כמה היו ועל מה דיברתם. כמה נגיעות, בערך שתי דקות.'],
   ['.bottomnav .bn.mid', 'המבט השבועי, מכל מסך', 'הכפתור הכחול באמצע פותח את השאלות על השבוע, בכל רגע.'],
   ['.bottomnav a[href="#/mapping"]', 'הכיתה שלי', 'מיפוי הכיתה: מי כבר קיבלו שיחה אישית ומי עוד מחכים. השמות נשארים רק במכשיר שלך.'],
-  ['.bottomnav a[href="#/tools"]', 'ארגז הכלים', 'כלים לשיחה הבאה לפי צירי ההכשרה: זהות וחוזקות, יעדים ומטרות, אייג\'נסי.'],
+  ['.bottomnav a[href="#/tools"]', 'ארגז הכלים', 'כלים לשיחה הבאה לפי צירי ההכשרה: זהות וחוזקות, מומחיות ומטרות, אייג\'נסי.'],
   ['.bottomnav a[href="#/tools/cards"]', 'קלפי שיח', 'שאלות ותמונות שעוזרות לפתוח שיחה אישית.'],
   ['.etop .avatar', 'השבועות שלי', 'כל השבועות שלך, התזכורת השבועית והחשבון.'],
 ];
